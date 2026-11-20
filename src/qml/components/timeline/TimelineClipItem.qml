@@ -47,7 +47,11 @@ Item {
                 || event.key === Qt.Key_Backspace)
                 && clipItem.selected) {
 
-            EditorState.deleteSelectedClip()
+            if (event.modifiers & Qt.ShiftModifier) {
+                EditorState.rippleDelete()
+            } else {
+                EditorState.deleteSelectedClip()
+            }
             event.accepted = true
         }
     }

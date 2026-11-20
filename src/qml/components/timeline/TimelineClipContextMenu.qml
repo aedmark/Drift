@@ -432,6 +432,11 @@ ThemedContextMenu {
         onTriggered: EditorState.deleteSelectedClip()
     }
     ThemedMenuItem {
+        text: qsTr("Ripple Delete")
+        icon.name: Theme.icons.foldHorizontal
+        onTriggered: EditorState.rippleDelete()
+    }
+    ThemedMenuItem {
         // Plain Delete leaves a graded clip's effects on the timeline, unlinked; this takes them
         // (and its masks) with it, in the same undo step.
         text: qsTr("Delete with effects")

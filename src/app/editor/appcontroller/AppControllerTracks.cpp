@@ -132,7 +132,9 @@ QHash<QString, QString> defaultShortcuts()
         {QStringLiteral("goToIn"), QStringLiteral("Shift+I")},
         {QStringLiteral("goToOut"), QStringLiteral("Shift+O")},
         {QStringLiteral("clearInOut"), QStringLiteral("Alt+X")},
-        {QStringLiteral("toggleLoop"), QStringLiteral("Ctrl+L")},
+        {QStringLiteral("toggleLoop"), QStringLiteral("Ctrl+Shift+L")},
+        {QStringLiteral("toggleAutoRipple"), QStringLiteral("Ctrl+L")},
+        {QStringLiteral("rippleDelete"), QStringLiteral("Shift+Delete")},
         // The timeline tool modes live in QML, so Main.qml intercepts these rather
         // than triggerAction dispatching them. They are registered all the same, so
         // they show up in the shortcut list and can be rebound — hardcoded in
@@ -1749,6 +1751,10 @@ void AppController::triggerAction(const QString &actionId)
         deleteSelectedClip();
     else if (actionId == QStringLiteral("deleteWithEffects"))
         deleteSelectedClipWithEffects();
+    else if (actionId == QStringLiteral("rippleDelete"))
+        rippleDelete();
+    else if (actionId == QStringLiteral("toggleAutoRipple"))
+        toggleAutoRipple();
     else if (actionId == QStringLiteral("undo"))
         undo();
     else if (actionId == QStringLiteral("redo"))

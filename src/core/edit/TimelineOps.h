@@ -308,6 +308,38 @@ QString nextSplitPieceName(const Track &track, const QString &name);
 // clips (tight or loose) ripple together as one group, so linked audio never drifts from its
 // video and nothing a ripple moves lands on a clip that stayed. Adjustment tracks are never in a
 // group: pinned adjustments follow their clip in the edit's normalisation.
+enum class RippleMode {
+    AffectedTracks = 0,
+    AffectedTracksMarkersRegions = 1,
+    AllTracksMarkersRegions = 2
+};
+
+inline QString rippleModeToString(RippleMode mode)
+{
+    switch (mode) {
+    case RippleMode::AffectedTracksMarkersRegions:
+        return QStringLiteral("affectedTracksMarkersRegions");
+    case RippleMode::AllTracksMarkersRegions:
+        return QStringLiteral("allTracksMarkersRegions");
+    case RippleMode::AffectedTracks:
+    default:
+        return QStringLiteral("affectedTracks");
+    }
+}
+
+inline RippleMode rippleModeFromString(const QString &str)
+{
+    if (str == QLatin1String("affectedTracksMarkersRegions") || str == QLatin1String("affected_markers"))
+        return RippleMode::AffectedTracksMarkersRegions;
+    if (str == QLatin1String("allTracksMarkersRegions") || str == QLatin1String("all") || str == QLatin1String("all_markers"))
+        return RippleMode::AllTracksMarkersRegions;
+    return RippleMode::AffectedTracks;
+}
+
+// Shifts bookmarks (and timeline work area) starting at or after fromUs by deltaUs.
+// If deltaUs is negative (gap closure), bookmarks within the closed gap collapse to fromUs.
+void rippleBookmarks(Project &project, TimeUs fromUs, TimeUs deltaUs);
+
 QSet<int> rippleTrackGroup(const Project &project, int trackIndex);
 
 // Moves every clip on `tracks` that starts at or after `fromUs` (and is not in `exclude`) by

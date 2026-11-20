@@ -359,6 +359,7 @@ private slots:
     void projectNotesAndMetadataRoundTrip();
     void velocityEnvelopeEditorStateActionsAndUndo();
     void splitPreviewVideoComparisonWipeActionsAndRendering();
+    void vegasAutoRippleModesAndRippleDelete();
     void customFadeCurveSessionApplyAndCancel();
     void animationCurveSessionIsSeparateFromFade();
     void clipAnimationKindsListsBuiltins();
@@ -8180,6 +8181,180 @@ void EditorStateTest::splitPreviewVideoComparisonWipeActionsAndRendering()
     QVERIFY(!bypassed.isNull());
 
     QVERIFY(!SplitPreviewImageStore::frame().isNull());
+}
+
+void EditorStateTest::vegasAutoRippleModesAndRippleDelete()
+{
+    AssetLibrary library;
+    AppController state(&library);
+
+    // 1. Property defaults, string conversions, and mode switching
+    QVERIFY(!state.rippleEnabled());
+    QCOMPARE(state.rippleMode(), drift::RippleMode::AffectedTracks);
+    QCOMPARE(state.rippleModeString(), QStringLiteral("affectedTracks"));
+    QCOMPARE(state.rippleModeIndex(), 0);
+
+    state.toggleAutoRipple();
+    QVERIFY(state.rippleEnabled());
+
+    state.setRippleMode(drift::RippleMode::AffectedTracksMarkersRegions);
+    QCOMPARE(state.rippleMode(), drift::RippleMode::AffectedTracksMarkersRegions);
+    QCOMPARE(state.rippleModeString(), QStringLiteral("affectedTracksMarkersRegions"));
+    QCOMPARE(state.rippleModeIndex(), 1);
+
+    state.setRippleMode(drift::RippleMode::AllTracksMarkersRegions);
+    QCOMPARE(state.rippleMode(), drift::RippleMode::AllTracksMarkersRegions);
+    QCOMPARE(state.rippleModeString(), QStringLiteral("allTracksMarkersRegions"));
+    QCOMPARE(state.rippleModeIndex(), 2);
+
+    state.setRippleModeString(QStringLiteral("affectedTracks"));
+    QCOMPARE(state.rippleMode(), drift::RippleMode::AffectedTracks);
+
+    // Helper to set up a clean 2-track test fixture with independent clips and bookmarks
+    const auto setupProject = [&state]() {
+        state.project()->tracks().clear();
+        state.project()->bookmarks().clear();
+
+        // Track 0
+        drift::Track t0;
+        t0.type = drift::TrackType::Video;
+        drift::Clip cA;
+        cA.id = QStringLiteral("clipA");
+        cA.timelineStart = drift::secondsToUs(0.0);
+        cA.timelineDuration = drift::secondsToUs(4.0);
+        drift::Clip cB;
+        cB.id = QStringLiteral("clipB");
+        cB.timelineStart = drift::secondsToUs(6.0);
+        cB.timelineDuration = drift::secondsToUs(4.0);
+        t0.clips = {cA, cB};
+
+        // Track 1 (unlinked)
+        drift::Track t1;
+        t1.type = drift::TrackType::Video;
+        drift::Clip cC;
+        cC.id = QStringLiteral("clipC");
+        cC.timelineStart = drift::secondsToUs(0.0);
+        cC.timelineDuration = drift::secondsToUs(2.0);
+        drift::Clip cD;
+        cD.id = QStringLiteral("clipD");
+        cD.timelineStart = drift::secondsToUs(6.0);
+        cD.timelineDuration = drift::secondsToUs(4.0);
+        t1.clips = {cC, cD};
+
+        state.project()->tracks() = {t0, t1};
+
+        // Bookmarks at 1.0s, 5.0s, 8.0s
+        state.project()->bookmarks().append({drift::secondsToUs(1.0), QStringLiteral("M1")});
+        state.project()->bookmarks().append({drift::secondsToUs(5.0), QStringLiteral("M2")});
+        state.project()->bookmarks().append({drift::secondsToUs(8.0), QStringLiteral("M3")});
+    };
+
+    // 2. Mode 1: AffectedTracks
+    setupProject();
+    state.setRippleEnabled(true);
+    state.setRippleMode(drift::RippleMode::AffectedTracks);
+
+    state.selectClip(0, 0); // Select clipA on track 0
+    state.deleteSelectedClip();
+
+    // Track 0 clipB should shift left by 4.0s (from 6.0s to 2.0s)
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 1);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).id, QStringLiteral("clipB"));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineStart, drift::secondsToUs(2.0));
+
+    // Track 1 clipD must NOT shift in AffectedTracks mode
+    QCOMPARE(state.project()->tracks().at(1).clips.size(), 2);
+    QCOMPARE(state.project()->tracks().at(1).clips.at(1).timelineStart, drift::secondsToUs(6.0));
+
+    // Bookmarks must NOT shift in AffectedTracks mode
+    QCOMPARE(state.project()->bookmarks().size(), 3);
+    QCOMPARE(state.project()->bookmarks().at(0).timeUs, drift::secondsToUs(1.0));
+    QCOMPARE(state.project()->bookmarks().at(1).timeUs, drift::secondsToUs(5.0));
+    QCOMPARE(state.project()->bookmarks().at(2).timeUs, drift::secondsToUs(8.0));
+
+    state.undo();
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 2);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(6.0));
+
+    // 3. Mode 2: AffectedTracksMarkersRegions
+    setupProject();
+    state.setRippleEnabled(true);
+    state.setRippleMode(drift::RippleMode::AffectedTracksMarkersRegions);
+
+    state.selectClip(0, 0); // Select clipA
+    state.deleteSelectedClip();
+
+    // Track 0 clipB moved to 2.0s
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineStart, drift::secondsToUs(2.0));
+    // Track 1 clipD stayed at 6.0s
+    QCOMPARE(state.project()->tracks().at(1).clips.at(1).timelineStart, drift::secondsToUs(6.0));
+
+    // Downstream bookmarks shifted by -4.0s:
+    // M1 was at 1.0s (inside the deleted range 0..4s, so collapsed to 0s)
+    // M2 was at 5.0s (after 4.0s -> 5.0 - 4.0 = 1.0s)
+    // M3 was at 8.0s (after 4.0s -> 8.0 - 4.0 = 4.0s)
+    QCOMPARE(state.project()->bookmarks().size(), 3);
+    QCOMPARE(state.project()->bookmarks().at(0).timeUs, drift::secondsToUs(0.0));
+    QCOMPARE(state.project()->bookmarks().at(1).timeUs, drift::secondsToUs(1.0));
+    QCOMPARE(state.project()->bookmarks().at(2).timeUs, drift::secondsToUs(4.0));
+
+    state.undo();
+    QCOMPARE(state.project()->bookmarks().at(1).timeUs, drift::secondsToUs(5.0));
+    QCOMPARE(state.project()->bookmarks().at(2).timeUs, drift::secondsToUs(8.0));
+
+    // 4. Mode 3: AllTracksMarkersRegions
+    setupProject();
+    state.setRippleEnabled(true);
+    state.setRippleMode(drift::RippleMode::AllTracksMarkersRegions);
+
+    state.selectClip(0, 0); // Select clipA
+    state.deleteSelectedClip();
+
+    // Track 0 clipB moved to 2.0s
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineStart, drift::secondsToUs(2.0));
+    // Track 1 clipD ALSO moved from 6.0s to 2.0s!
+    QCOMPARE(state.project()->tracks().at(1).clips.at(1).timelineStart, drift::secondsToUs(2.0));
+    // Bookmarks shifted
+    QCOMPARE(state.project()->bookmarks().at(1).timeUs, drift::secondsToUs(1.0));
+    QCOMPARE(state.project()->bookmarks().at(2).timeUs, drift::secondsToUs(4.0));
+
+    state.undo();
+    QCOMPARE(state.project()->tracks().at(1).clips.at(1).timelineStart, drift::secondsToUs(6.0));
+
+    // 5. Shift+Delete (rippleDelete) gap closure works even when rippleEnabled is false
+    setupProject();
+    state.setRippleEnabled(false);
+    state.setRippleMode(drift::RippleMode::AllTracksMarkersRegions);
+
+    state.selectClip(0, 0);
+    state.rippleDelete(); // Shift+Delete
+
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineStart, drift::secondsToUs(2.0));
+    QCOMPARE(state.project()->tracks().at(1).clips.at(1).timelineStart, drift::secondsToUs(2.0));
+    QCOMPARE(state.project()->bookmarks().at(2).timeUs, drift::secondsToUs(4.0));
+
+    // 6. Trimming in AffectedTracksMarkersRegions ripples bookmarks
+    setupProject();
+    state.setRippleEnabled(true);
+    state.setRippleMode(drift::RippleMode::AffectedTracksMarkersRegions);
+
+    // Trim clipA right edge from 4.0s to 2.0s (computed delta = -2.0s)
+    AppController::TrimComputation tc;
+    tc.ok = true;
+    tc.changed = true;
+    tc.outcome = AppController::TrimMoved;
+    tc.clip = state.project()->tracks().at(0).clips.at(0);
+    tc.clip.timelineDuration = drift::secondsToUs(2.0);
+    tc.rippleFrom = drift::secondsToUs(4.0);
+    tc.rippleDelta = drift::secondsToUs(-2.0);
+
+    state.applyTrim(0, 0, tc, 1);
+
+    // clipB moves left by 2.0s (from 6.0s to 4.0s)
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(4.0));
+    // Bookmarks at/after 4.0s shift left by 2.0s: M2 was at 5.0s -> 3.0s, M3 was at 8.0s -> 6.0s
+    QCOMPARE(state.project()->bookmarks().at(1).timeUs, drift::secondsToUs(3.0));
+    QCOMPARE(state.project()->bookmarks().at(2).timeUs, drift::secondsToUs(6.0));
 }
 
 void EditorStateTest::customFadeCurveSessionApplyAndCancel()

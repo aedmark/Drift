@@ -1784,6 +1784,8 @@ QVariantList AppController::actions() const
         action(QStringLiteral("playPause"), tr("Play/Pause")),
         action(QStringLiteral("delete"), tr("Delete selection")),
         action(QStringLiteral("deleteWithEffects"), tr("Delete selection with its effects")),
+        action(QStringLiteral("rippleDelete"), tr("Ripple delete selection")),
+        action(QStringLiteral("toggleAutoRipple"), tr("Toggle Auto-Ripple")),
         action(QStringLiteral("undo"), tr("Undo")),
         action(QStringLiteral("redo"), tr("Redo")),
         action(QStringLiteral("copy"), tr("Copy selection")),
@@ -1993,6 +1995,35 @@ void AppController::setRippleEnabled(bool enabled)
         return;
     m_rippleEnabled = enabled;
     emit rippleEnabledChanged();
+}
+
+void AppController::toggleAutoRipple()
+{
+    setRippleEnabled(!m_rippleEnabled);
+}
+
+void AppController::setRippleMode(drift::RippleMode mode)
+{
+    if (m_rippleMode == mode)
+        return;
+    m_rippleMode = mode;
+    emit rippleModeChanged();
+}
+
+void AppController::setRippleModeString(const QString &mode)
+{
+    setRippleMode(drift::rippleModeFromString(mode));
+}
+
+void AppController::setRippleModeIndex(int index)
+{
+    if (index >= 0 && index <= 2)
+        setRippleMode(static_cast<drift::RippleMode>(index));
+}
+
+void AppController::setRippleMode(const QString &mode)
+{
+    setRippleModeString(mode);
 }
 
 void AppController::setAllowClipOverlap(bool enabled)

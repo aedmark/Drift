@@ -1923,6 +1923,7 @@ void ProjectFileController::newProject(bool silent)
     // that was just discarded. Same defaults applyProjectJson falls back to.
     m_app->m_snapEnabled = true;
     m_app->m_rippleEnabled = false;
+    m_app->m_rippleMode = drift::RippleMode::AffectedTracks;
     m_app->m_allowClipOverlap = false;
     m_app->setLoopWorkAreaEnabled(false);
     m_app->setMediaGridMode(true);
@@ -1936,6 +1937,7 @@ void ProjectFileController::newProject(bool silent)
     emit m_app->projectLayoutChosenChanged();
     emit m_app->snapEnabledChanged();
     emit m_app->rippleEnabledChanged();
+    emit m_app->rippleModeChanged();
     emit m_app->allowClipOverlapChanged();
     m_app->notifyTracksChanged();
     emit m_app->sequenceTabsChanged();

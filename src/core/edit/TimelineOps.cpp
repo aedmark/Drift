@@ -1424,6 +1424,58 @@ QString nextSplitPieceName(const Track &track, const QString &name)
     return QStringLiteral("%1 (%2)").arg(base).arg(next);
 }
 
+void rippleBookmarks(Project &project, TimeUs fromUs, TimeUs deltaUs)
+{
+    if (deltaUs == 0)
+        return;
+
+    bool changed = false;
+    for (Bookmark &bm : project.bookmarks()) {
+        if (deltaUs < 0) {
+            const TimeUs gapLength = -deltaUs;
+            if (bm.timeUs >= fromUs + gapLength) {
+                bm.timeUs = qMax<TimeUs>(0, bm.timeUs + deltaUs);
+                changed = true;
+            } else if (bm.timeUs >= fromUs) {
+                bm.timeUs = fromUs;
+                changed = true;
+            }
+        } else {
+            if (bm.timeUs >= fromUs) {
+                bm.timeUs += deltaUs;
+                changed = true;
+            }
+        }
+    }
+
+    if (project.hasWorkArea()) {
+        if (deltaUs < 0) {
+            const TimeUs gapLength = -deltaUs;
+            if (project.workAreaInUs() >= fromUs + gapLength)
+                project.setWorkAreaInUs(project.workAreaInUs() + deltaUs);
+            else if (project.workAreaInUs() >= fromUs)
+                project.setWorkAreaInUs(fromUs);
+
+            if (project.workAreaOutUs() >= fromUs + gapLength)
+                project.setWorkAreaOutUs(project.workAreaOutUs() + deltaUs);
+            else if (project.workAreaOutUs() >= fromUs)
+                project.setWorkAreaOutUs(fromUs);
+        } else {
+            if (project.workAreaInUs() >= fromUs)
+                project.setWorkAreaInUs(project.workAreaInUs() + deltaUs);
+            if (project.workAreaOutUs() >= fromUs)
+                project.setWorkAreaOutUs(project.workAreaOutUs() + deltaUs);
+        }
+    }
+
+    if (changed) {
+        std::sort(project.bookmarks().begin(), project.bookmarks().end(),
+                  [](const Bookmark &a, const Bookmark &b) {
+                      return a.timeUs < b.timeUs;
+                  });
+    }
+}
+
 QSet<int> rippleTrackGroup(const Project &project, int trackIndex)
 {
     const QList<Track> &tracks = project.tracks();

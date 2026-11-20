@@ -240,11 +240,76 @@ Item {
             active: EditorState.snapEnabled
             onClicked: EditorState.snapEnabled = !EditorState.snapEnabled
         }
-        TimelineToolbarToolButton {
-            glyph: Theme.icons.foldHorizontal
-            tooltip: qsTr("Ripple editing: keep following clips together when trimming")
-            active: EditorState.rippleEnabled
-            onClicked: EditorState.rippleEnabled = !EditorState.rippleEnabled
+        Row {
+            spacing: 0
+
+            TimelineToolbarToolButton {
+                glyph: Theme.icons.foldHorizontal
+                tooltip: {
+                    const modeText = !EditorState.rippleEnabled ? qsTr("Off") :
+                        EditorState.rippleMode === "allTracksMarkersRegions" ? qsTr("All Tracks, Markers, and Regions") :
+                        EditorState.rippleMode === "affectedTracksMarkersRegions" ? qsTr("Affected Tracks, Markers, and Regions") :
+                        qsTr("Affected Tracks");
+                    return toolbar.withShortcut(qsTr("Auto-Ripple: %1").arg(modeText), "toggleAutoRipple");
+                }
+                active: EditorState.rippleEnabled
+                onClicked: EditorState.toggleAutoRipple()
+            }
+
+            IconButton {
+                id: rippleChevron
+                anchors.verticalCenter: parent.verticalCenter
+                glyph: Theme.icons.chevronDown
+                variant: "text"
+                tooltip: qsTr("Auto-Ripple mode options")
+                buttonSize: Theme.iconButtonSize * 0.6
+                iconSize: Theme.iconSizeBase * 0.75
+                active: rippleContextMenu.visible
+                onClicked: rippleContextMenu.popup(rippleChevron, 0, rippleChevron.height + Theme.spacingMd)
+            }
+
+            ThemedContextMenu {
+                id: rippleContextMenu
+
+                ThemedMenuItem {
+                    text: EditorState.rippleEnabled ? qsTr("Disable Auto-Ripple") : qsTr("Enable Auto-Ripple (Ctrl+L)")
+                    onTriggered: EditorState.toggleAutoRipple()
+                }
+
+                ThemedMenuSeparator {}
+
+                ThemedMenuItem {
+                    text: qsTr("Affected Tracks") + (EditorState.rippleMode === "affectedTracks" ? "  ✓" : "")
+                    onTriggered: {
+                        EditorState.setRippleMode("affectedTracks")
+                        if (!EditorState.rippleEnabled) EditorState.rippleEnabled = true
+                    }
+                }
+
+                ThemedMenuItem {
+                    text: qsTr("Affected Tracks, Markers, and Regions") + (EditorState.rippleMode === "affectedTracksMarkersRegions" ? "  ✓" : "")
+                    onTriggered: {
+                        EditorState.setRippleMode("affectedTracksMarkersRegions")
+                        if (!EditorState.rippleEnabled) EditorState.rippleEnabled = true
+                    }
+                }
+
+                ThemedMenuItem {
+                    text: qsTr("All Tracks, Markers, and Regions") + (EditorState.rippleMode === "allTracksMarkersRegions" ? "  ✓" : "")
+                    onTriggered: {
+                        EditorState.setRippleMode("allTracksMarkersRegions")
+                        if (!EditorState.rippleEnabled) EditorState.rippleEnabled = true
+                    }
+                }
+
+                ThemedMenuSeparator {}
+
+                ThemedMenuItem {
+                    text: qsTr("Ripple Delete (Shift+Del)")
+                    icon.name: Theme.icons.foldHorizontal
+                    onTriggered: EditorState.rippleDelete()
+                }
+            }
         }
 
         TimelineToolbarZoomControl {

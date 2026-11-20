@@ -884,8 +884,46 @@ void AppController::applyRippleShift(drift::Track &track, int fromClipIndex, dri
     if (!m_rippleEnabled || delta == 0)
         return;
 
-    for (int i = fromClipIndex + 1; i < track.clips.size(); ++i)
-        track.clips[i].timelineStart = qMax<drift::TimeUs>(0, track.clips[i].timelineStart + delta);
+    int trackIndex = -1;
+    for (int t = 0; t < m_project.tracks().size(); ++t) {
+        if (&m_project.tracks().at(t) == &track) {
+            trackIndex = t;
+            break;
+        }
+    }
+    if (trackIndex < 0 || fromClipIndex < 0 || fromClipIndex >= track.clips.size())
+        return;
+
+    const drift::Clip &fromClip = track.clips.at(fromClipIndex);
+    const drift::TimeUs fromUs = fromClip.timelineEnd();
+
+    QSet<int> tracks;
+    if (m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+        for (int t = 0; t < m_project.tracks().size(); ++t) {
+            if (!m_project.tracks().at(t).isAdjustment() && !m_project.tracks().at(t).locked)
+                tracks.insert(t);
+        }
+    } else {
+        tracks.insert(trackIndex);
+        for (const drift::ClipRef &ref : drift::linkedPartners(m_project, fromClip))
+            tracks.insert(ref.trackIndex);
+    }
+    QSet<QString> exclude{fromClip.id};
+    for (const drift::ClipRef &ref : drift::linkedPartners(m_project, fromClip)) {
+        if (ref.trackIndex >= 0 && ref.trackIndex < m_project.tracks().size()
+            && ref.clipIndex >= 0 && ref.clipIndex < m_project.tracks().at(ref.trackIndex).clips.size()) {
+            exclude.insert(m_project.tracks().at(ref.trackIndex).clips.at(ref.clipIndex).id);
+        }
+    }
+
+    rippleTracksFrom(m_project, tracks, fromUs, delta, exclude);
+
+    if (m_rippleMode == drift::RippleMode::AffectedTracksMarkersRegions
+        || m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+        const drift::TimeUs bmFrom = delta < 0 ? fromUs + delta : fromUs;
+        drift::rippleBookmarks(m_project, bmFrom, delta);
+        emit bookmarksChanged();
+    }
 }
 
 bool AppController::compositeAssetPlaceable(const QVariantMap &asset) const
@@ -1644,6 +1682,19 @@ void AppController::deleteSelectedClipWithEffects()
     deleteSelection(/*withPinnedAdjustments=*/true);
 }
 
+void AppController::rippleDelete()
+{
+    // If a selection exists, delete it with ripple closure (Shift+Delete)
+    if (!m_selection.isEmpty() || (m_selectedTrack >= 0 && m_selectedClip >= 0)) {
+        deleteSelection(/*withPinnedAdjustments=*/true, /*ripple=*/true);
+        return;
+    }
+    // If no clip is selected but playhead is over a gap on selected track, close the gap
+    if (m_selectedTrack >= 0 && m_selectedTrack < m_project.tracks().size()) {
+        closeGap(m_selectedTrack, playheadSeconds());
+    }
+}
+
 bool AppController::selectionHasPinnedAdjustments() const
 {
     QList<QPair<int, int>> pairs = m_selection;
@@ -1748,7 +1799,7 @@ bool AppController::deleteSelection(bool withPinnedAdjustments, std::optional<bo
             removedRanges.append({pair.first, clip.timelineStart, clip.timelineDuration});
         m_project.tracks()[pair.first].clips.removeAt(pair.second);
     }
-    if (ripple.has_value()) {
+    if (ripple.has_value() && error) {
         // Agent ops: linked tracks close together, each merged range once; refused (and undone)
         // rather than overlap a clip in the way or move a locked track.
         // Groups and locks come from before the delete: a link held only by a deleted clip still
@@ -1783,7 +1834,7 @@ bool AppController::deleteSelection(bool withPinnedAdjustments, std::optional<bo
                 *error = problem;
             return false;
         }
-    } else if (m_rippleEnabled) {
+    } else if (ripple.value_or(m_rippleEnabled)) {
         // The same ripple core as the agent ops: tracks joined by linked clips close together, each
         // merged range once, so a linked pair's followers move once and nothing lands on a clip that
         // stayed. Groups come from before the delete (a link held only by a deleted clip still
@@ -1807,7 +1858,9 @@ bool AppController::deleteSelection(bool withPinnedAdjustments, std::optional<bo
             }
             groupRanges[g].append(qMakePair(range.start, range.start + range.duration));
         }
+        QSet<int> touchedTracks;
         for (int g = 0; g < groups.size(); ++g) {
+            touchedTracks.unite(groups.at(g));
             // Merge, then trim each range's edges to what no clip left on the group's tracks still
             // covers: a crossfade (an overlap) or an L-cut keeps its part, and only the rest closes,
             // so the next clip lands against it instead of blocking the close. A clip inside what
@@ -1848,14 +1901,40 @@ bool AppController::deleteSelection(bool withPinnedAdjustments, std::optional<bo
             if (locked) {
                 if (gapWarning.isEmpty())
                     gapWarning = tr("The gap stays open: a linked track is locked");
-            } else if (!drift::closeRippleRanges(m_project, ranges, &blocker, nullptr, &before) && gapWarning.isEmpty()) {
-                int t = -1;
-                int c = -1;
-                const QString name = findClipById(m_project, blocker, &t, &c)
-                                         ? m_project.tracks().at(t).clips.at(c).name
-                                         : QString();
-                gapWarning = name.isEmpty() ? tr("The gap stays open: a clip is in the way of closing it")
-                                            : tr("The gap stays open: \"%1\" is in the way of closing it").arg(name);
+            } else if (!drift::closeRippleRanges(m_project, ranges, &blocker, nullptr, &before)) {
+                if (gapWarning.isEmpty()) {
+                    int t = -1;
+                    int c = -1;
+                    const QString name = findClipById(m_project, blocker, &t, &c)
+                                             ? m_project.tracks().at(t).clips.at(c).name
+                                             : QString();
+                    gapWarning = name.isEmpty() ? tr("The gap stays open: a clip is in the way of closing it")
+                                                : tr("The gap stays open: \"%1\" is in the way of closing it").arg(name);
+                }
+            } else {
+                for (int i = int(ranges.size()) - 1; i >= 0; --i) {
+                    const drift::TimeUs rStart = ranges.at(i).start;
+                    const drift::TimeUs rEnd = ranges.at(i).end;
+                    const drift::TimeUs rDelta = -(rEnd - rStart);
+
+                    if (m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+                        for (int ot = 0; ot < m_project.tracks().size(); ++ot) {
+                            if (!touchedTracks.contains(ot) && !m_project.tracks().at(ot).locked
+                                && !m_project.tracks().at(ot).isAdjustment()) {
+                                rippleTracksFrom(m_project, {ot}, rEnd, rDelta, {});
+                            }
+                        }
+                    }
+
+                    if (m_rippleMode == drift::RippleMode::AffectedTracksMarkersRegions
+                        || m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+                        drift::rippleBookmarks(m_project, rStart, rDelta);
+                    }
+                }
+                if (m_rippleMode == drift::RippleMode::AffectedTracksMarkersRegions
+                    || m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+                    emit bookmarksChanged();
+                }
             }
         }
         // Latest first, so each range is closed while the clips before it are still in place.
@@ -1899,7 +1978,7 @@ bool AppController::deleteSelection(bool withPinnedAdjustments, std::optional<bo
     finishEdit(tr("Clip deleted"));
     // #521: a ripple delete under the playhead lands it where the closed gap began, on the clip
     // that slid in, instead of partway into it. Agent ops leave the playhead alone.
-    if (!ripple.has_value() && m_rippleEnabled && gapWarning.isEmpty() && !refusedByLock) {
+    if (ripple.value_or(m_rippleEnabled) && gapWarning.isEmpty() && !refusedByLock) {
         std::optional<drift::TimeUs> landing;
         for (const RemovedRange &range : std::as_const(removedRanges)) {
             if (m_playheadUs >= range.start && m_playheadUs < range.start + range.duration)
@@ -2078,16 +2157,35 @@ void AppController::closeGap(int trackIndex, double gapStartSeconds)
         return;
 
     QSet<QString> movedIds;
-    for (drift::Clip &clip : track.clips) {
-        if (clip.timelineStart < gapStartUs)
-            continue;
-        clip.timelineStart -= gapLength;
-        movedIds.insert(clip.id);
+    if (m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+        for (int t = 0; t < m_project.tracks().size(); ++t) {
+            if (m_project.tracks().at(t).locked || m_project.tracks().at(t).isAdjustment())
+                continue;
+            for (drift::Clip &clip : m_project.tracks()[t].clips) {
+                if (clip.timelineStart < gapStartUs)
+                    continue;
+                clip.timelineStart = qMax<drift::TimeUs>(0, clip.timelineStart - gapLength);
+                movedIds.insert(clip.id);
+            }
+        }
+    } else {
+        for (drift::Clip &clip : track.clips) {
+            if (clip.timelineStart < gapStartUs)
+                continue;
+            clip.timelineStart -= gapLength;
+            movedIds.insert(clip.id);
+        }
+        for (const drift::Clip &clip : track.clips) {
+            if (!movedIds.contains(clip.id))
+                continue;
+            syncLinkedPartnersFrom(m_project, clip, movedIds);
+        }
     }
-    for (const drift::Clip &clip : track.clips) {
-        if (!movedIds.contains(clip.id))
-            continue;
-        syncLinkedPartnersFrom(m_project, clip, movedIds);
+
+    if (m_rippleMode == drift::RippleMode::AffectedTracksMarkersRegions
+        || m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+        drift::rippleBookmarks(m_project, gapStartUs, -gapLength);
+        emit bookmarksChanged();
     }
 
     pushProjectEdit(before, tr("Close gap"));
@@ -2764,15 +2862,23 @@ AppController::TrimComputation AppController::computeTrimRight(int trackIndex, i
 // The clips a trim's ripple would move, for the live preview. Mirrors what applyTrim hands to
 // rippleTracksFrom: followers on the clip's and its partners' tracks, plus their own partners.
 static QStringList rippleFollowerIds(const drift::Project &project, int trackIndex, int clipIndex,
-                                     drift::TimeUs fromUs)
+                                     drift::TimeUs fromUs, drift::RippleMode mode)
 {
     const drift::Clip &clip = project.tracks().at(trackIndex).clips.at(clipIndex);
-    QSet<int> tracks{trackIndex};
-    QSet<QString> exclude{clip.id};
-    for (const drift::ClipRef &ref : drift::linkedPartners(project, clip)) {
-        tracks.insert(ref.trackIndex);
-        exclude.insert(project.tracks().at(ref.trackIndex).clips.at(ref.clipIndex).id);
+    QSet<int> tracks;
+    if (mode == drift::RippleMode::AllTracksMarkersRegions) {
+        for (int t = 0; t < project.tracks().size(); ++t) {
+            if (!project.tracks().at(t).isAdjustment() && !project.tracks().at(t).locked)
+                tracks.insert(t);
+        }
+    } else {
+        tracks.insert(trackIndex);
+        for (const drift::ClipRef &ref : drift::linkedPartners(project, clip))
+            tracks.insert(ref.trackIndex);
     }
+    QSet<QString> exclude{clip.id};
+    for (const drift::ClipRef &ref : drift::linkedPartners(project, clip))
+        exclude.insert(project.tracks().at(ref.trackIndex).clips.at(ref.clipIndex).id);
     QSet<QString> moved;
     for (const int t : std::as_const(tracks)) {
         for (const drift::Clip &follower : project.tracks().at(t).clips) {
@@ -2793,7 +2899,7 @@ QVariantMap AppController::trimPreviewToMap(int trackIndex, int clipIndex,
     if (!c.ok)
         return QVariantMap{{QStringLiteral("ok"), false}};
     const QStringList rippleIds = c.changed && c.rippleDelta != 0
-                                      ? rippleFollowerIds(m_project, trackIndex, clipIndex, c.rippleFrom)
+                                      ? rippleFollowerIds(m_project, trackIndex, clipIndex, c.rippleFrom, m_rippleMode)
                                       : QStringList();
     return QVariantMap{
         {QStringLiteral("rippleIds"), rippleIds},
@@ -3220,18 +3326,34 @@ int AppController::applyTrim(int trackIndex, int clipIndex, const TrimComputatio
     if (!clip.linkId.isEmpty())
         syncLinkedPartnersFrom(m_project, clip);
     if (computed.rippleDelta != 0) {
-        QSet<int> tracks{trackIndex};
-        QSet<QString> ids{clip.id};
-        for (const drift::ClipRef &ref : drift::linkedPartners(m_project, clip)) {
-            tracks.insert(ref.trackIndex);
-            ids.insert(m_project.tracks().at(ref.trackIndex).clips.at(ref.clipIndex).id);
+        QSet<int> tracks;
+        if (m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+            for (int t = 0; t < m_project.tracks().size(); ++t) {
+                if (!m_project.tracks().at(t).isAdjustment() && !m_project.tracks().at(t).locked)
+                    tracks.insert(t);
+            }
+        } else {
+            tracks.insert(trackIndex);
+            for (const drift::ClipRef &ref : drift::linkedPartners(m_project, clip))
+                tracks.insert(ref.trackIndex);
+            if (clip.linkLoose)
+                tracks = {trackIndex};
         }
-        if (clip.linkLoose)
-            tracks = {trackIndex};
+        QSet<QString> ids{clip.id};
+        for (const drift::ClipRef &ref : drift::linkedPartners(m_project, clip))
+            ids.insert(m_project.tracks().at(ref.trackIndex).clips.at(ref.clipIndex).id);
         rippleTracksFrom(m_project, tracks, computed.rippleFrom, computed.rippleDelta, ids);
         for (const int t : std::as_const(tracks)) {
             if (t != trackIndex)
                 syncOverlapTransitionsOnTrack(m_project.tracks()[t]);
+        }
+        if (m_rippleMode == drift::RippleMode::AffectedTracksMarkersRegions
+            || m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+            const drift::TimeUs bmFrom = computed.rippleDelta < 0
+                                             ? computed.rippleFrom + computed.rippleDelta
+                                             : computed.rippleFrom;
+            drift::rippleBookmarks(m_project, bmFrom, computed.rippleDelta);
+            emit bookmarksChanged();
         }
     }
     // Each loose partner ripples its own track from its own end, which need not be this clip's.
@@ -3239,8 +3361,17 @@ int AppController::applyTrim(int trackIndex, int clipIndex, const TrimComputatio
         QSet<QString> ids{clip.id};
         for (const drift::ClipRef &ref : drift::linkedPartners(m_project, clip))
             ids.insert(m_project.tracks().at(ref.trackIndex).clips.at(ref.clipIndex).id);
-        if (p.second.rippleDelta != 0)
+        if (p.second.rippleDelta != 0) {
             rippleTracksFrom(m_project, {p.first}, p.second.rippleFrom, p.second.rippleDelta, ids);
+            if (m_rippleMode == drift::RippleMode::AffectedTracksMarkersRegions
+                || m_rippleMode == drift::RippleMode::AllTracksMarkersRegions) {
+                const drift::TimeUs bmFrom = p.second.rippleDelta < 0
+                                                 ? p.second.rippleFrom + p.second.rippleDelta
+                                                 : p.second.rippleFrom;
+                drift::rippleBookmarks(m_project, bmFrom, p.second.rippleDelta);
+                emit bookmarksChanged();
+            }
+        }
         if (p.first != trackIndex)
             syncOverlapTransitionsOnTrack(m_project.tracks()[p.first]);
     }

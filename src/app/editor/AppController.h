@@ -242,6 +242,8 @@ class AppController : public QObject
     Q_PROPERTY(bool previewDragActive READ previewDragActive NOTIFY previewDragActiveChanged)
     Q_PROPERTY(bool snapEnabled READ snapEnabled WRITE setSnapEnabled NOTIFY snapEnabledChanged)
     Q_PROPERTY(bool rippleEnabled READ rippleEnabled WRITE setRippleEnabled NOTIFY rippleEnabledChanged)
+    Q_PROPERTY(QString rippleMode READ rippleModeString WRITE setRippleModeString NOTIFY rippleModeChanged)
+    Q_PROPERTY(int rippleModeIndex READ rippleModeIndex WRITE setRippleModeIndex NOTIFY rippleModeChanged)
     Q_PROPERTY(bool allowClipOverlap READ allowClipOverlap WRITE setAllowClipOverlap NOTIFY allowClipOverlapChanged)
   // Per-project UI prefs (serialized with the .drift file, not global QSettings).
     Q_PROPERTY(bool mediaGridMode READ mediaGridMode WRITE setMediaGridMode NOTIFY mediaGridModeChanged)
@@ -473,6 +475,12 @@ public:
     bool previewDragActive() const { return m_previewDragActive; }
     bool snapEnabled() const { return m_snapEnabled; }
     bool rippleEnabled() const { return m_rippleEnabled; }
+    drift::RippleMode rippleMode() const { return m_rippleMode; }
+    QString rippleModeString() const { return drift::rippleModeToString(m_rippleMode); }
+    int rippleModeIndex() const { return static_cast<int>(m_rippleMode); }
+    void setRippleMode(drift::RippleMode mode);
+    void setRippleModeString(const QString &mode);
+    void setRippleModeIndex(int index);
     bool allowClipOverlap() const { return m_allowClipOverlap; }
     bool projectPortrait() const { return m_project.height() > m_project.width(); }
     bool mediaGridMode() const { return m_mediaViewMode == QLatin1String("grid"); }
@@ -897,6 +905,11 @@ public:
     // Same, and also removes the adjustments pinned to the deleted clips (their effect stacks and
     // masks) in the same undo step, instead of leaving them unlinked on the timeline.
     Q_INVOKABLE void deleteSelectedClipWithEffects();
+    // VEGAS Pro parity: deletes the selection and closes the resulting gap, rippling downstream
+    // clips, markers, and regions according to the active Auto-Ripple mode (Ctrl+L / Shift+Del).
+    Q_INVOKABLE void rippleDelete();
+    Q_INVOKABLE void toggleAutoRipple();
+    Q_INVOKABLE void setRippleMode(const QString &mode);
     // Whether deleteSelectedClipWithEffects would remove anything beyond plain Delete: an effect
     // stack or mask pinned to a selected clip or one of its linked A/V partners.
     Q_INVOKABLE bool selectionHasPinnedAdjustments() const;
@@ -1973,6 +1986,7 @@ signals:
     void currentMicrophoneChanged();
     void snapEnabledChanged();
     void rippleEnabledChanged();
+    void rippleModeChanged();
     void allowClipOverlapChanged();
     void mediaGridModeChanged();
     void mediaViewModeChanged();
@@ -2517,6 +2531,7 @@ protected:
     bool m_scrubbing = false;
     bool m_snapEnabled = true;
     bool m_rippleEnabled = false;
+    drift::RippleMode m_rippleMode = drift::RippleMode::AffectedTracks;
     drift::TimeUs m_snapThresholdUs = drift::kSnapThresholdUs;
     bool m_allowClipOverlap = false;
     bool m_loopWorkAreaEnabled = false;

@@ -68,6 +68,7 @@ QJsonObject AppController::sessionJson() const
     root.insert(QStringLiteral("playheadUs"), static_cast<double>(m_playheadUs));
     root.insert(QStringLiteral("snapEnabled"), m_snapEnabled);
     root.insert(QStringLiteral("rippleEnabled"), m_rippleEnabled);
+    root.insert(QStringLiteral("rippleMode"), drift::rippleModeToString(m_rippleMode));
     root.insert(QStringLiteral("allowClipOverlap"), m_allowClipOverlap);
     root.insert(QStringLiteral("mediaViewMode"), m_mediaViewMode);
     // Still written so a project saved here opens with the right view in builds that
@@ -252,6 +253,7 @@ void AppController::applyParsedProject(ParsedProject parsed)
     setPlaying(false);
     m_snapEnabled = root.value(QStringLiteral("snapEnabled")).toBool(true);
     m_rippleEnabled = root.value(QStringLiteral("rippleEnabled")).toBool(false);
+    m_rippleMode = drift::rippleModeFromString(root.value(QStringLiteral("rippleMode")).toString());
     m_allowClipOverlap = root.value(QStringLiteral("allowClipOverlap")).toBool(false);
 
     if (root.contains(QStringLiteral("mediaViewMode"))) {
@@ -339,6 +341,7 @@ void AppController::applyParsedProject(ParsedProject parsed)
     m_projectFile->sweepBrushMattes();
     emit snapEnabledChanged();
     emit rippleEnabledChanged();
+    emit rippleModeChanged();
     emit allowClipOverlapChanged();
     notifyTracksChanged();
     emit sequenceTabsChanged();
