@@ -246,6 +246,7 @@ qt_add_executable(tst_mcp
     ../src/app/mcp/transport/McpHttp.cpp
     ../src/ui/imageproviders/segment/SegmentImageStore.cpp
     ../src/playback/preview/ClipPreviewImageStore.cpp
+    ../src/playback/preview/SplitPreviewImageStore.cpp
     ../src/ui/imageproviders/multicam/MulticamImageStore.cpp
     ../src/app/editor/AppController.cpp
     ../src/app/editor/appcontroller/AppControllerClipModel.cpp

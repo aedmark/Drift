@@ -148,6 +148,12 @@ Item {
         }
 
         // Above anything a mode view adds to the canvas, such as the guides.
+        PreviewSplitWipe {
+            anchors.fill: parent
+            visible: EditorState.preview.splitPreviewEnabled && !viewport.mode3d
+            z: 0.5
+        }
+
         PreviewStatusLayer {
             anchors.fill: parent
             z: 1

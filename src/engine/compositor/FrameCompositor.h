@@ -56,6 +56,10 @@ public:
         bool useBakes = true;
         // The frame is for a file (export, bake): procedural scripts get the longer wall-clock limit.
         bool exporting = false;
+        // A/B preview comparison: bypass all video effects and adjustment layers across the project.
+        bool bypassEffects = false;
+        // A/B preview comparison: isolate and render only this track index (-1 for all tracks).
+        int isolateTrackIndex = -1;
         // The preview's 3D mode: the scene seen from the editor's free viewpoint, with the camera
         // and the stage drawn as guides. Only the preview sets it; export never does.
         struct EditorView

@@ -18,9 +18,13 @@
 #include "engine/render3d/models/ModelClipTransform.h"
 #include "engine/compositor/PreviewSnap.h"
 #include "engine/compositor/layers/TransformLayer.h"
+#include "engine/compositor/FrameCompositor.h"
+#include "playback/preview/SplitPreviewImageStore.h"
 #include "app/editor/AppController.h"
 #include "app/editor/AppControllerDetail.h"
 
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QLineF>
 #include <QPolygonF>
 #include <QSettings>
@@ -204,6 +208,32 @@ PreviewController::PreviewController(AppController &app, QObject *parent)
     connect(&m_app, &AppController::playheadSecondsChanged, this, &PreviewController::refreshOutliner);
     connect(&m_app, &AppController::selectionChanged, this, &PreviewController::refreshOutliner);
     refreshOutliner();
+
+    if (QClipboard *clipboard = QGuiApplication::clipboard()) {
+        m_hasClipboardImage = !clipboard->image().isNull();
+        connect(clipboard, &QClipboard::dataChanged, this, [this] {
+            const bool hasImg = !QGuiApplication::clipboard()->image().isNull();
+            if (m_hasClipboardImage != hasImg) {
+                m_hasClipboardImage = hasImg;
+                emit clipboardImageChanged();
+            }
+            if (m_splitPreviewEnabled && m_splitPreviewSource == QStringLiteral("clipboard")) {
+                updateComparisonFrame();
+            }
+        });
+    }
+
+    connect(&m_app, &AppController::playheadSecondsChanged, this, [this] {
+        if (m_splitPreviewEnabled && (m_splitPreviewSource == QStringLiteral("fxBypass") || m_splitPreviewSource == QStringLiteral("track"))) {
+            updateComparisonFrame();
+        }
+    });
+
+    connect(&m_app, &AppController::tracksChanged, this, [this] {
+        if (m_splitPreviewEnabled && (m_splitPreviewSource == QStringLiteral("fxBypass") || m_splitPreviewSource == QStringLiteral("track"))) {
+            updateComparisonFrame();
+        }
+    });
 }
 
 PreviewController::~PreviewController() = default;
@@ -2453,6 +2483,169 @@ bool PreviewController::resetSceneCamera(int trackIndex, int clipIndex)
     m_app.pushProjectEdit(before, AppController::tr("Reset camera"));
     m_app.finishEdit(AppController::tr("Camera reset"));
     return true;
+}
+
+void PreviewController::setSplitPreviewEnabled(bool enabled)
+{
+    if (m_splitPreviewEnabled == enabled)
+        return;
+    m_splitPreviewEnabled = enabled;
+    emit splitPreviewChanged();
+    if (m_splitPreviewEnabled)
+        updateComparisonFrame();
+}
+
+void PreviewController::setSplitPreviewMode(const QString &mode)
+{
+    if (m_splitPreviewMode == mode)
+        return;
+    m_splitPreviewMode = mode;
+    emit splitPreviewChanged();
+}
+
+void PreviewController::setSplitPreviewSource(const QString &source)
+{
+    if (m_splitPreviewSource == source)
+        return;
+    m_splitPreviewSource = source;
+    emit splitPreviewChanged();
+    if (m_splitPreviewEnabled)
+        updateComparisonFrame();
+}
+
+void PreviewController::setSplitDividerPosition(double pos)
+{
+    pos = std::clamp(pos, 0.0, 1.0);
+    if (qFuzzyCompare(m_splitDividerPosition, pos))
+        return;
+    m_splitDividerPosition = pos;
+    emit splitPreviewChanged();
+}
+
+void PreviewController::setSplitInverted(bool inverted)
+{
+    if (m_splitInverted == inverted)
+        return;
+    m_splitInverted = inverted;
+    emit splitPreviewChanged();
+}
+
+void PreviewController::setSplitTrackIndex(int trackIndex)
+{
+    trackIndex = std::max(0, trackIndex);
+    if (m_splitTrackIndex == trackIndex)
+        return;
+    m_splitTrackIndex = trackIndex;
+    emit splitPreviewChanged();
+    if (m_splitPreviewEnabled && m_splitPreviewSource == QStringLiteral("track"))
+        updateComparisonFrame();
+}
+
+QImage PreviewController::captureCurrentPreviewFrame() const
+{
+    FrameCompositor compositor;
+    compositor.setProject(&m_app.m_project);
+    FrameCompositor::RenderOptions options;
+    options.previewScale = 1.0;
+    return compositor.compositeAt(m_app.m_playheadUs, options);
+}
+
+bool PreviewController::captureSnapshotToClipboard()
+{
+    QImage frame = captureCurrentPreviewFrame();
+    if (frame.isNull())
+        return false;
+    QClipboard *clipboard = QGuiApplication::clipboard();
+    if (!clipboard)
+        return false;
+    clipboard->setImage(frame);
+    m_hasClipboardImage = true;
+    emit clipboardImageChanged();
+    if (m_splitPreviewEnabled && m_splitPreviewSource == QStringLiteral("clipboard"))
+        updateComparisonFrame();
+    return true;
+}
+
+bool PreviewController::captureReferenceFrame()
+{
+    QImage frame = captureCurrentPreviewFrame();
+    if (frame.isNull())
+        return false;
+    m_referenceImage = frame;
+    m_hasReferenceFrame = true;
+    emit referenceFrameChanged();
+    if (m_splitPreviewEnabled && m_splitPreviewSource == QStringLiteral("reference"))
+        updateComparisonFrame();
+    return true;
+}
+
+bool PreviewController::loadReferenceImage(const QString &filePath)
+{
+    QImage img(filePath);
+    if (img.isNull())
+        return false;
+    m_referenceImage = img;
+    m_hasReferenceFrame = true;
+    emit referenceFrameChanged();
+    if (m_splitPreviewEnabled && m_splitPreviewSource == QStringLiteral("reference"))
+        updateComparisonFrame();
+    return true;
+}
+
+bool PreviewController::saveSnapshotToFile(const QString &filePath)
+{
+    if (filePath.isEmpty())
+        return false;
+    QImage frame = captureCurrentPreviewFrame();
+    if (frame.isNull())
+        return false;
+    return frame.save(filePath);
+}
+
+void PreviewController::clearReferenceFrame()
+{
+    m_referenceImage = QImage();
+    m_hasReferenceFrame = false;
+    emit referenceFrameChanged();
+    if (m_splitPreviewEnabled && m_splitPreviewSource == QStringLiteral("reference"))
+        updateComparisonFrame();
+}
+
+QImage PreviewController::currentComparisonImage() const
+{
+    if (m_splitPreviewSource == QStringLiteral("clipboard")) {
+        if (QClipboard *clipboard = QGuiApplication::clipboard())
+            return clipboard->image();
+        return {};
+    }
+    if (m_splitPreviewSource == QStringLiteral("reference")) {
+        return m_referenceImage;
+    }
+    if (m_splitPreviewSource == QStringLiteral("fxBypass")) {
+        FrameCompositor compositor;
+        compositor.setProject(&m_app.m_project);
+        FrameCompositor::RenderOptions options;
+        options.bypassEffects = true;
+        options.previewScale = 1.0;
+        return compositor.compositeAt(m_app.m_playheadUs, options);
+    }
+    if (m_splitPreviewSource == QStringLiteral("track")) {
+        FrameCompositor compositor;
+        compositor.setProject(&m_app.m_project);
+        FrameCompositor::RenderOptions options;
+        options.isolateTrackIndex = m_splitTrackIndex;
+        options.previewScale = 1.0;
+        return compositor.compositeAt(m_app.m_playheadUs, options);
+    }
+    return {};
+}
+
+void PreviewController::updateComparisonFrame()
+{
+    QImage comp = currentComparisonImage();
+    SplitPreviewImageStore::setFrame(comp);
+    ++m_splitRevision;
+    emit splitRevisionChanged();
 }
 
 #include "moc_PreviewController.cpp"

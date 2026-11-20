@@ -1140,6 +1140,8 @@ qt_add_executable(drift
     src/ui/imageproviders/segment/SegmentImageProvider.cpp
     src/ui/imageproviders/clippreview/ClipPreviewImageProvider.h
     src/ui/imageproviders/clippreview/ClipPreviewImageProvider.cpp
+    src/ui/imageproviders/splitpreview/SplitPreviewImageProvider.h
+    src/ui/imageproviders/splitpreview/SplitPreviewImageProvider.cpp
     src/ui/imageproviders/TextStylePreviewImageProvider.h
     src/ui/imageproviders/TextStylePreviewImageProvider.cpp
     src/ui/imageproviders/ShapePreviewImageProvider.h
@@ -1224,6 +1226,8 @@ target_sources(driftapp PRIVATE
     src/ui/imageproviders/segment/SegmentImageStore.cpp
     src/playback/preview/ClipPreviewImageStore.h
     src/playback/preview/ClipPreviewImageStore.cpp
+    src/playback/preview/SplitPreviewImageStore.h
+    src/playback/preview/SplitPreviewImageStore.cpp
     src/ui/imageproviders/multicam/MulticamImageProvider.h
     src/ui/imageproviders/multicam/MulticamImageProvider.cpp
     src/ui/imageproviders/multicam/MulticamImageStore.h

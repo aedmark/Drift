@@ -48,6 +48,7 @@
 #include "engine/packages/effects/EffectTemplateCatalog.h"
 #include "engine/decode/hw/VaapiZeroCopy.h"
 #include "ui/imageproviders/clippreview/ClipPreviewImageProvider.h"
+#include "ui/imageproviders/splitpreview/SplitPreviewImageProvider.h"
 #include "ui/imageproviders/color/ColorImageProvider.h"
 #include "ui/imageproviders/DriftImageProvider.h"
 #include "ui/imageproviders/multicam/MulticamImageProvider.h"
@@ -1008,6 +1009,7 @@ int main(int argc, char *argv[])
     engine.addImageProvider(QStringLiteral("drift"), new DriftImageProvider());
     engine.addImageProvider(QStringLiteral("segment"), new SegmentImageProvider());
     engine.addImageProvider(QStringLiteral("clippreview"), new ClipPreviewImageProvider());
+    engine.addImageProvider(QStringLiteral("splitpreview"), new SplitPreviewImageProvider());
     engine.addImageProvider(QStringLiteral("multicam"), new MulticamImageProvider());
     engine.addImageProvider(QStringLiteral("textstyle"), new TextStylePreviewImageProvider());
     engine.addImageProvider(QStringLiteral("shape"), new ShapePreviewImageProvider());

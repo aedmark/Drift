@@ -18,6 +18,7 @@
 #include "app/jobs/vision/StabilizeController.h"
 #include "app/bin/MediaBinController.h"
 #include "app/editor/sessions/SpeedCurveController.h"
+#include "playback/preview/SplitPreviewImageStore.h"
 #include "ui/preview/PreviewController.h"
 #include "ui/preview/Outliner3dModel.h"
 #include "engine/audio/AudioMixer.h"
@@ -357,6 +358,7 @@ private slots:
     void trackAndMasterAudioFxRacks();
     void projectNotesAndMetadataRoundTrip();
     void velocityEnvelopeEditorStateActionsAndUndo();
+    void splitPreviewVideoComparisonWipeActionsAndRendering();
     void customFadeCurveSessionApplyAndCancel();
     void animationCurveSessionIsSeparateFromFade();
     void clipAnimationKindsListsBuiltins();
@@ -8079,6 +8081,105 @@ void EditorStateTest::velocityEnvelopeEditorStateActionsAndUndo()
     state.clearClipVelocityEnvelope(0, 0);
     QVERIFY(!state.clipHasVelocityEnvelope(0, 0));
     QVERIFY(!state.clipVelocityEnvelopeEnabled(0, 0));
+}
+
+void EditorStateTest::splitPreviewVideoComparisonWipeActionsAndRendering()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    appendLinkedVideoAudioPair(*state.project());
+
+    PreviewController *preview = state.preview();
+    QVERIFY(preview != nullptr);
+
+    // 1. Initial defaults
+    QCOMPARE(preview->splitPreviewEnabled(), false);
+    QCOMPARE(preview->splitPreviewMode(), QStringLiteral("verticalWipe"));
+    QCOMPARE(preview->splitPreviewSource(), QStringLiteral("fxBypass"));
+    QCOMPARE(preview->splitDividerPosition(), 0.5);
+    QCOMPARE(preview->splitInverted(), false);
+
+    // 2. Enable / toggle
+    preview->toggleSplitPreview();
+    QCOMPARE(preview->splitPreviewEnabled(), true);
+    preview->toggleSplitPreview();
+    QCOMPARE(preview->splitPreviewEnabled(), false);
+    preview->setSplitPreviewEnabled(true);
+    QCOMPARE(preview->splitPreviewEnabled(), true);
+
+    // 3. Mode switching
+    preview->setSplitPreviewMode(QStringLiteral("horizontalWipe"));
+    QCOMPARE(preview->splitPreviewMode(), QStringLiteral("horizontalWipe"));
+    preview->setSplitPreviewMode(QStringLiteral("sideBySide"));
+    QCOMPARE(preview->splitPreviewMode(), QStringLiteral("sideBySide"));
+    preview->setSplitPreviewMode(QStringLiteral("verticalWipe"));
+    QCOMPARE(preview->splitPreviewMode(), QStringLiteral("verticalWipe"));
+
+    // 4. Invert / swap sides
+    QCOMPARE(preview->splitInverted(), false);
+    preview->toggleSplitInverted();
+    QCOMPARE(preview->splitInverted(), true);
+    preview->setSplitInverted(false);
+    QCOMPARE(preview->splitInverted(), false);
+
+    // 5. Divider position & clamping
+    preview->setSplitDividerPosition(0.72);
+    QCOMPARE(preview->splitDividerPosition(), 0.72);
+    preview->setSplitDividerPosition(-0.35); // Clamped to 0.0
+    QCOMPARE(preview->splitDividerPosition(), 0.0);
+    preview->setSplitDividerPosition(1.45); // Clamped to 1.0
+    QCOMPARE(preview->splitDividerPosition(), 1.0);
+    preview->resetSplitDivider();
+    QCOMPARE(preview->splitDividerPosition(), 0.5);
+
+    // 6. Source switching & track index
+    preview->setSplitPreviewSource(QStringLiteral("reference"));
+    QCOMPARE(preview->splitPreviewSource(), QStringLiteral("reference"));
+    preview->setSplitTrackIndex(1);
+    QCOMPARE(preview->splitTrackIndex(), 1);
+    preview->setSplitPreviewSource(QStringLiteral("track"));
+    QCOMPARE(preview->splitPreviewSource(), QStringLiteral("track"));
+
+    // 7. Reference snapshot capture & storage
+    QVERIFY(!preview->hasReferenceFrame());
+    QVERIFY(preview->captureReferenceFrame());
+    QVERIFY(preview->hasReferenceFrame());
+    preview->setSplitPreviewSource(QStringLiteral("reference"));
+    const QImage refImg = preview->currentComparisonImage();
+    QVERIFY(!refImg.isNull());
+    QCOMPARE(SplitPreviewImageStore::frame().size(), refImg.size());
+    preview->clearReferenceFrame();
+    QVERIFY(!preview->hasReferenceFrame());
+
+    // 8. Clipboard snapshot capture & file save
+    QVERIFY(preview->captureSnapshotToClipboard());
+    QVERIFY(preview->hasClipboardImage());
+    preview->setSplitPreviewSource(QStringLiteral("clipboard"));
+    const QImage clipImg = preview->currentComparisonImage();
+    QVERIFY(!clipImg.isNull());
+
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    const QString snapFile = tempDir.filePath(QStringLiteral("preview_snap.png"));
+    QVERIFY(preview->saveSnapshotToFile(snapFile));
+    QVERIFY(QFile::exists(snapFile));
+    QVERIFY(QFileInfo(snapFile).size() > 0);
+
+    // 9. FX Bypass rendering comparison
+    drift::Effect fx;
+    fx.catalogId = QStringLiteral("color");
+    fx.enabled = true;
+    fx.parameters[QStringLiteral("brightness")] = 1.0;
+    state.project()->tracks()[0].clips[0].effects.append(fx);
+
+    const QImage withFx = preview->captureCurrentPreviewFrame();
+    QVERIFY(!withFx.isNull());
+
+    preview->setSplitPreviewSource(QStringLiteral("fxBypass"));
+    const QImage bypassed = preview->currentComparisonImage();
+    QVERIFY(!bypassed.isNull());
+
+    QVERIFY(!SplitPreviewImageStore::frame().isNull());
 }
 
 void EditorStateTest::customFadeCurveSessionApplyAndCancel()

@@ -82,6 +82,24 @@ struct ExportingScope
     bool previous;
 };
 
+thread_local bool t_bypassEffects = false;
+
+struct BypassEffectsScope
+{
+    explicit BypassEffectsScope(bool bypass) : previous(t_bypassEffects) { t_bypassEffects = bypass; }
+    ~BypassEffectsScope() { t_bypassEffects = previous; }
+    bool previous;
+};
+
+thread_local int t_isolateTrackIndex = -1;
+
+struct IsolateTrackScope
+{
+    explicit IsolateTrackScope(int track) : previous(t_isolateTrackIndex) { t_isolateTrackIndex = track; }
+    ~IsolateTrackScope() { t_isolateTrackIndex = previous; }
+    int previous;
+};
+
 // Mixed into every decode stream id while a composite's timeline is being read. The pool keeps
 // one cursor per stream id, so without it two instances of one composite (or one instance and
 // the composite's own tab) would share a cursor for each inner clip and seek it back and forth.
@@ -777,6 +795,8 @@ void applyDepthOcclusion(const drift::Project &project, GpuScene &scene, GpuLaye
 // between preview and export.
 QList<drift::Effect> resolvedClipEffects(const drift::Clip &clip, drift::TimeUs clipTimeUs)
 {
+    if (t_bypassEffects)
+        return {};
     QList<drift::Effect> filtered;
     filtered.reserve(clip.effects.size());
     for (const drift::Effect &effect : clip.effects) {
@@ -804,6 +824,8 @@ QList<drift::Effect> resolvedClipEffects(const drift::Clip &clip, drift::TimeUs 
 QList<drift::Effect> laneAdjustmentEffects(const drift::Project &project, int trackIndex,
                                            drift::TimeUs timelineUs, const QString &hostClipId)
 {
+    if (t_bypassEffects)
+        return {};
     QList<drift::Effect> result;
     for (const int laneIndex : drift::adjustmentLaneIndexes(project, trackIndex)) {
         const drift::Track &lane = project.tracks().at(laneIndex);
@@ -1968,6 +1990,8 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
         const drift::Track &track = tracks.at(ti);
         if (track.hidden || track.type == drift::TrackType::Audio)
             continue;
+        if (t_isolateTrackIndex >= 0 && ti != t_isolateTrackIndex)
+            continue;
         // A transform layer draws nothing itself; transformParentsAt carries it to its tracks.
         if (track.isTransformLayer())
             continue;
@@ -2029,6 +2053,8 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
                 continue;
 
             if (clip.type == drift::ClipType::Adjustment) {
+                if (t_bypassEffects)
+                    continue;
                 // An audio adjustment shares the timeline with the visual ones but belongs to the
                 // mixer; rendering it here would blit the canvas for an empty effect chain.
                 if (clip.adjustmentKind != drift::AdjustmentKind::VideoEffects
@@ -2213,7 +2239,8 @@ bool FrameCompositor::prepare(drift::TimeUs timelineUs, const RenderOptions &opt
     if (width <= 0 || height <= 0)
         return false;
 
-    if (sceneOut && m_bakes && prepareFromBake(timelineUs, options, sceneOut, width, height, renderScale)) {
+    if (sceneOut && m_bakes && !options.bypassEffects && options.isolateTrackIndex < 0
+        && prepareFromBake(timelineUs, options, sceneOut, width, height, renderScale)) {
         *widthOut = width;
         *heightOut = height;
         *renderScaleOut = renderScale;
@@ -2222,6 +2249,8 @@ bool FrameCompositor::prepare(drift::TimeUs timelineUs, const RenderOptions &opt
 
     const AllowProxiesScope proxies(options.allowProxies);
     const ExportingScope exporting(options.exporting);
+    const BypassEffectsScope bypassEffectsScope(options.bypassEffects);
+    const IsolateTrackScope isolateTrackScope(options.isolateTrackIndex);
     // One scope per compositor and preview stream: the preview, an export and every thumbnail pass
     // each step their clips' frame histories on their own, so none disturbs another.
     const quint64 historyScope = (m_historyId << 4) | quint64(options.stream & 0xF);

@@ -3,6 +3,7 @@
 #include "engine/render3d/scene/EditorView3d.h"
 #include "engine/render3d/scene/SceneCamera3d.h"
 
+#include <QImage>
 #include <QMatrix4x4>
 #include <QObject>
 #include <functional>
@@ -86,6 +87,17 @@ class PreviewController : public QObject
     // Grips are drawn only while the picture holds still and there is a canvas to put them on.
     Q_PROPERTY(bool handlesVisible READ handlesVisible NOTIFY handlesVisibleChanged)
 
+    // A/B Split-Screen Video Preview comparison wipe
+    Q_PROPERTY(bool splitPreviewEnabled READ splitPreviewEnabled WRITE setSplitPreviewEnabled NOTIFY splitPreviewChanged)
+    Q_PROPERTY(QString splitPreviewMode READ splitPreviewMode WRITE setSplitPreviewMode NOTIFY splitPreviewChanged)
+    Q_PROPERTY(QString splitPreviewSource READ splitPreviewSource WRITE setSplitPreviewSource NOTIFY splitPreviewChanged)
+    Q_PROPERTY(double splitDividerPosition READ splitDividerPosition WRITE setSplitDividerPosition NOTIFY splitPreviewChanged)
+    Q_PROPERTY(bool splitInverted READ splitInverted WRITE setSplitInverted NOTIFY splitPreviewChanged)
+    Q_PROPERTY(int splitTrackIndex READ splitTrackIndex WRITE setSplitTrackIndex NOTIFY splitPreviewChanged)
+    Q_PROPERTY(bool hasReferenceFrame READ hasReferenceFrame NOTIFY referenceFrameChanged)
+    Q_PROPERTY(bool hasClipboardImage READ hasClipboardImage NOTIFY clipboardImageChanged)
+    Q_PROPERTY(int splitRevision READ splitRevision NOTIFY splitRevisionChanged)
+
 public:
     explicit PreviewController(AppController &app, QObject *parent = nullptr);
     ~PreviewController() override;
@@ -148,6 +160,34 @@ public:
     bool maskEditActive() const;
     QString activeTool() const { return m_activeTool; }
     bool handlesVisible() const { return m_handlesVisible; }
+
+    bool splitPreviewEnabled() const { return m_splitPreviewEnabled; }
+    void setSplitPreviewEnabled(bool enabled);
+    QString splitPreviewMode() const { return m_splitPreviewMode; }
+    void setSplitPreviewMode(const QString &mode);
+    QString splitPreviewSource() const { return m_splitPreviewSource; }
+    void setSplitPreviewSource(const QString &source);
+    double splitDividerPosition() const { return m_splitDividerPosition; }
+    void setSplitDividerPosition(double pos);
+    bool splitInverted() const { return m_splitInverted; }
+    void setSplitInverted(bool inverted);
+    int splitTrackIndex() const { return m_splitTrackIndex; }
+    void setSplitTrackIndex(int trackIndex);
+    bool hasReferenceFrame() const { return m_hasReferenceFrame; }
+    bool hasClipboardImage() const { return m_hasClipboardImage; }
+    int splitRevision() const { return m_splitRevision; }
+
+    Q_INVOKABLE void toggleSplitPreview() { setSplitPreviewEnabled(!m_splitPreviewEnabled); }
+    Q_INVOKABLE void toggleSplitInverted() { setSplitInverted(!m_splitInverted); }
+    Q_INVOKABLE void resetSplitDivider() { setSplitDividerPosition(0.5); }
+    Q_INVOKABLE bool captureSnapshotToClipboard();
+    Q_INVOKABLE bool captureReferenceFrame();
+    Q_INVOKABLE bool loadReferenceImage(const QString &filePath);
+    Q_INVOKABLE bool saveSnapshotToFile(const QString &filePath);
+    Q_INVOKABLE void clearReferenceFrame();
+    Q_INVOKABLE QImage currentComparisonImage() const;
+    Q_INVOKABLE QImage captureCurrentPreviewFrame() const;
+    Q_INVOKABLE void updateComparisonFrame();
 
     // Editor viewport navigation. Orbit is in degrees; pan in canvas px of pointer travel; dolly in wheel
     // steps (+ toward the target). Each re-renders the preview.
@@ -321,6 +361,10 @@ signals:
     void maskEditActiveChanged();
     void activeToolChanged();
     void handlesVisibleChanged();
+    void splitPreviewChanged();
+    void referenceFrameChanged();
+    void clipboardImageChanged();
+    void splitRevisionChanged();
 
 private:
     // The scene camera at the playhead in canvas pixels (renderScale 1, which is the space the
@@ -393,4 +437,15 @@ private:
     QString m_maskingTool;
     QString m_activeTool = QStringLiteral("transform");
     bool m_handlesVisible = false;
+
+    bool m_splitPreviewEnabled = false;
+    QString m_splitPreviewMode = QStringLiteral("verticalWipe");
+    QString m_splitPreviewSource = QStringLiteral("fxBypass");
+    double m_splitDividerPosition = 0.5;
+    bool m_splitInverted = false;
+    int m_splitTrackIndex = 0;
+    bool m_hasReferenceFrame = false;
+    bool m_hasClipboardImage = false;
+    int m_splitRevision = 0;
+    QImage m_referenceImage;
 };

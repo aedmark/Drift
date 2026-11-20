@@ -111,6 +111,15 @@ Popup {
         ThemedSwitch {
             Layout.columnSpan: 2
             Layout.fillWidth: true
+            text: qsTr("Split Screen View (A/B Compare)")
+            tooltip: qsTr("Split the preview window to compare the timeline with FX bypass, clipboard, or reference snapshot")
+            checked: EditorState.preview.splitPreviewEnabled
+            onToggled: EditorState.preview.splitPreviewEnabled = checked
+        }
+
+        ThemedSwitch {
+            Layout.columnSpan: 2
+            Layout.fillWidth: true
             text: qsTr("Keep mask handles up")
             tooltip: qsTr("Keep mask handles on the preview while another clip is selected")
             checked: EditorState.preview.maskEditMode

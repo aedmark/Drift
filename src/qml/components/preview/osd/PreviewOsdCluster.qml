@@ -6,8 +6,8 @@ Item {
     id: cluster
 
     property var viewport
-    readonly property bool menuOpen: guideMenu.menuOpen
-    readonly property bool menuBusy: optionsButton.menuBusy
+    readonly property bool menuOpen: guideMenu.menuOpen || splitButton.menuOpen
+    readonly property bool menuBusy: optionsButton.menuBusy || splitButton.menuBusy
     readonly property alias hovered: rightHover.hovered
 
     width: rightRow.implicitWidth + Theme.spacingXs * 2
@@ -43,6 +43,10 @@ Item {
 
         PreviewOsdGuideMenuButton {
             id: guideMenu
+        }
+
+        PreviewOsdSplitButton {
+            id: splitButton
         }
 
         PreviewOsdOptionsButton {
