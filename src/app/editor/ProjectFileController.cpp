@@ -1611,8 +1611,6 @@ void ProjectFileController::finishLoad(int generation, const QUrl &url,
                 for (drift::MediaAsset &asset : m_app->m_project.assets()) {
                     if (asset.path == newPath) {
                         asset.editFriendly = true;
-                        asset.variableFrameRate = false;
-                        asset.frameRateKnown = true;
                     }
                 }
             }
@@ -1679,8 +1677,6 @@ void ProjectFileController::finishLoad(int generation, const QUrl &url,
             for (drift::MediaAsset &asset : m_app->m_project.assets()) {
                 if (asset.path == newPath) {
                     asset.editFriendly = true;
-                    asset.variableFrameRate = false;
-                    asset.frameRateKnown = true;
                 }
             }
         }
