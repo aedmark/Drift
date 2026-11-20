@@ -28,6 +28,7 @@ private slots:
     void readsVideoEffectsLevelsAndColor();
     void readsVignetteAndSoftlightEffects();
     void readsEventPanCropAndKeyframes();
+    void readsProjectSummaryRiffInfoChunks();
 };
 
 void TestInterchangeVegas::detectsVegasProject()
@@ -1084,6 +1085,208 @@ void TestInterchangeVegas::readsEventPanCropAndKeyframes()
         }
         qDebug() << "3.1b.veg found 4-keyframe zoom out:" << found4KeyframeZoom;
         QVERIFY(found4KeyframeZoom);
+    }
+}
+
+void TestInterchangeVegas::readsProjectSummaryRiffInfoChunks()
+{
+    // 1. Synthetic Wave64 RIFF project with summary metadata chunk
+    const uint8_t kGuidW64Riff[16] = {
+        0x72, 0x69, 0x66, 0x66, 0x2e, 0x91, 0xcf, 0x11, 0xa5, 0xd6, 0x28, 0xdb, 0x04, 0xc1, 0x00, 0x00
+    };
+    const uint8_t kGuidW64List[16] = {
+        0x6c, 0x69, 0x73, 0x74, 0x2f, 0x91, 0xcf, 0x11, 0xa5, 0xd6, 0x28, 0xdb, 0x04, 0xc1, 0x00, 0x00
+    };
+    const uint8_t kTypeSummaryList[16] = {
+        0xbc, 0x94, 0x5f, 0x92, 0x5a, 0x52, 0xd2, 0x11, 0x86, 0xdc, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a
+    };
+    const uint8_t kGuidSummaryChunk[16] = {
+        0x1d, 0x4f, 0x23, 0x71, 0x57, 0x52, 0xd2, 0x11, 0x86, 0xdc, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a
+    };
+
+    auto encodeUtf16 = [](const QString &s) -> QByteArray {
+        QByteArray bytes;
+        const qsizetype len = s.length();
+        bytes.resize((len + 1) * sizeof(char16_t));
+        auto *chars = reinterpret_cast<char16_t *>(bytes.data());
+        for (int i = 0; i < len; ++i)
+            chars[i] = s.at(i).unicode();
+        chars[len] = 0;
+        return bytes;
+    };
+
+    struct FieldDef {
+        const char *tag;
+        QString text;
+    };
+    const QList<FieldDef> fields = {
+        {"INAM", QStringLiteral("Odds Episode 3 Remaster")},
+        {"IART", QStringLiteral("Gordon K")},
+        {"ICMT", QStringLiteral("Director notes: final cut with remaster audio")},
+        {"ICOP", QStringLiteral("Copyright 2026 Odds Productions")},
+        {"IENG", QStringLiteral("Sound Engineer: Vegas Pro 21")},
+        {"ICRD", QStringLiteral("2026-11-19")},
+    };
+
+    QByteArray subPayload;
+    // 4 bytes hdrSize (8), 4 bytes fieldCount (fields.size())
+    const quint32 hdrSize = 8;
+    const quint32 fieldCount = static_cast<quint32>(fields.size());
+    subPayload.append(reinterpret_cast<const char *>(&hdrSize), 4);
+    subPayload.append(reinterpret_cast<const char *>(&fieldCount), 4);
+
+    for (const auto &f : fields) {
+        const QByteArray strBytes = encodeUtf16(f.text);
+        const quint32 strLen = static_cast<quint32>(strBytes.size());
+        subPayload.append(f.tag, 4);
+        subPayload.append(reinterpret_cast<const char *>(&strLen), 4);
+        subPayload.append(strBytes);
+    }
+
+    // Pad subchunk to 8-byte boundary
+    quint64 subchunkSize = 24 + subPayload.size();
+    const int padSub = static_cast<int>((8 - (subchunkSize % 8)) % 8);
+    subPayload.append(QByteArray(padSub, '\0'));
+    subchunkSize += padSub;
+
+    QByteArray subChunk;
+    subChunk.append(reinterpret_cast<const char *>(kGuidSummaryChunk), 16);
+    subChunk.append(reinterpret_cast<const char *>(&subchunkSize), 8);
+    subChunk.append(subPayload);
+
+    QByteArray listPayload;
+    listPayload.append(reinterpret_cast<const char *>(kTypeSummaryList), 16);
+    listPayload.append(subChunk);
+
+    quint64 listSize = 24 + listPayload.size();
+    const int padList = static_cast<int>((8 - (listSize % 8)) % 8);
+    listPayload.append(QByteArray(padList, '\0'));
+    listSize += padList;
+
+    QByteArray listChunk;
+    listChunk.append(reinterpret_cast<const char *>(kGuidW64List), 16);
+    listChunk.append(reinterpret_cast<const char *>(&listSize), 8);
+    listChunk.append(listPayload);
+
+    // Chunk 0 (project settings)
+    QByteArray c0Payload(50, '\0');
+    // Set 48000 sample rate at offset 12
+    const quint32 sr = 48000;
+    std::memcpy(c0Payload.data() + 12, &sr, 4);
+    // Set 24.0 fps at offset 16
+    const double fps = 24.0;
+    std::memcpy(c0Payload.data() + 16, &fps, 8);
+
+    quint64 c0Size = 24 + c0Payload.size();
+    const int padC0 = static_cast<int>((8 - (c0Size % 8)) % 8);
+    c0Payload.append(QByteArray(padC0, '\0'));
+    c0Size += padC0;
+
+    QByteArray c0Chunk;
+    c0Chunk.append(QByteArray(16, '\0')); // settings GUID
+    c0Chunk.append(reinterpret_cast<const char *>(&c0Size), 8);
+    c0Chunk.append(c0Payload);
+
+    // Minimal Timeline with 1 Track so readProjectData accepts the project
+    const uint8_t kTypeTimeline[16] = {
+        0x47, 0x07, 0x6c, 0x4d, 0x16, 0x23, 0xd2, 0x11, 0x86, 0xb0, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a
+    };
+    const uint8_t kTypeTrack[16] = {
+        0x48, 0x07, 0x6c, 0x4d, 0x16, 0x23, 0xd2, 0x11, 0x86, 0xb0, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a
+    };
+    QByteArray trackChunk;
+    const quint64 trackSize = 40;
+    trackChunk.append(reinterpret_cast<const char *>(kGuidW64List), 16);
+    trackChunk.append(reinterpret_cast<const char *>(&trackSize), 8);
+    trackChunk.append(reinterpret_cast<const char *>(kTypeTrack), 16);
+
+    QByteArray timelinePayload;
+    timelinePayload.append(reinterpret_cast<const char *>(kTypeTimeline), 16);
+    timelinePayload.append(trackChunk);
+    const quint64 timelineSize = 24 + timelinePayload.size();
+    QByteArray timelineChunk;
+    timelineChunk.append(reinterpret_cast<const char *>(kGuidW64List), 16);
+    timelineChunk.append(reinterpret_cast<const char *>(&timelineSize), 8);
+    timelineChunk.append(timelinePayload);
+
+    quint64 totalSize = 40 + c0Chunk.size() + listChunk.size() + timelineChunk.size();
+    QByteArray w64Data;
+    w64Data.append(reinterpret_cast<const char *>(kGuidW64Riff), 16);
+    w64Data.append(reinterpret_cast<const char *>(&totalSize), 8);
+    w64Data.append(QByteArray(16, '\0')); // type GUID
+    w64Data.append(c0Chunk);
+    w64Data.append(timelineChunk);
+    w64Data.append(listChunk);
+
+    // Test parseProjectSummary on Wave64 data
+    const drift::vegas::ProjectSummary summary = drift::vegas::parseProjectSummary(w64Data);
+    QVERIFY(!summary.isEmpty());
+    QCOMPARE(summary.title, QStringLiteral("Odds Episode 3 Remaster"));
+    QCOMPARE(summary.author, QStringLiteral("Gordon K"));
+    QCOMPARE(summary.comments, QStringLiteral("Director notes: final cut with remaster audio"));
+    QCOMPARE(summary.copyright, QStringLiteral("Copyright 2026 Odds Productions"));
+    QCOMPARE(summary.engineer, QStringLiteral("Sound Engineer: Vegas Pro 21"));
+    QCOMPARE(summary.creationDate, QStringLiteral("2026-11-19"));
+
+    // Test readProjectData imports summary into Project
+    QString readErr;
+    const auto optProj = drift::vegas::readProjectData(w64Data, QString(), &readErr);
+    QVERIFY2(optProj.has_value(), qPrintable(readErr));
+    const drift::Project &proj = *optProj;
+    QCOMPARE(proj.name(), QStringLiteral("Odds Episode 3 Remaster"));
+    QCOMPARE(proj.author(), QStringLiteral("Gordon K"));
+    QCOMPARE(proj.notes(), proj.description());
+    QVERIFY(proj.notes().contains(QStringLiteral("Director notes: final cut with remaster audio")));
+    QVERIFY(proj.notes().contains(QStringLiteral("Copyright 2026 Odds Productions")));
+
+    // 2. Standard 32-bit RIFF INFO chunk parsing
+    QByteArray riffSubPayload;
+    auto appendRiffTag = [&](const char *tag, const QString &text) {
+        const QByteArray utf8 = text.toUtf8() + '\0';
+        const quint32 len = static_cast<quint32>(utf8.size());
+        riffSubPayload.append(tag, 4);
+        riffSubPayload.append(reinterpret_cast<const char *>(&len), 4);
+        riffSubPayload.append(utf8);
+        if (len % 2 != 0)
+            riffSubPayload.append('\0'); // 2-byte word align
+    };
+    appendRiffTag("INAM", QStringLiteral("Classic Vegas Cut"));
+    appendRiffTag("IART", QStringLiteral("Antigravity Author"));
+    appendRiffTag("ICMT", QStringLiteral("Archived standard RIFF notes"));
+    appendRiffTag("ICOP", QStringLiteral("2026 All Rights Reserved"));
+
+    QByteArray riffData;
+    riffData.append("RIFF", 4);
+    const quint32 riffTotalSize = 4 + 4 + 4 + static_cast<quint32>(riffSubPayload.size());
+    riffData.append(reinterpret_cast<const char *>(&riffTotalSize), 4);
+    riffData.append("WAVE", 4);
+
+    riffData.append("LIST", 4);
+    const quint32 listSubSize = 4 + static_cast<quint32>(riffSubPayload.size());
+    riffData.append(reinterpret_cast<const char *>(&listSubSize), 4);
+    riffData.append("INFO", 4);
+    riffData.append(riffSubPayload);
+
+    const drift::vegas::ProjectSummary riffSummary = drift::vegas::parseProjectSummary(riffData);
+    QVERIFY(!riffSummary.isEmpty());
+    QCOMPARE(riffSummary.title, QStringLiteral("Classic Vegas Cut"));
+    QCOMPARE(riffSummary.author, QStringLiteral("Antigravity Author"));
+    QCOMPARE(riffSummary.comments, QStringLiteral("Archived standard RIFF notes"));
+    QCOMPARE(riffSummary.copyright, QStringLiteral("2026 All Rights Reserved"));
+
+    // 3. Real sample.veg fixture: empty fields parse cleanly without overriding defaults
+    const QString fixtureVeg = QStringLiteral(DRIFT_TEST_DATA_DIR "/sample.veg");
+    if (QFile::exists(fixtureVeg)) {
+        QFile file(fixtureVeg);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray sampleData = file.readAll();
+        const drift::vegas::ProjectSummary sampleSummary = drift::vegas::parseProjectSummary(sampleData);
+        // sample.veg had empty summary fields
+        QVERIFY(sampleSummary.isEmpty());
+
+        const auto sampleProj = drift::vegas::readProject(fixtureVeg);
+        QVERIFY(sampleProj.has_value());
+        QCOMPARE(sampleProj->name(), QStringLiteral("Untitled Project"));
     }
 }
 

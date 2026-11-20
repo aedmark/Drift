@@ -36,6 +36,7 @@ class ProjectFileController : public QObject
     Q_PROPERTY(QVariantMap background READ background NOTIFY backgroundChanged)
     Q_PROPERTY(QString projectName READ projectName WRITE setProjectName NOTIFY projectNameChanged)
     Q_PROPERTY(QVariantMap projectMetadata READ projectMetadata NOTIFY projectMetadataChanged)
+    Q_PROPERTY(QString projectNotes READ projectNotes WRITE setProjectNotes NOTIFY projectMetadataChanged)
     Q_PROPERTY(bool packaging READ packaging NOTIFY packagingChanged)
     Q_PROPERTY(double packageProgress READ packageProgress NOTIFY packageProgressChanged)
     Q_PROPERTY(bool collectingMedia READ collectingMedia NOTIFY collectingMediaChanged)
@@ -71,6 +72,8 @@ public:
     QVariantMap projectMetadata() const;
     Q_INVOKABLE void setProjectMetadata(const QString &title, const QString &author,
                                         const QString &description);
+    QString projectNotes() const;
+    Q_INVOKABLE void setProjectNotes(const QString &notes);
 
     Q_INVOKABLE int projectWidth() const;
     Q_INVOKABLE int projectHeight() const;

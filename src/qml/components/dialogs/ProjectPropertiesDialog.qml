@@ -51,14 +51,14 @@ ThemedDialog {
         }
 
         ThemedLabel {
-            text: qsTr("Description")
+            text: qsTr("Description / Notes")
         }
 
         ThemedTextArea {
             id: descriptionField
             width: parent.width
             height: 96
-            placeholderText: qsTr("What this project is")
+            placeholderText: qsTr("What this project is or project notes")
         }
 
         Row {

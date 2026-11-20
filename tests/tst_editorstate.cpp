@@ -355,6 +355,7 @@ private slots:
     void cursorlessSplitAtPlayhead();
     void slipEditingToolAltDrag();
     void trackAndMasterAudioFxRacks();
+    void projectNotesAndMetadataRoundTrip();
     void customFadeCurveSessionApplyAndCancel();
     void animationCurveSessionIsSeparateFromFade();
     void clipAnimationKindsListsBuiltins();
@@ -7976,6 +7977,49 @@ void EditorStateTest::trackAndMasterAudioFxRacks()
         QVERIFY(!std::isnan(sample));
         QVERIFY(!std::isinf(sample));
     }
+}
+
+void EditorStateTest::projectNotesAndMetadataRoundTrip()
+{
+    AssetLibrary library;
+    AppController state(&library);
+
+    // Initial state
+    QCOMPARE(state.projectFile()->projectNotes(), QString());
+    QCOMPARE(state.project()->notes(), QString());
+    QCOMPARE(state.project()->description(), QString());
+
+    // Set notes via projectNotes
+    state.projectFile()->setProjectNotes(QStringLiteral("Vegas RIFF INFO notes test"));
+    QCOMPARE(state.projectFile()->projectNotes(), QStringLiteral("Vegas RIFF INFO notes test"));
+    QCOMPARE(state.project()->notes(), QStringLiteral("Vegas RIFF INFO notes test"));
+    QCOMPARE(state.project()->description(), QStringLiteral("Vegas RIFF INFO notes test"));
+
+    // Check projectMetadata map
+    const QVariantMap meta = state.projectFile()->projectMetadata();
+    QCOMPARE(meta.value(QStringLiteral("notes")).toString(), QStringLiteral("Vegas RIFF INFO notes test"));
+    QCOMPARE(meta.value(QStringLiteral("description")).toString(), QStringLiteral("Vegas RIFF INFO notes test"));
+
+    // Set metadata with author and title
+    state.projectFile()->setProjectMetadata(QStringLiteral("Episode 3"), QStringLiteral("Gordon K"),
+                                            QStringLiteral("Remaster notes for audio and video"));
+    QCOMPARE(state.project()->name(), QStringLiteral("Episode 3"));
+    QCOMPARE(state.project()->author(), QStringLiteral("Gordon K"));
+    QCOMPARE(state.project()->notes(), QStringLiteral("Remaster notes for audio and video"));
+
+    // Project JSON serialization round trip
+    const QJsonObject json = state.project()->toJson();
+    QVERIFY(json.contains(QStringLiteral("notes")));
+    QVERIFY(json.contains(QStringLiteral("description")));
+    QCOMPARE(json.value(QStringLiteral("notes")).toString(), QStringLiteral("Remaster notes for audio and video"));
+
+    QString err;
+    const drift::Project loaded = drift::Project::fromJson(json, &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    QCOMPARE(loaded.name(), QStringLiteral("Episode 3"));
+    QCOMPARE(loaded.author(), QStringLiteral("Gordon K"));
+    QCOMPARE(loaded.notes(), QStringLiteral("Remaster notes for audio and video"));
+    QCOMPARE(loaded.description(), QStringLiteral("Remaster notes for audio and video"));
 }
 
 void EditorStateTest::customFadeCurveSessionApplyAndCancel()

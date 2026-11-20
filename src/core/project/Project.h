@@ -142,6 +142,9 @@ public:
 
     QString description() const { return m_description; }
     void setDescription(const QString &description) { m_description = description; }
+
+    QString notes() const { return m_description; }
+    void setNotes(const QString &notes) { m_description = notes; }
     // Not undoable: ProjectSnapshotCommand carries the live script across undo/redo.
     QString teleprompterScript() const { return m_teleprompterScript; }
     void setTeleprompterScript(const QString &script) { m_teleprompterScript = script; }

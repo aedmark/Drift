@@ -78,6 +78,12 @@ static const uint8_t kTypeMarkerList[16] = {
 static const uint8_t kGuidMarker[16] = {
     0x56, 0x62, 0xf7, 0xab, 0x2d, 0x39, 0xd2, 0x11, 0x86, 0xc7, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a
 };
+static const uint8_t kTypeSummaryList[16] = {
+    0xbc, 0x94, 0x5f, 0x92, 0x5a, 0x52, 0xd2, 0x11, 0x86, 0xdc, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a
+};
+static const uint8_t kGuidSummaryChunk[16] = {
+    0x1d, 0x4f, 0x23, 0x71, 0x57, 0x52, 0xd2, 0x11, 0x86, 0xdc, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a
+};
 
 inline quint32 readU32LE(const uint8_t *p)
 {
@@ -1271,6 +1277,142 @@ std::optional<Project> readProject(const QString &filePath, QString *error,
     return readProjectData(data, sourceDir, error, visitedPaths, depth);
 }
 
+ProjectSummary parseProjectSummary(const QByteArray &data)
+{
+    ProjectSummary summary;
+    if (data.size() < 12)
+        return summary;
+
+    const auto *bytes = reinterpret_cast<const uint8_t *>(data.constData());
+    const qsizetype totalSize = data.size();
+
+    auto assignTag = [&](const QString &tag, const QString &val) {
+        if (val.isEmpty())
+            return;
+        if (tag == QLatin1String("INAM")) {
+            if (summary.title.isEmpty()) summary.title = val;
+        } else if (tag == QLatin1String("IART")) {
+            if (summary.author.isEmpty()) summary.author = val;
+        } else if (tag == QLatin1String("ICMT")) {
+            if (summary.comments.isEmpty()) summary.comments = val;
+        } else if (tag == QLatin1String("ICOP")) {
+            if (summary.copyright.isEmpty()) summary.copyright = val;
+        } else if (tag == QLatin1String("IENG")) {
+            if (summary.engineer.isEmpty()) summary.engineer = val;
+        } else if (tag == QLatin1String("ICRD")) {
+            if (summary.creationDate.isEmpty()) summary.creationDate = val;
+        } else if (tag == QLatin1String("ISBJ")) {
+            if (summary.subject.isEmpty()) summary.subject = val;
+        } else if (tag == QLatin1String("IGNR")) {
+            if (summary.genre.isEmpty()) summary.genre = val;
+        } else if (tag == QLatin1String("ISFT")) {
+            if (summary.software.isEmpty()) summary.software = val;
+        } else {
+            summary.customFields.insert(tag, val);
+        }
+    };
+
+    auto decodeString = [](const uint8_t *payload, qsizetype len) -> QString {
+        if (len <= 0)
+            return {};
+        // Check if string is UTF-16LE (e.g. second byte is 0 for western text, or starts with null)
+        bool isUtf16 = false;
+        if (len >= 2 && (len % 2 == 0)) {
+            if (payload[0] == 0 && payload[1] == 0)
+                isUtf16 = true;
+            else if (payload[0] != 0 && payload[1] == 0)
+                isUtf16 = true;
+        }
+        if (isUtf16) {
+            const auto *chars = reinterpret_cast<const char16_t *>(payload);
+            qsizetype charCount = len / 2;
+            while (charCount > 0 && chars[charCount - 1] == 0)
+                --charCount;
+            if (charCount > 0) {
+                QString s = QString::fromUtf16(chars, charCount).trimmed();
+                if (!s.isEmpty())
+                    return s;
+            }
+        }
+        // Fallback to UTF-8 / ASCII
+        qsizetype byteCount = len;
+        while (byteCount > 0 && payload[byteCount - 1] == 0)
+            --byteCount;
+        if (byteCount > 0)
+            return QString::fromUtf8(reinterpret_cast<const char *>(payload), byteCount).trimmed();
+        return {};
+    };
+
+    // 1. Sony Wave64 RIFF format
+    if (isVegasData(data)) {
+        // Find kGuidSummaryChunk or kTypeSummaryList
+        qsizetype scanPos = 40;
+        while (scanPos + 24 <= totalSize) {
+            const void *found = std::memchr(bytes + scanPos, kGuidSummaryChunk[0], totalSize - scanPos);
+            if (!found)
+                break;
+            const qsizetype idx = static_cast<const uint8_t *>(found) - bytes;
+            if (idx + 24 > totalSize)
+                break;
+
+            if (std::memcmp(bytes + idx, kGuidSummaryChunk, 16) == 0) {
+                const quint64 chunkSize = readU64LE(bytes + idx + 16);
+                if (chunkSize >= 24 && idx + static_cast<qsizetype>(chunkSize) <= totalSize) {
+                    const uint8_t *payload = bytes + idx + 24;
+                    const qsizetype payloadSize = static_cast<qsizetype>(chunkSize - 24);
+                    if (payloadSize >= 8) {
+                        const quint32 fieldCount = readU32LE(payload + 4);
+                        qsizetype fieldPos = 8;
+                        for (quint32 f = 0; f < fieldCount && fieldPos + 8 <= payloadSize; ++f) {
+                            const QString tag = QString::fromLatin1(reinterpret_cast<const char *>(payload + fieldPos), 4);
+                            const quint32 fieldLen = readU32LE(payload + fieldPos + 4);
+                            fieldPos += 8;
+                            if (fieldPos + static_cast<qsizetype>(fieldLen) > payloadSize)
+                                break;
+                            const QString val = decodeString(payload + fieldPos, fieldLen);
+                            assignTag(tag, val);
+                            fieldPos += fieldLen;
+                        }
+                    }
+                }
+            }
+            scanPos = idx + 1;
+        }
+    }
+
+    // 2. Standard 4-byte RIFF / AVI / WAV LIST 'INFO' chunks
+    {
+        qsizetype pos = 0;
+        while (pos + 12 <= totalSize) {
+            const void *found = std::memchr(bytes + pos, 'L', totalSize - pos);
+            if (!found)
+                break;
+            const qsizetype idx = static_cast<const uint8_t *>(found) - bytes;
+            if (idx + 12 > totalSize)
+                break;
+
+            if (std::memcmp(bytes + idx, "LIST", 4) == 0 && std::memcmp(bytes + idx + 8, "INFO", 4) == 0) {
+                const quint32 listSize = readU32LE(bytes + idx + 4);
+                const qsizetype listEnd = qMin(totalSize, idx + 8 + static_cast<qsizetype>(listSize));
+                qsizetype subPos = idx + 12;
+                while (subPos + 8 <= listEnd) {
+                    const QString tag = QString::fromLatin1(reinterpret_cast<const char *>(bytes + subPos), 4);
+                    const quint32 subSize = readU32LE(bytes + subPos + 4);
+                    subPos += 8;
+                    if (subPos + static_cast<qsizetype>(subSize) > listEnd)
+                        break;
+                    const QString val = decodeString(bytes + subPos, subSize);
+                    assignTag(tag, val);
+                    subPos += (subSize + 1) & ~1; // 2-byte word aligned
+                }
+            }
+            pos = idx + 1;
+        }
+    }
+
+    return summary;
+}
+
 std::optional<Project> readProjectData(const QByteArray &data, const QString &sourceDir,
                                        QString *error,
                                        QSet<QString> visitedPaths, int depth)
@@ -1321,6 +1463,34 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
     project.setResolution(canvasWidth, canvasHeight);
     project.setFps(qRound(fps));
     project.setSampleRate(static_cast<int>(sampleRate));
+
+    // Project summary metadata (RIFF INFO chunk: INAM, IART, ICMT, etc.)
+    const ProjectSummary summary = parseProjectSummary(data);
+    if (!summary.title.isEmpty())
+        project.setName(summary.title);
+    if (!summary.author.isEmpty())
+        project.setAuthor(summary.author);
+    if (!summary.comments.isEmpty()) {
+        project.setDescription(summary.comments);
+        project.setNotes(summary.comments);
+    }
+    if (!summary.copyright.isEmpty() || !summary.engineer.isEmpty()) {
+        QString extra;
+        if (!summary.copyright.isEmpty())
+            extra += QStringLiteral("Copyright: %1").arg(summary.copyright);
+        if (!summary.engineer.isEmpty()) {
+            if (!extra.isEmpty()) extra += QLatin1Char('\n');
+            extra += QStringLiteral("Engineer: %1").arg(summary.engineer);
+        }
+        if (project.description().isEmpty()) {
+            project.setDescription(extra);
+            project.setNotes(extra);
+        } else if (!project.description().contains(summary.copyright)) {
+            const QString combined = project.description() + QStringLiteral("\n") + extra;
+            project.setDescription(combined);
+            project.setNotes(combined);
+        }
+    }
 
     // Search directories for media resolution
     QList<QDir> searchDirs;

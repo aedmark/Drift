@@ -347,9 +347,20 @@ QVariantMap ProjectFileController::projectMetadata() const
         {QStringLiteral("title"), m_app->m_project.name()},
         {QStringLiteral("author"), m_app->m_project.author()},
         {QStringLiteral("description"), m_app->m_project.description()},
+        {QStringLiteral("notes"), m_app->m_project.description()},
         {QStringLiteral("createdAt"), m_app->m_project.createdAt().toLocalTime()},
         {QStringLiteral("modifiedAt"), m_app->m_project.modifiedAt().toLocalTime()},
     };
+}
+
+QString ProjectFileController::projectNotes() const
+{
+    return m_app->m_project.description();
+}
+
+void ProjectFileController::setProjectNotes(const QString &notes)
+{
+    setProjectMetadata(m_app->m_project.name(), m_app->m_project.author(), notes);
 }
 
 void ProjectFileController::setProjectMetadata(const QString &title, const QString &author,

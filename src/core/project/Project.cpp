@@ -1755,6 +1755,8 @@ Project Project::fromJson(const QJsonObject &object, QString *errorOut)
         project.m_id = savedId;
     project.m_author = object.value(QStringLiteral("author")).toString();
     project.m_description = object.value(QStringLiteral("description")).toString();
+    if (project.m_description.isEmpty() && object.contains(QStringLiteral("notes")))
+        project.m_description = object.value(QStringLiteral("notes")).toString();
     project.m_teleprompterScript = object.value(QStringLiteral("teleprompterScript")).toString();
     const QDateTime created =
         QDateTime::fromString(object.value(QStringLiteral("createdAt")).toString(), Qt::ISODate);
@@ -1866,6 +1868,7 @@ QJsonObject Project::toJson(bool includeTranscripts) const
         {QStringLiteral("id"), m_id},
         {QStringLiteral("author"), m_author},
         {QStringLiteral("description"), m_description},
+        {QStringLiteral("notes"), m_description},
         {QStringLiteral("createdAt"), m_createdAt.toString(Qt::ISODate)},
         {QStringLiteral("modifiedAt"), m_modifiedAt.toString(Qt::ISODate)},
         {QStringLiteral("fps"), m_fps},
