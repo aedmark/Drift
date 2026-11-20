@@ -367,7 +367,7 @@ ThemedContextMenu {
                  && typeof ShellBridge.main?.openRestore === "function"
         onTriggered: ShellBridge.main.openRestore(owner.trackIndex, owner.clipIndex)
     }
-    ThemedMenu {
+    ThemedContextMenu {
         title: qsTr("Group")
         icon.name: Theme.icons.group
         visible: !owner.isTransformClip && owner.clipData.kind !== "adjustment"

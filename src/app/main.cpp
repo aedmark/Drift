@@ -1148,6 +1148,10 @@ int main(int argc, char *argv[])
     const auto loadShell = [&engine, resolvedShell, windowOf, hookWindow](bool first) {
         engine.setInitialProperties({{QStringLiteral("shellPreference"), resolvedShell}});
         engine.loadFromModule("Drift", "Shell");
+        if (engine.rootObjects().isEmpty()) {
+            qCritical("Failed to load Shell QML module");
+            return;
+        }
         hookWindow(windowOf(engine.rootObjects().constLast()), first, true);
     };
 

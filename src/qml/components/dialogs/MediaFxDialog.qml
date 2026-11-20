@@ -79,7 +79,7 @@ ThemedDialog {
                 tone: "accent"
                 onClicked: addMenu.open()
 
-                ThemedMenu {
+                ThemedContextMenu {
                     id: addMenu
                     y: parent.height + 4
 
