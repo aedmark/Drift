@@ -60,6 +60,22 @@ Item {
                 EditorState.nextTake()
             }
             event.accepted = true
+        } else if (event.key === Qt.Key_G && clipItem.selected) {
+            if (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ControlModifier) {
+                EditorState.groupSelectedClips()
+                event.accepted = true
+            }
+        } else if (event.key === Qt.Key_U) {
+            if (event.modifiers === (Qt.ControlModifier | Qt.ShiftModifier)) {
+                EditorState.toggleIgnoreGrouping()
+                event.accepted = true
+            } else if (clipItem.selected && event.modifiers === Qt.NoModifier) {
+                EditorState.ungroupSelectedClips()
+                event.accepted = true
+            } else if (clipItem.selected && event.modifiers === Qt.ControlModifier) {
+                EditorState.clearGroupSelectedClips()
+                event.accepted = true
+            }
         }
     }
 

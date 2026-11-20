@@ -84,8 +84,12 @@ QHash<QString, QString> defaultShortcuts()
         {QStringLiteral("split"), QStringLiteral("S")},
         {QStringLiteral("splitSelection"), QStringLiteral("Shift+S")},
         {QStringLiteral("merge"), QStringLiteral("Ctrl+M")},
-        {QStringLiteral("unlink"), QStringLiteral("Ctrl+Shift+U")},
-        {QStringLiteral("link"), QStringLiteral("Ctrl+Shift+L")},
+        {QStringLiteral("unlink"), QStringLiteral("U")},
+        {QStringLiteral("link"), QStringLiteral("G")},
+        {QStringLiteral("group"), QStringLiteral("G")},
+        {QStringLiteral("ungroup"), QStringLiteral("U")},
+        {QStringLiteral("clearGroup"), QStringLiteral("Ctrl+U")},
+        {QStringLiteral("toggleIgnoreGrouping"), QStringLiteral("Ctrl+Shift+U")},
         {QStringLiteral("separateAudio"), QStringLiteral("Ctrl+Shift+S")},
         {QStringLiteral("copy"), QStringLiteral("Ctrl+C")},
         {QStringLiteral("cut"), QStringLiteral("Ctrl+X")},
@@ -116,7 +120,7 @@ QHash<QString, QString> defaultShortcuts()
         // rate, so the material stays listenable while it runs fast.
         {QStringLiteral("speedUp"), QStringLiteral("L")},
         {QStringLiteral("speedDown"), QStringLiteral("J")},
-        {QStringLiteral("toggleGuides"), QStringLiteral("G")},
+        {QStringLiteral("toggleGuides"), QStringLiteral("Alt+Shift+G")},
         {QStringLiteral("toggleTrackHidden"), QStringLiteral("Shift+E")},
         // The 3D gizmo's tools.
         {QStringLiteral("gizmoMove"), QStringLiteral("Alt+G")},
@@ -1792,10 +1796,14 @@ void AppController::triggerAction(const QString &actionId)
         mergeSelectedClips();
     else if (actionId == QStringLiteral("separateAudio"))
         separateAudioFromSelection();
-    else if (actionId == QStringLiteral("unlink"))
-        unlinkSelectedClips();
-    else if (actionId == QStringLiteral("link"))
-        linkSelectedClips();
+    else if (actionId == QStringLiteral("unlink") || actionId == QStringLiteral("ungroup"))
+        ungroupSelectedClips();
+    else if (actionId == QStringLiteral("link") || actionId == QStringLiteral("group"))
+        groupSelectedClips();
+    else if (actionId == QStringLiteral("clearGroup"))
+        clearGroupSelectedClips();
+    else if (actionId == QStringLiteral("toggleIgnoreGrouping"))
+        toggleIgnoreGrouping();
     else if (actionId == QStringLiteral("copy"))
         copySelection();
     else if (actionId == QStringLiteral("cut"))

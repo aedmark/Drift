@@ -367,6 +367,9 @@ class AppController : public QObject
     Q_PROPERTY(QString activeSequenceId READ activeSequenceId NOTIFY sequenceTabsChanged)
     Q_PROPERTY(bool unlinkAvailable READ canUnlinkSelection NOTIFY editCapabilitiesChanged)
     Q_PROPERTY(bool linkAvailable READ canLinkSelection NOTIFY editCapabilitiesChanged)
+    Q_PROPERTY(bool groupAvailable READ canGroupSelection NOTIFY editCapabilitiesChanged)
+    Q_PROPERTY(bool ungroupAvailable READ canUngroupSelection NOTIFY editCapabilitiesChanged)
+    Q_PROPERTY(bool ignoreGrouping READ ignoreGrouping WRITE setIgnoreGrouping NOTIFY ignoreGroupingChanged)
     Q_PROPERTY(bool mergeAvailable READ canMergeSelection NOTIFY editCapabilitiesChanged)
     Q_PROPERTY(bool textToSubtitleAvailable READ canConvertSelectionToSubtitle NOTIFY editCapabilitiesChanged)
     // False until the user picks a launch layout (or decides later via first-clip setup / load).
@@ -1367,6 +1370,15 @@ public:
     Q_INVOKABLE void unlinkSelectedClips();
     Q_INVOKABLE bool canLinkSelection() const;
     Q_INVOKABLE void linkSelectedClips();
+    Q_INVOKABLE bool canGroupSelection() const;
+    Q_INVOKABLE void groupSelectedClips();
+    Q_INVOKABLE bool canUngroupSelection() const;
+    Q_INVOKABLE void ungroupSelectedClips();
+    Q_INVOKABLE void clearGroupSelectedClips();
+    Q_INVOKABLE void selectAllInGroup(int trackIndex, int clipIndex);
+    bool ignoreGrouping() const;
+    void setIgnoreGrouping(bool ignore);
+    Q_INVOKABLE void toggleIgnoreGrouping();
     Q_INVOKABLE void setClipMask(int trackIndex, int clipIndex, const QVariantMap &mask);
 
     // The mask shapes the assets panel offers as cards: {id, label} per entry. A "media" mask is
@@ -2000,6 +2012,7 @@ signals:
     void mediaGridModeChanged();
     void mediaViewModeChanged();
     void autoKeyEnabledChanged();
+    void ignoreGroupingChanged();
     void positionLinkedChanged();
     void sizeLinkedChanged();
     void masterVolumeChanged();
@@ -2747,6 +2760,7 @@ protected:
     bool m_quietUndoPush = false;
     bool m_undoRefreshOwed = false;
     bool m_editRefusedByLock = false;
+    bool m_ignoreGrouping = false;
     // Set while commitPreviewDrag finishes a drag that left the selection on the same clip:
     // finishEdit then skips selectionChanged.
     bool m_quietSelection = false;

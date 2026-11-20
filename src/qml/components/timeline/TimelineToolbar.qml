@@ -312,6 +312,15 @@ Item {
             }
         }
 
+        TimelineToolbarToolButton {
+            glyph: EditorState.ignoreGrouping ? Theme.icons.unlink : Theme.icons.link
+            tooltip: toolbar.withShortcut(EditorState.ignoreGrouping
+                ? qsTr("Ignore Event Grouping: ON (Clips move independently)")
+                : qsTr("Ignore Event Grouping: OFF (Grouped clips move together)"), "toggleIgnoreGrouping")
+            active: EditorState.ignoreGrouping
+            onClicked: EditorState.toggleIgnoreGrouping()
+        }
+
         TimelineToolbarZoomControl {
             host: toolbar
         }

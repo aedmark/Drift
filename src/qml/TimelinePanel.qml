@@ -383,6 +383,10 @@ PanelFrame {
     property real rippleShiftDelta: 0
 
     function setTrimFollow(linkId, clipId, start, duration, inPoint, outPoint, rippleIds, rippleDelta) {
+        if (EditorState.ignoreGrouping) {
+            clearTrimFollow()
+            return
+        }
         trimFollowLinkId = linkId || ""
         trimFollowClipId = clipId || ""
         trimFollowStart = start

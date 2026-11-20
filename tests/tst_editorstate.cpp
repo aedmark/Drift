@@ -361,6 +361,7 @@ private slots:
     void splitPreviewVideoComparisonWipeActionsAndRendering();
     void vegasAutoRippleModesAndRippleDelete();
     void vegasMultiTakeManagementAndCycling();
+    void vegasEventGroupingAndIgnoreGrouping();
     void customFadeCurveSessionApplyAndCancel();
     void animationCurveSessionIsSeparateFromFade();
     void clipAnimationKindsListsBuiltins();
@@ -8525,6 +8526,162 @@ void EditorStateTest::vegasMultiTakeManagementAndCycling()
     QCOMPARE(restored.tracks().at(0).clips.at(0).takes.size(), 2);
     QCOMPARE(restored.tracks().at(0).clips.at(0).activeTakeIndex,
              state.project()->tracks().at(0).clips.at(0).activeTakeIndex);
+}
+
+void EditorStateTest::vegasEventGroupingAndIgnoreGrouping()
+{
+    AssetLibrary library;
+    AppController state(&library);
+
+    // 1. Setup fixture: 3 tracks (Video 0, Video 1, Audio 2) with 3 clips
+    drift::Track t0;
+    t0.id = QStringLiteral("t0");
+    t0.type = drift::TrackType::Video;
+    drift::Clip cA;
+    cA.id = QStringLiteral("clipA");
+    cA.timelineStart = drift::secondsToUs(1.0);
+    cA.timelineDuration = drift::secondsToUs(4.0);
+    t0.clips = {cA};
+
+    drift::Track t1;
+    t1.id = QStringLiteral("t1");
+    t1.type = drift::TrackType::Video;
+    drift::Clip cB;
+    cB.id = QStringLiteral("clipB");
+    cB.timelineStart = drift::secondsToUs(1.0);
+    cB.timelineDuration = drift::secondsToUs(4.0);
+    t1.clips = {cB};
+
+    drift::Track t2;
+    t2.id = QStringLiteral("t2");
+    t2.type = drift::TrackType::Audio;
+    drift::Clip cC;
+    cC.id = QStringLiteral("clipC");
+    cC.type = drift::ClipType::Audio;
+    cC.timelineStart = drift::secondsToUs(2.0);
+    cC.timelineDuration = drift::secondsToUs(5.0);
+    t2.clips = {cC};
+
+    state.project()->tracks() = {t0, t1, t2};
+    state.syncClipModels();
+
+    // 2. Initial state
+    QVERIFY(!state.canGroupSelection());
+    QVERIFY(!state.canUngroupSelection());
+    QVERIFY(!state.ignoreGrouping());
+
+    // 3. Select clipA and clipB, and group them (G)
+    state.setSelection({clipPair(0, 0), clipPair(1, 0)});
+    QVERIFY(state.canGroupSelection());
+    state.groupSelectedClips();
+
+    const QString g1 = state.project()->tracks().at(0).clips.at(0).linkId;
+    QVERIFY(!g1.isEmpty());
+    QCOMPARE(state.project()->tracks().at(1).clips.at(0).linkId, g1);
+    QVERIFY(state.project()->tracks().at(0).clips.at(0).linkLoose);
+    QVERIFY(state.project()->tracks().at(1).clips.at(0).linkLoose);
+    QVERIFY(state.project()->tracks().at(2).clips.at(0).linkId.isEmpty());
+
+    // 4. Grouped selection & movement
+    state.selectClip(0, 0); // Click clipA
+    QCOMPARE(state.selectionCount(), 2); // ClipB was brought along into selection
+    QVERIFY(state.selectionContains(0, 0));
+    QVERIFY(state.selectionContains(1, 0));
+
+    // Move clipA to 3.0s (delta = +2.0s). ClipB must move by the same delta
+    state.moveClip(0, 0, 3.0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineStart, drift::secondsToUs(3.0));
+    QCOMPARE(state.project()->tracks().at(1).clips.at(0).timelineStart, drift::secondsToUs(3.0));
+    QCOMPARE(state.project()->tracks().at(2).clips.at(0).timelineStart, drift::secondsToUs(2.0)); // ClipC untouched
+
+    // 5. Expand Group: Select clips A, B and add C, then Group (G)
+    state.setSelection({clipPair(0, 0), clipPair(1, 0), clipPair(2, 0)});
+    QVERIFY(state.canGroupSelection());
+    state.groupSelectedClips();
+
+    const QString g2 = state.project()->tracks().at(0).clips.at(0).linkId;
+    QVERIFY(!g2.isEmpty());
+    QCOMPARE(state.project()->tracks().at(1).clips.at(0).linkId, g2);
+    QCOMPARE(state.project()->tracks().at(2).clips.at(0).linkId, g2);
+
+    state.selectClip(2, 0); // Click clipC
+    QCOMPARE(state.selectionCount(), 3); // All 3 selected together
+
+    // 6. Ungroup Single Event (U / ungroupSelectedClips): Select only clipA and remove it from group
+    // Temporarily ignore grouping to isolate clipA
+    state.setIgnoreGrouping(true);
+    state.selectClip(0, 0);
+    QCOMPARE(state.selectionCount(), 1);
+    QVERIFY(state.canUngroupSelection());
+    state.ungroupSelectedClips();
+
+    // ClipA is now ungrouped, but ClipB and ClipC remain grouped!
+    QVERIFY(state.project()->tracks().at(0).clips.at(0).linkId.isEmpty());
+    const QString g3 = state.project()->tracks().at(1).clips.at(0).linkId;
+    QVERIFY(!g3.isEmpty());
+    QCOMPARE(state.project()->tracks().at(2).clips.at(0).linkId, g3);
+
+    // 7. Ungroup when only 2 remain: removing ClipB dissolves the group (no 1-clip groups)
+    state.selectClip(1, 0);
+    state.ungroupSelectedClips();
+    QVERIFY(state.project()->tracks().at(1).clips.at(0).linkId.isEmpty());
+    QVERIFY(state.project()->tracks().at(2).clips.at(0).linkId.isEmpty());
+
+    // 8. Re-group A and B to test Ignore Event Grouping (Ctrl+Shift+U)
+    state.setIgnoreGrouping(false);
+    state.setSelection({clipPair(0, 0), clipPair(1, 0)});
+    state.groupSelectedClips();
+    const QString g4 = state.project()->tracks().at(0).clips.at(0).linkId;
+    QVERIFY(!g4.isEmpty());
+
+    // Toggle Ignore Grouping ON (Ctrl+Shift+U)
+    state.toggleIgnoreGrouping();
+    QVERIFY(state.ignoreGrouping());
+
+    // In Ignore Grouping mode, clicking clipA selects ONLY clipA
+    state.selectClip(0, 0);
+    QCOMPARE(state.selectionCount(), 1);
+
+    // Moving clipA only moves clipA; clipB stays put!
+    state.moveClip(0, 0, 6.0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineStart, drift::secondsToUs(6.0));
+    QCOMPARE(state.project()->tracks().at(1).clips.at(0).timelineStart, drift::secondsToUs(3.0));
+
+    // selectAllInGroup explicitly selects all members even with ignoreGrouping
+    state.selectAllInGroup(0, 0);
+    QCOMPARE(state.selectionCount(), 2);
+
+    // Toggle Ignore Grouping OFF
+    state.toggleIgnoreGrouping();
+    QVERIFY(!state.ignoreGrouping());
+
+    // Clicking clipA selects both A and B again!
+    state.selectClip(0, 0);
+    QCOMPARE(state.selectionCount(), 2);
+
+    // 9. Deleting clip with Ignore Grouping active
+    state.setIgnoreGrouping(true);
+    state.selectClip(0, 0);
+    state.deleteSelectedClip();
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 0);
+    QCOMPARE(state.project()->tracks().at(1).clips.size(), 1); // ClipB survived!
+
+    // 10. Undo / Redo
+    state.undo(); // Undo delete clipA
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 1);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).linkId, g4);
+
+    state.redo(); // Redo delete clipA
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 0);
+
+    state.undo(); // Put clipA back
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 1);
+
+    // 11. Serialization Roundtrip
+    const QJsonObject json = state.project()->toJson();
+    const drift::Project restored = drift::Project::fromJson(json);
+    QCOMPARE(restored.tracks().at(0).clips.at(0).linkId, g4);
+    QVERIFY(restored.tracks().at(0).clips.at(0).linkLoose);
 }
 
 void EditorStateTest::customFadeCurveSessionApplyAndCancel()

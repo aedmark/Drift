@@ -1514,7 +1514,9 @@ void AppController::selectClip(int trackIndex, int clipIndex)
     if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked)
         return;
 
-    const QList<QPair<int, int>> next = selectionWithLinkedPartners(m_project, trackIndex, clipIndex);
+    const QList<QPair<int, int>> next = m_ignoreGrouping
+        ? QList<QPair<int, int>>{qMakePair(trackIndex, clipIndex)}
+        : selectionWithLinkedPartners(m_project, trackIndex, clipIndex);
     if (next == m_selection && m_selectedTrack == trackIndex && m_selectedClip == clipIndex
         && m_selectedTransitionTrack < 0) {
         // Re-selecting is how callers refresh after editing the clip in place.
@@ -1584,7 +1586,10 @@ void AppController::addToSelection(int trackIndex, int clipIndex)
         return;
 
     bool changed = m_selectedTrack != trackIndex || m_selectedClip != clipIndex;
-    for (const QPair<int, int> &pair : selectionWithLinkedPartners(m_project, trackIndex, clipIndex)) {
+    const auto partners = m_ignoreGrouping
+        ? QList<QPair<int, int>>{qMakePair(trackIndex, clipIndex)}
+        : selectionWithLinkedPartners(m_project, trackIndex, clipIndex);
+    for (const QPair<int, int> &pair : partners) {
         if (!m_project.tracks().at(pair.first).locked && !selectionContains(pair.first, pair.second)) {
             m_selection.append(pair);
             changed = true;
@@ -1604,8 +1609,11 @@ void AppController::setSelection(const QVariantList &pairs)
         const QVariantMap map = value.toMap();
         const int trackIndex = map.value(QStringLiteral("track")).toInt();
         const int clipIndex = map.value(QStringLiteral("clip")).toInt();
-        // Match click-select: bring linked A/V partners along.
-        for (const QPair<int, int> &pair : selectionWithLinkedPartners(m_project, trackIndex, clipIndex)) {
+        // Match click-select: bring linked A/V partners along unless ignoreGrouping is on.
+        const auto partners = m_ignoreGrouping
+            ? QList<QPair<int, int>>{qMakePair(trackIndex, clipIndex)}
+            : selectionWithLinkedPartners(m_project, trackIndex, clipIndex);
+        for (const QPair<int, int> &pair : partners) {
             if (!next.contains(pair) && !m_project.tracks().at(pair.first).locked)
                 next.append(pair);
         }
@@ -1683,7 +1691,8 @@ bool AppController::selectionHasPinnedAdjustments() const
         pairs = {qMakePair(m_selectedTrack, m_selectedClip)};
     if (pairs.isEmpty())
         return false;
-    expandSelectionWithLinkedPartners(m_project, pairs);
+    if (!m_ignoreGrouping)
+        expandSelectionWithLinkedPartners(m_project, pairs);
     QSet<QString> hostIds;
     for (const QPair<int, int> &pair : std::as_const(pairs)) {
         if (isValidClipIndex(pair.first, pair.second))
@@ -1736,7 +1745,8 @@ bool AppController::deleteSelection(bool withPinnedAdjustments, std::optional<bo
 
     const drift::Project before = m_project;
     QList<QPair<int, int>> pairs = m_selection;
-    expandSelectionWithLinkedPartners(m_project, pairs);
+    if (!m_ignoreGrouping)
+        expandSelectionWithLinkedPartners(m_project, pairs);
     // Pinned adjustments are removed without rippling their lane: the lane follows its parent
     // track, and syncLinkedAdjustments re-spans the remaining ones onto their clips afterwards.
     QSet<QPair<int, int>> pinnedAdjustments;
@@ -2028,8 +2038,10 @@ void AppController::moveClip(int trackIndex, int clipIndex, double newStart)
     const QPair<int, int> requested(trackIndex, clipIndex);
     QList<QPair<int, int>> targets = m_selection.contains(requested) ? m_selection
                                                                       : QList<QPair<int, int>>{requested};
-    // Linked partners ride along by the same delta whether or not they are selected.
-    expandSelectionWithLinkedPartners(m_project, targets);
+    // Linked partners ride along by the same delta whether or not they are selected,
+    // unless Ignore Event Grouping is active.
+    if (!m_ignoreGrouping)
+        expandSelectionWithLinkedPartners(m_project, targets);
     const drift::Project before = m_project;
     const drift::TimeUs desiredUs = drift::secondsToUs(newStart);
     const drift::TimeUs baseUs = m_project.tracks().at(trackIndex).clips.at(clipIndex).timelineStart;
@@ -3286,7 +3298,7 @@ int AppController::applyTrim(int trackIndex, int clipIndex, const TrimComputatio
     // A loose partner has its own length, so it gets the same edge moved by the same amount
     // rather than a copy of this clip's timing. Ripple, when on, keeps every left edge put.
     QList<QPair<int, TrimComputation>> loosePartners;
-    if (clip.linkLoose && durationDelta != 0) {
+    if (!m_ignoreGrouping && clip.linkLoose && durationDelta != 0) {
         for (const drift::ClipRef &ref : drift::linkedPartners(m_project, clip)) {
             const drift::Clip &partner = m_project.tracks().at(ref.trackIndex).clips.at(ref.clipIndex);
             const TrimComputation c =
@@ -3304,7 +3316,7 @@ int AppController::applyTrim(int trackIndex, int clipIndex, const TrimComputatio
     // linkId, not linkedClipId: linkId is what symmetrically pairs A/V companions, which is what
     // syncLinkedPartnersFrom walks. linkedClipId is the directional pin used by adjustments, and
     // guarding on it here skipped the partner sync for every linked audio clip.
-    if (!clip.linkId.isEmpty())
+    if (!m_ignoreGrouping && !clip.linkId.isEmpty())
         syncLinkedPartnersFrom(m_project, clip);
     if (computed.rippleDelta != 0) {
         QSet<int> tracks;
@@ -4416,7 +4428,7 @@ void AppController::moveClipToTrack(int trackIndex, int clipIndex, int newTrackI
             && !c.linkId.isEmpty())
             movingVideoLinkIds.insert(c.linkId);
     }
-    if (!movingVideoLinkIds.isEmpty()) {
+    if (!m_ignoreGrouping && !movingVideoLinkIds.isEmpty()) {
         const QList<QPair<int, int>> videoTargets = targets;
         for (const QPair<int, int> &pair : videoTargets) {
             if (!isValidClipIndex(pair.first, pair.second))

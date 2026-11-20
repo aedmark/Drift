@@ -528,21 +528,6 @@ void AppController::separateAudioFromClip(int trackIndex, int clipIndex)
     finishEdit(tr("Audio separated"));
 }
 
-bool AppController::canUnlinkSelection() const
-{
-    QList<QPair<int, int>> pairs = m_selection;
-    if (pairs.isEmpty() && m_selectedTrack >= 0 && m_selectedClip >= 0)
-        pairs.append(qMakePair(m_selectedTrack, m_selectedClip));
-
-    for (const QPair<int, int> &pair : pairs) {
-        if (!isValidClipIndex(pair.first, pair.second))
-            continue;
-        if (!m_project.tracks().at(pair.first).clips.at(pair.second).linkId.isEmpty())
-            return true;
-    }
-    return false;
-}
-
 void AppController::separateAudioFromSelection()
 {
     QList<QPair<int, int>> pairs = m_selection;
@@ -1857,91 +1842,6 @@ void AppController::setClipAudioStreamIndex(int trackIndex, int clipIndex, int s
     clip.audioStreamIndex = streamIndex;
     pushProjectEdit(before, tr("Change audio track"));
     finishEdit(tr("Change audio track"));
-}
-
-void AppController::unlinkSelectedClips()
-{
-    QList<QPair<int, int>> pairs = m_selection;
-    if (pairs.isEmpty() && m_selectedTrack >= 0 && m_selectedClip >= 0)
-        pairs.append(qMakePair(m_selectedTrack, m_selectedClip));
-    if (pairs.isEmpty())
-        return;
-
-    const drift::Project before = m_project;
-    bool changed = false;
-    QSet<QString> clearedLinkIds;
-    for (const QPair<int, int> &pair : pairs) {
-        if (!isValidClipIndex(pair.first, pair.second))
-            continue;
-
-        // A copy: clearing the clip's own linkId mid-loop would stop later partners matching.
-        const QString linkId = m_project.tracks().at(pair.first).clips.at(pair.second).linkId;
-        if (linkId.isEmpty() || clearedLinkIds.contains(linkId))
-            continue;
-
-        clearedLinkIds.insert(linkId);
-        for (drift::Track &track : m_project.tracks()) {
-            for (drift::Clip &candidate : track.clips) {
-                if (candidate.linkId == linkId) {
-                    candidate.linkId.clear();
-                    candidate.linkLoose = false;
-                }
-            }
-        }
-        changed = true;
-    }
-
-    if (!changed)
-        return;
-
-    if (m_selectedTrack >= 0 && m_selectedClip >= 0)
-        m_selection = {qMakePair(m_selectedTrack, m_selectedClip)};
-
-    pushProjectEdit(before, tr("Clips unlinked"));
-    finishEdit(tr("Audio unlinked"));
-}
-
-bool AppController::canLinkSelection() const
-{
-    // Two or more selected clips, none of them already part of a link.
-    QList<QPair<int, int>> pairs = m_selection;
-    if (pairs.isEmpty() && m_selectedTrack >= 0 && m_selectedClip >= 0)
-        pairs.append(qMakePair(m_selectedTrack, m_selectedClip));
-
-    int valid = 0;
-    for (const QPair<int, int> &pair : pairs) {
-        if (!isValidClipIndex(pair.first, pair.second))
-            continue;
-        if (!m_project.tracks().at(pair.first).clips.at(pair.second).linkId.isEmpty())
-            return false;
-        ++valid;
-    }
-    return valid >= 2;
-}
-
-void AppController::linkSelectedClips()
-{
-    if (!canLinkSelection())
-        return;
-
-    QList<QPair<int, int>> pairs = m_selection;
-    if (pairs.isEmpty() && m_selectedTrack >= 0 && m_selectedClip >= 0)
-        pairs.append(qMakePair(m_selectedTrack, m_selectedClip));
-
-    const drift::Project before = m_project;
-    const QString linkId = newClipId();
-    for (const QPair<int, int> &pair : pairs) {
-        if (!isValidClipIndex(pair.first, pair.second))
-            continue;
-        drift::Clip &clip = m_project.tracks()[pair.first].clips[pair.second];
-        clip.linkId = linkId;
-        // Manually linked clips usually come from different media, so the link is loose: it
-        // never copies one clip's duration, trim or speed onto the other.
-        clip.linkLoose = true;
-    }
-
-    pushProjectEdit(before, tr("Clips linked"));
-    finishEdit(tr("Clips linked"));
 }
 
 void AppController::setClipFade(int trackIndex, int clipIndex, double fadeInSeconds, double fadeOutSeconds)

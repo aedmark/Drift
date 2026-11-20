@@ -367,6 +367,41 @@ ThemedContextMenu {
                  && typeof ShellBridge.main?.openRestore === "function"
         onTriggered: ShellBridge.main.openRestore(owner.trackIndex, owner.clipIndex)
     }
+    ThemedMenu {
+        title: qsTr("Group")
+        icon.name: Theme.icons.group
+        visible: !owner.isTransformClip && owner.clipData.kind !== "adjustment"
+
+        ThemedMenuItem {
+            text: qsTr("Create New (G)")
+            icon.name: Theme.icons.link
+            enabled: EditorState.canGroupSelection()
+            onTriggered: EditorState.groupSelectedClips()
+        }
+        ThemedMenuItem {
+            text: qsTr("Remove from Group (U)")
+            icon.name: Theme.icons.unlink
+            enabled: !!owner.clipData.linked || EditorState.canUngroupSelection()
+            onTriggered: EditorState.ungroupSelectedClips()
+        }
+        ThemedMenuItem {
+            text: qsTr("Clear Group")
+            icon.name: Theme.icons.unlink
+            enabled: !!owner.clipData.linked || EditorState.canUngroupSelection()
+            onTriggered: EditorState.clearGroupSelectedClips()
+        }
+        ThemedMenuItem {
+            text: qsTr("Select All in Group")
+            icon.name: Theme.icons.group
+            enabled: !!owner.clipData.linked
+            onTriggered: EditorState.selectAllInGroup(owner.trackIndex, owner.clipIndex)
+        }
+        ThemedMenuSeparator {}
+        ThemedMenuItem {
+            text: (EditorState.ignoreGrouping ? "✓  " : "    ") + qsTr("Ignore Event Grouping (Ctrl+Shift+U)")
+            onTriggered: EditorState.toggleIgnoreGrouping()
+        }
+    }
     ThemedMenuItem {
         text: qsTr("Unlink")
         icon.name: Theme.icons.unlink
@@ -376,7 +411,7 @@ ThemedContextMenu {
     ThemedMenuItem {
         text: qsTr("Link")
         icon.name: Theme.icons.link
-        // Needs two or more unlinked clips selected (Shift+click to add).
+        // Needs two or more clips selected (Shift+click to add).
         visible: EditorState.linkAvailable
         onTriggered: EditorState.linkSelectedClips()
     }
