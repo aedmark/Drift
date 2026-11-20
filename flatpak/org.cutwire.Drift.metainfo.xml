@@ -50,8 +50,8 @@
     <category>AudioVideoEditing</category>
   </categories>
   <url type="homepage">https://cutwire.org/drift</url>
-  <url type="bugtracker">https://github.com/CutWire-Studios/Drift/issues</url>
-  <url type="vcs-browser">https://github.com/CutWire-Studios/Drift</url>
+  <url type="bugtracker">https://github.com/aedmark/Drift/issues</url>
+  <url type="vcs-browser">https://github.com/aedmark/Drift</url>
   <!-- Screenshot URLs are pinned to a commit: Flathub rejects branch-based git URLs
        because their contents change under the published listing. -->
   <screenshots>
@@ -89,6 +89,21 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.0.0" date="2026-11-20">
+      <url type="details">https://github.com/aedmark/Drift/releases/tag/v1.0.0</url>
+      <description>
+        <p>Drift Mojave 1.0.0 — What happens in the timeline, stays in the timeline. Establishes the standalone Drift Mojave fork with Sony/MAGIX VEGAS Pro project import, native in-process ProRes transcoding, and an expanded non-linear editing toolset.</p>
+        <ul>
+          <li>VEGAS Pro (.veg) binary project reader supporting tracks, clips, stream offsets, fades, and audio/video pairings</li>
+          <li>Native in-process Apple ProRes 422 background transcoding via libavcodec with automatic co-located .mov relinking on project load</li>
+          <li>VEGAS-style fade and transition curves alongside velocity envelopes for smooth speed ramping</li>
+          <li>Multi-take management and cycling, event grouping with ignore-grouping toggle, and multi-mode auto-ripple editing</li>
+          <li>Elastic time-stretch, slip editing tool, and cursorless split-at-playhead workflow</li>
+          <li>Media Pool pre-timeline FX with source-time keyframing and track/master audio FX racks</li>
+          <li>Split-preview comparison wipe, project notes and metadata persistence, and full Drift Mojave identity</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.2" date="2026-11-14">
       <url type="details">https://github.com/CutWire-Studios/Drift/releases/tag/v0.9.2</url>
       <description>
