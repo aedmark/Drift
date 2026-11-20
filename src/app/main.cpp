@@ -819,7 +819,10 @@ int main(int argc, char *argv[])
     }
     // Associates the window with the installed .desktop entry so shells (notably
     // Wayland) can find its icon and app metadata.
-    QGuiApplication::setDesktopFileName(QStringLiteral("org.cutwire.Drift"));
+#ifndef DRIFT_APP_ID
+#define DRIFT_APP_ID "org.driftmojave.Drift"
+#endif
+    QGuiApplication::setDesktopFileName(QStringLiteral(DRIFT_APP_ID));
     // Title bar / taskbar icon when no desktop entry is available (Windows, and
     // Linux runs from the build tree). The .exe still needs the Windows .rc icon
     // for Explorer and pinned-taskbar identity.

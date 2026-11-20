@@ -34,7 +34,11 @@ using namespace drift::crash;
 
 namespace {
 
-const QString kEndpoint = QStringLiteral("https://crash-reporting.cutwire.org/v1/report");
+#ifndef DRIFT_CRASH_REPORT_URL
+#define DRIFT_CRASH_REPORT_URL ""
+#endif
+
+const QString kEndpoint = QStringLiteral(DRIFT_CRASH_REPORT_URL);
 const QString kSettingKey = QStringLiteral("privacy/sendCrashReports");
 
 constexpr qint64 kMaxUploadDump = 512 * 1024;
@@ -152,7 +156,7 @@ void CrashReporter::startUploads()
     m_queue = m_store.pendingUploads(now);
     if (m_queue.isEmpty())
         return;
-    if (!automaticReports()) {
+    if (kEndpoint.isEmpty() || !automaticReports()) {
         // Turning it back on later must not send what was crashed with it off.
         for (const CrashInfo &crash : std::as_const(m_queue))
             m_store.markDone(crash);
@@ -166,7 +170,7 @@ void CrashReporter::startUploads()
 
 void CrashReporter::uploadNext()
 {
-    if (m_queue.isEmpty())
+    if (m_queue.isEmpty() || kEndpoint.isEmpty())
         return;
     const CrashInfo crash = m_queue.takeFirst();
     m_store.recordAttempt(crash);

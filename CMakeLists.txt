@@ -108,8 +108,14 @@ set(DRIFT_MARKET_CLIENT_KEY "5409a0bebab4446f88e51d06024a5cf9a694ee141a6a1c6be7a
 # Set it to an empty string for builds a package manager owns — the Flatpak manifests and the Arch
 # PKGBUILD all do. There, pacman or flatpak fetches the update on its own schedule and an in-app
 # nag is noise the user cannot act on (Flathub's quality guidelines say as much).
-set(DRIFT_UPDATE_FEED_URL "https://api.github.com/repos/CutWire-Studios/Drift/releases/latest"
+set(DRIFT_UPDATE_FEED_URL "https://api.github.com/repos/aedmark/Drift/releases/latest"
     CACHE STRING "Release feed polled for updates; empty disables the update check")
+set(DRIFT_UPDATE_VERSION_HOST ""
+    CACHE STRING "DNS TXT record host for version checks; empty uses GitHub release feed directly")
+
+# --- Crash reporting --------------------------------------------------------
+set(DRIFT_CRASH_REPORT_URL ""
+    CACHE STRING "Crash report endpoint; empty disables automatic crash report uploads")
 
 # --- Release channel --------------------------------------------------------
 # Nightly builds are the same source with a different identity: their own app id, their own
@@ -127,13 +133,13 @@ if(NOT DRIFT_CHANNEL STREQUAL "stable" AND NOT DRIFT_CHANNEL STREQUAL "nightly")
     message(FATAL_ERROR "DRIFT_CHANNEL must be 'stable' or 'nightly', not '${DRIFT_CHANNEL}'")
 endif()
 
-set(DRIFT_APP_ID "org.cutwire.Drift")
+set(DRIFT_APP_ID "org.driftmojave.Drift")
 set(DRIFT_APP_NAME "Drift Mojave")
 set(DRIFT_TAGLINE "What happens in the timeline, stays in the timeline.")
 set(DRIFT_VERSION_STRING "${PROJECT_VERSION}")
 if(DRIFT_CHANNEL STREQUAL "nightly")
-    set(DRIFT_APP_ID "org.cutwire.Drift.Nightly")
-    set(DRIFT_APP_NAME "Drift Nightly")
+    set(DRIFT_APP_ID "org.driftmojave.Drift.Nightly")
+    set(DRIFT_APP_NAME "Drift Mojave Nightly")
     # A local nightly configure with no stamp is still legible rather than "0.7.0-nightly.".
     if(DRIFT_BUILD_ID STREQUAL "")
         set(DRIFT_BUILD_ID "dev")
@@ -2954,8 +2960,11 @@ target_compile_definitions(drift PRIVATE
     DRIFT_MARKET_API_URL="${DRIFT_MARKET_API_URL}"
     DRIFT_MARKET_CLIENT_KEY="${DRIFT_MARKET_CLIENT_KEY}"
     DRIFT_UPDATE_FEED_URL="${DRIFT_UPDATE_FEED_URL}"
+    DRIFT_UPDATE_VERSION_HOST="${DRIFT_UPDATE_VERSION_HOST}"
+    DRIFT_CRASH_REPORT_URL="${DRIFT_CRASH_REPORT_URL}"
     DRIFT_VERSION="${DRIFT_VERSION_STRING}"
     DRIFT_APP_NAME="${DRIFT_APP_NAME}"
+    DRIFT_APP_ID="${DRIFT_APP_ID}"
     DRIFT_TAGLINE="${DRIFT_TAGLINE}"
     DRIFT_DISTRIBUTION="${DRIFT_DISTRIBUTION}"
 )
@@ -3104,10 +3113,6 @@ include(GNUInstallDirs)
 # Icon= all carry that string — and the human-facing name suffixed, so the launcher shows
 # "Drift Nightly" next to a stable entry rather than two identical ones.
 function(drift_install_metadata source destination name)
-    if(DRIFT_CHANNEL STREQUAL "stable")
-        install(FILES "${source}" DESTINATION "${destination}" RENAME "${name}" COMPONENT drift)
-        return()
-    endif()
     file(READ "${CMAKE_SOURCE_DIR}/${source}" _content)
     string(REPLACE "org.cutwire.Drift" "${DRIFT_APP_ID}" _content "${_content}")
     string(REPLACE "Name=Drift\n" "Name=${DRIFT_APP_NAME}\n" _content "${_content}")

@@ -60,9 +60,12 @@ const QString kFeedUrl = QStringLiteral(DRIFT_UPDATE_FEED_URL);
 const QString kCurrentVersion = QStringLiteral(DRIFT_VERSION);
 const QString kDistribution = QStringLiteral(DRIFT_DISTRIBUTION);
 
-// The newest stable version. A TXT record, so the check is one DNS query and does not depend on
-// GitHub's API answering before we know whether anything changed.
-const QString kVersionHost = QStringLiteral("drift-version.cutwire.org");
+#ifndef DRIFT_UPDATE_VERSION_HOST
+#define DRIFT_UPDATE_VERSION_HOST ""
+#endif
+
+// The newest stable version. When empty, update checks query GitHub's release API directly.
+const QString kVersionHost = QStringLiteral(DRIFT_UPDATE_VERSION_HOST);
 
 QString settingsKey(const char *name)
 {
@@ -442,6 +445,46 @@ void UpdateChecker::check(bool manual)
     if (manual)
         setStatus(QString());
     setError(QString());
+
+    if (kVersionHost.isEmpty()) {
+        QNetworkRequest request{QUrl(kFeedUrl)};
+        request.setHeader(QNetworkRequest::UserAgentHeader,
+                          QLatin1String("DriftMojave/") + kCurrentVersion);
+        request.setRawHeader("Accept", "application/vnd.github+json");
+        request.setRawHeader("X-GitHub-Api-Version", "2022-11-28");
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                             QNetworkRequest::NoLessSafeRedirectPolicy);
+        request.setTransferTimeout(kTransferTimeoutMs);
+
+        QNetworkReply *reply = m_network->get(request);
+        connect(reply, &QNetworkReply::finished, this, [this, reply, manual] {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                if (manual)
+                    setStatus(tr("Couldn’t check for updates: %1").arg(reply->errorString()));
+                setChecking(false);
+                return;
+            }
+            const QByteArray body = reply->readAll();
+            const QJsonObject release = QJsonDocument::fromJson(body).object();
+            const QString tag = release.value(QStringLiteral("tag_name")).toString();
+            const QString version = tag.startsWith(QLatin1Char('v')) ? tag.mid(1) : tag;
+            QSettings().setValue(settingsKey("lastCheck"), QDateTime::currentDateTimeUtc());
+            if (version.isEmpty() || drift::compareVersions(kCurrentVersion, version) >= 0) {
+                clearRelease();
+                if (manual)
+                    setStatus(tr("Drift Mojave %1 is the latest version.").arg(kCurrentVersion));
+                setChecking(false);
+                return;
+            }
+            if (!applyRelease(body, manual, version)) {
+                publishFromVersion(version, manual);
+            } else {
+                finishCheck(version, manual);
+            }
+        });
+        return;
+    }
 
     auto *dns = new QDnsLookup(QDnsLookup::TXT, kVersionHost, this);
     connect(dns, &QDnsLookup::finished, this, [this, dns, manual] {

@@ -663,7 +663,7 @@ bool inFlatpak()
 
 QString flatpakId()
 {
-    return qEnvironmentVariable("FLATPAK_ID", QStringLiteral("org.cutwire.Drift"));
+    return qEnvironmentVariable("FLATPAK_ID", QStringLiteral("org.driftmojave.Drift"));
 }
 
 // AMD's packages install to /opt/rocm-X.Y.Z, with /opt/rocm a symlink through /etc/alternatives.
