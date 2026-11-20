@@ -61,13 +61,13 @@ ThemedDialog {
 
             ThemedButton {
                 text: qsTr("Video FX (%1)").arg(root.videoEffects.length)
-                tone: root.currentTab === 0 ? "accent" : "subtle"
+                variant: root.currentTab === 0 ? "primary" : "secondary"
                 onClicked: root.currentTab = 0
             }
 
             ThemedButton {
                 text: qsTr("Audio FX (%1)").arg(root.audioEffects.length)
-                tone: root.currentTab === 1 ? "accent" : "subtle"
+                variant: root.currentTab === 1 ? "primary" : "secondary"
                 onClicked: root.currentTab = 1
             }
 
@@ -75,8 +75,8 @@ ThemedDialog {
 
             ThemedButton {
                 text: qsTr("Add Effect…")
-                icon.name: Theme.icons.plus
-                tone: "accent"
+                glyph: Theme.icons.plus
+                variant: "primary"
                 onClicked: addMenu.open()
 
                 ThemedContextMenu {
@@ -106,8 +106,8 @@ ThemedDialog {
 
             ThemedButton {
                 text: qsTr("Clear All")
-                icon.name: Theme.icons.trash
-                tone: "subtle"
+                glyph: Theme.icons.trash
+                variant: "secondary"
                 enabled: root.currentTab === 0 ? root.videoEffects.length > 0 : root.audioEffects.length > 0
                 onClicked: {
                     if (root.currentTab === 0)
@@ -121,7 +121,7 @@ ThemedDialog {
         Rectangle {
             width: parent.width
             height: 1
-            color: Theme.c.borderMuted
+            color: Theme.panelBorder
         }
 
         // Empty state when no effects
@@ -139,7 +139,7 @@ ThemedDialog {
                     anchors.horizontalCenter: parent.horizontalCenter
                     glyph: Theme.icons.sparkles
                     iconSize: 32
-                    iconColor: Theme.c.foregroundMuted
+                    iconColor: Theme.mutedForeground
                 }
 
                 ThemedLabel {
@@ -154,7 +154,7 @@ ThemedDialog {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: qsTr("Media FX process the source media before it hits the timeline.")
                     size: "sm"
-                    tone: "subtle"
+                    tone: "muted"
                 }
             }
         }
@@ -171,10 +171,10 @@ ThemedDialog {
             Rectangle {
                 width: 240
                 height: parent.height
-                color: Theme.c.surfaceRaised
+                color: Theme.panelSecondaryBg
                 radius: Theme.radiusSm
                 border.width: 1
-                border.color: Theme.c.borderMuted
+                border.color: Theme.panelBorder
                 clip: true
 
                 ListView {
@@ -197,8 +197,8 @@ ThemedDialog {
                                 ? (root.selectedEffectIndex === index)
                                 : (root.selectedAudioEffectIndex === index)
                             if (isSel)
-                                return Theme.c.selectionBackground
-                            return rowHover.hovered ? Theme.c.surfaceHovered : "transparent"
+                                return Theme.panelMuted
+                            return rowHover.hovered ? Theme.popoverHover : "transparent"
                         }
 
                         HoverHandler { id: rowHover }
@@ -235,8 +235,8 @@ ThemedDialog {
                             }
 
                             ThemedButton {
-                                icon.name: Theme.icons.arrowUp
-                                tone: "ghost"
+                                glyph: Theme.icons.arrowUp
+                                variant: "ghost"
                                 enabled: effectRow.index > 0
                                 onClicked: {
                                     if (root.currentTab === 0) {
@@ -250,8 +250,8 @@ ThemedDialog {
                             }
 
                             ThemedButton {
-                                icon.name: Theme.icons.arrowDown
-                                tone: "ghost"
+                                glyph: Theme.icons.arrowDown
+                                variant: "ghost"
                                 enabled: effectRow.index < (root.currentTab === 0 ? root.videoEffects.length - 1 : root.audioEffects.length - 1)
                                 onClicked: {
                                     if (root.currentTab === 0) {
@@ -265,8 +265,8 @@ ThemedDialog {
                             }
 
                             ThemedButton {
-                                icon.name: Theme.icons.x
-                                tone: "ghost"
+                                glyph: Theme.icons.x
+                                variant: "ghost"
                                 onClicked: {
                                     if (root.currentTab === 0) {
                                         EditorState.removeAssetEffect(root.assetId, effectRow.index)
@@ -284,12 +284,13 @@ ThemedDialog {
 
             // Right: Selected effect parameters
             Rectangle {
+                id: paramsPane
                 width: parent.width - 240 - Theme.spacingMd
                 height: parent.height
-                color: Theme.c.surfaceRaised
+                color: Theme.panelSecondaryBg
                 radius: Theme.radiusSm
                 border.width: 1
-                border.color: Theme.c.borderMuted
+                border.color: Theme.panelBorder
                 clip: true
 
                 readonly property var currentEffect: {
@@ -315,12 +316,14 @@ ThemedDialog {
                         spacing: Theme.spacingMd
 
                         ThemedLabel {
-                            text: currentEffect ? (currentEffect.label || currentEffect.catalogId) : ""
-                            size: "lg"
+                            text: paramsPane.currentEffect ? (paramsPane.currentEffect.label || paramsPane.currentEffect.catalogId) : ""
+                            size: "base"
+                            font.bold: true
+                            tone: "default"
                         }
 
                         Repeater {
-                            model: currentEffect ? (currentEffect.params || []) : []
+                            model: paramsPane.currentEffect ? (paramsPane.currentEffect.params || []) : []
                             delegate: Column {
                                 id: paramDelegate
                                 required property var modelData

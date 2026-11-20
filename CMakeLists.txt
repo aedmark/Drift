@@ -1770,6 +1770,7 @@ qt_add_qml_module(drift
         src/qml/PreviewPanel.qml
         src/qml/components/preview/ViewAxisWidget.qml
         src/qml/components/preview/PreviewViewport.qml
+        src/qml/components/preview/PreviewSplitWipe.qml
         src/qml/components/preview/PreviewStatusLayer.qml
         src/qml/components/preview/PreviewToolHost.qml
         src/qml/components/preview/InlineTextEditor.qml
@@ -2330,6 +2331,7 @@ qt_add_qml_module(drift
         src/qml/components/preview/osd/PreviewOsdGuidesButton.qml
         src/qml/components/preview/osd/PreviewOsdGuideMenuButton.qml
         src/qml/components/preview/osd/PreviewOsdCluster.qml
+        src/qml/components/preview/osd/PreviewOsdSplitButton.qml
         src/qml/components/preview/options/PreviewOptionsRowLabel.qml
         src/qml/components/preview/options/PreviewOptionsDecodeWarning.qml
         src/qml/components/preview/options/PreviewOptionsDecodeDialog.qml

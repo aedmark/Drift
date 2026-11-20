@@ -118,11 +118,11 @@ Item {
             border.color: vDragArea.containsMouse || vDragArea.pressed ? Theme.accentHover : Theme.accent
             border.width: 1.5
 
-            IconItem {
+            IconGlyph {
                 anchors.centerIn: parent
                 glyph: Theme.icons.split
-                size: 14
-                color: Theme.foreground
+                iconSize: 14
+                iconColor: Theme.foreground
             }
         }
 
@@ -173,11 +173,11 @@ Item {
             border.color: hDragArea.containsMouse || hDragArea.pressed ? Theme.accentHover : Theme.accent
             border.width: 1.5
 
-            IconItem {
+            IconGlyph {
                 anchors.centerIn: parent
                 glyph: Theme.icons.split
-                size: 14
-                color: Theme.foreground
+                iconSize: 14
+                iconColor: Theme.foreground
             }
         }
 
@@ -223,7 +223,7 @@ Item {
                 text: root.inverted ? root.sourceLabelB : root.sourceLabelA
                 color: Theme.foreground
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize2xs
+                font.pixelSize: Theme.fontSizeXs
                 font.weight: Font.Medium
             }
         }
@@ -250,7 +250,7 @@ Item {
                 text: root.inverted ? root.sourceLabelA : root.sourceLabelB
                 color: Theme.accent
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize2xs
+                font.pixelSize: Theme.fontSizeXs
                 font.weight: Font.Medium
             }
         }

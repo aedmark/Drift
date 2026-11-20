@@ -205,8 +205,11 @@ Item {
                 return !!root.clipData.hasVelocityEnvelope && !!root.clipData.velocityEnvelopeEnabled
             }
 
-            ThemedInspectorHeading {
-                title: qsTr("Velocity Envelope (VEGAS)")
+            Text {
+                text: qsTr("Velocity Envelope (VEGAS)")
+                color: Theme.c.speedFadeInspector.foregroundMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeXs
             }
 
             Row {

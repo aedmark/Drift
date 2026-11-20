@@ -7,7 +7,6 @@ AbstractButton {
     id: toggle
 
     property string glyph: ""
-    property string text: ""
     property string tooltip: ""
     property string tone: "destructive"
     property bool blinking: false
