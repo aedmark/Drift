@@ -15,9 +15,7 @@
 #include <QFutureWatcher>
 #include <QMutex>
 #include <QMutexLocker>
-#include <QProcess>
 #include <QSet>
-#include <QStandardPaths>
 #include <QThreadPool>
 #include <QtConcurrent>
 
@@ -1050,12 +1048,7 @@ void MediaBinController::convertToProRes(const QStringList &assetIds, const QUrl
     m_app->setLastMessage(tr("Starting Apple ProRes 422 transcode for %n file(s)…", nullptr, total),
                           QStringLiteral("info"));
 
-    QString ffmpegPath = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
-    if (ffmpegPath.isEmpty() && QFile::exists(QStringLiteral("/usr/bin/ffmpeg"))) {
-        ffmpegPath = QStringLiteral("/usr/bin/ffmpeg");
-    }
-
-    (void)QtConcurrent::run([this, items, ffmpegPath, total]() {
+    (void)QtConcurrent::run([this, items, total]() {
         const int maxThreads = std::clamp(QThread::idealThreadCount() / 2, 1, 6);
         QThreadPool pool;
         pool.setMaxThreadCount(maxThreads);
@@ -1068,7 +1061,7 @@ void MediaBinController::convertToProRes(const QStringList &assetIds, const QUrl
         } result;
 
         for (const TranscodeItem &item : items) {
-            pool.start([this, item, &result, ffmpegPath, total]() {
+            pool.start([this, item, &result, total]() {
                 if (m_editCancel.loadRelaxed() != 0)
                     return;
 
@@ -1091,56 +1084,25 @@ void MediaBinController::convertToProRes(const QStringList &assetIds, const QUrl
                     return;
                 }
 
-                if (ffmpegPath.isEmpty()) {
-                    ++result.failed;
-                    return;
-                }
+                // Native Apple ProRes 422 transcode via libav* (src/engine/encode/)
+                drift::MediaEditSpec spec;
+                spec.inputPath = item.inputPath;
+                spec.outputPath = item.outputPath;
+                spec.kind = QStringLiteral("video");
+                spec.conformFrameRate = true;
+                spec.output.container = QStringLiteral("mov");
+                spec.output.videoCodec = QStringLiteral("prores");
 
-                const QString tmpOut = item.outputPath + QStringLiteral(".tmp.mov");
-                if (QFile::exists(tmpOut))
-                    QFile::remove(tmpOut);
+                QString transcodeError;
+                const bool ok = drift::editMedia(spec, &transcodeError, [this](double) {
+                    return m_editCancel.loadRelaxed() == 0;
+                });
 
-                QStringList args;
-                args << QStringLiteral("-hide_banner")
-                     << QStringLiteral("-loglevel") << QStringLiteral("error")
-                     << QStringLiteral("-y")
-                     << QStringLiteral("-i") << item.inputPath
-                     << QStringLiteral("-c:v") << QStringLiteral("prores_ks")
-                     << QStringLiteral("-profile:v") << QStringLiteral("2")
-                     << QStringLiteral("-vendor") << QStringLiteral("apl0")
-                     << QStringLiteral("-pix_fmt") << QStringLiteral("yuv422p10le")
-                     << QStringLiteral("-c:a") << QStringLiteral("pcm_s16le")
-                     << QStringLiteral("-ar") << QStringLiteral("48000")
-                     << QStringLiteral("-map") << QStringLiteral("0:v:0")
-                     << QStringLiteral("-map") << QStringLiteral("0:a?")
-                     << tmpOut;
-
-                QProcess proc;
-                proc.start(ffmpegPath, args);
-
-                while (!proc.waitForFinished(200)) {
-                    if (m_editCancel.loadRelaxed() != 0) {
-                        proc.kill();
-                        proc.waitForFinished();
-                        QFile::remove(tmpOut);
-                        return;
-                    }
-                }
-
-                if (proc.exitStatus() == QProcess::NormalExit && proc.exitCode() == 0
-                    && QFile::exists(tmpOut) && QFileInfo(tmpOut).size() > 0) {
-                    if (QFile::exists(item.outputPath))
-                        QFile::remove(item.outputPath);
-                    if (QFile::rename(tmpOut, item.outputPath)) {
-                        QMutexLocker locker(&result.mutex);
-                        result.remap.insert(item.inputPath, item.outputPath);
-                    } else {
-                        ++result.failed;
-                        QFile::remove(tmpOut);
-                    }
+                if (ok && QFile::exists(item.outputPath) && QFileInfo(item.outputPath).size() > 0) {
+                    QMutexLocker locker(&result.mutex);
+                    result.remap.insert(item.inputPath, item.outputPath);
                 } else {
                     ++result.failed;
-                    QFile::remove(tmpOut);
                 }
 
                 const int done = ++result.completed;

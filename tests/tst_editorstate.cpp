@@ -3831,42 +3831,76 @@ void EditorStateTest::projectJsonExportImportRoundTrip()
     QVERIFY(state.projectFile()->hasUnsavedChanges());
 }
 
+namespace {
+bool makeSourceLabFixture(const QString &path)
+{
+    const QString ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
+    if (ffmpeg.isEmpty())
+        return false;
+    QProcess process;
+    process.start(ffmpeg, {QStringLiteral("-y"), QStringLiteral("-loglevel"), QStringLiteral("error"),
+                           QStringLiteral("-f"), QStringLiteral("lavfi"), QStringLiteral("-i"),
+                           QStringLiteral("testsrc=d=4:r=30:s=320x240"),
+                           QStringLiteral("-f"), QStringLiteral("lavfi"), QStringLiteral("-i"),
+                           QStringLiteral("sine=d=4"), QStringLiteral("-pix_fmt"),
+                           QStringLiteral("yuv420p"), QStringLiteral("-c:v"), QStringLiteral("libx264"),
+                           QStringLiteral("-c:a"), QStringLiteral("aac"), QStringLiteral("-shortest"),
+                           path});
+    return process.waitForFinished(60'000) && process.exitCode() == 0;
+}
+} // namespace
+
 void EditorStateTest::convertToProResTranscodesAndRelinks()
 {
-    const QString extendedDir = qEnvironmentVariable("DRIFT_EXTENDED_VEGAS_TESTS_DIR");
-    if (extendedDir.isEmpty()) {
-        QSKIP("Extended tests skipped; set DRIFT_EXTENDED_VEGAS_TESTS_DIR to run");
-    }
-    const QString realVeg = QDir(extendedDir).filePath(QStringLiteral("Episode 3/Remaster/Scene 2/E3S2.veg"));
-    if (!QFile::exists(realVeg)) {
-        QSKIP("Sample .veg file not present in DRIFT_EXTENDED_VEGAS_TESTS_DIR");
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString source = dir.filePath(QStringLiteral("test_clip.mp4"));
+    if (!makeSourceLabFixture(source)) {
+        QSKIP("ffmpeg not available to make test fixture");
     }
 
     AssetLibrary library;
     AppController state(&library);
-    state.projectFile()->loadProject(QUrl::fromLocalFile(realVeg));
-    QTRY_VERIFY_WITH_TIMEOUT(!state.projectFile()->projectLoadPending(), 10000);
+    drift::Project &project = *state.project();
+    drift::MediaAsset asset;
+    asset.id = QStringLiteral("vid-1");
+    asset.kind = drift::MediaKind::Video;
+    asset.path = source;
+    asset.name = QStringLiteral("test_clip");
+    asset.durationUs = 2 * drift::kUsPerSecond;
+    asset.width = 320;
+    asset.height = 240;
+    asset.fps = 30.0;
+    asset.hasAudio = true;
+    asset.hasAudioKnown = true;
+    project.assets().insert(asset.id, asset);
+    project.assetOrder().append(asset.id);
 
-    const auto &assets = state.project()->assets();
-    QVERIFY(!assets.isEmpty());
-    QString videoAssetId;
-    for (auto it = assets.begin(); it != assets.end(); ++it) {
-        if (it.value().kind == drift::MediaKind::Video && !it.value().path.isEmpty() && QFile::exists(it.value().path)) {
-            videoAssetId = it.key();
-            break;
-        }
-    }
-    QVERIFY(!videoAssetId.isEmpty());
+    drift::Track track;
+    track.type = drift::TrackType::Video;
+    drift::Clip clip;
+    clip.id = QStringLiteral("clip-1");
+    clip.assetId = asset.id;
+    clip.path = source;
+    clip.timelineStart = 0;
+    clip.timelineDuration = 2 * drift::kUsPerSecond;
+    clip.srcIn = 0;
+    clip.srcOut = 2 * drift::kUsPerSecond;
+    track.clips.append(clip);
+    project.tracks().append(track);
 
+    const QString projectPath = dir.filePath(QStringLiteral("project.veg"));
     QSignalSpy transcodeFinished(state.bin(), &MediaBinController::proresTranscodeFinished);
-    state.bin()->convertToProRes({videoAssetId}, QUrl::fromLocalFile(realVeg));
+    state.bin()->convertToProRes({asset.id}, QUrl::fromLocalFile(projectPath));
     QTRY_VERIFY_WITH_TIMEOUT(!state.bin()->editing(), 15000);
 
     QCOMPARE(transcodeFinished.count(), 1);
     QVERIFY(transcodeFinished.at(0).at(0).toInt() >= 1);
-    const drift::MediaAsset &updatedAsset = state.project()->assets().value(videoAssetId);
+    const drift::MediaAsset &updatedAsset = state.project()->assets().value(asset.id);
     QVERIFY(updatedAsset.editFriendly);
     QVERIFY(updatedAsset.path.endsWith(QLatin1String(".mov"), Qt::CaseInsensitive));
+    QVERIFY(QFile::exists(updatedAsset.path));
+    QVERIFY(QFileInfo(updatedAsset.path).size() > 0);
 }
 
 void EditorStateTest::loadVegasProjectViaLoadProject()
@@ -4422,25 +4456,6 @@ void EditorStateTest::sourceLabPureTrimCropCopyKeepsCrop()
     state.undo();
     QCOMPARE(state.project()->assetOrder().size(), 1);
 }
-
-namespace {
-bool makeSourceLabFixture(const QString &path)
-{
-    const QString ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
-    if (ffmpeg.isEmpty())
-        return false;
-    QProcess process;
-    process.start(ffmpeg, {QStringLiteral("-y"), QStringLiteral("-loglevel"), QStringLiteral("error"),
-                           QStringLiteral("-f"), QStringLiteral("lavfi"), QStringLiteral("-i"),
-                           QStringLiteral("testsrc=d=4:r=30:s=320x240"),
-                           QStringLiteral("-f"), QStringLiteral("lavfi"), QStringLiteral("-i"),
-                           QStringLiteral("sine=d=4"), QStringLiteral("-pix_fmt"),
-                           QStringLiteral("yuv420p"), QStringLiteral("-c:v"), QStringLiteral("libx264"),
-                           QStringLiteral("-c:a"), QStringLiteral("aac"), QStringLiteral("-shortest"),
-                           path});
-    return process.waitForFinished(60'000) && process.exitCode() == 0;
-}
-} // namespace
 
 void EditorStateTest::sourceLabReplaceWithSpeedRebasesEverything()
 {
