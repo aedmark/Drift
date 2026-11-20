@@ -8434,7 +8434,7 @@ void EngineTest::debugReportListsCommonCodecs()
 
     const QString text = DebugReport::formatPlainText(info);
     QVERIFY(text.contains(QStringLiteral("H264")));
-    QVERIFY(text.contains(QStringLiteral("CutWire Drift debug report")));
+    QVERIFY(text.contains(QStringLiteral("Drift Mojave debug report")));
     QVERIFY(text.contains(QStringLiteral("Video encoders")));
     QVERIFY(text.contains(QStringLiteral("Supported")));
 }

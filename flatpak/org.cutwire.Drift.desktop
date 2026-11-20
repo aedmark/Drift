@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=Drift
+Name=Drift Mojave
 GenericName=Video Editor
-Comment=Edit and export videos easily
+Comment=What happens in the timeline, stays in the timeline.
 Exec=drift %u
 Icon=org.cutwire.Drift
 Terminal=false
 Categories=AudioVideo;Video;AudioVideoEditing;
-Keywords=video;editor;movie;clip;ffmpeg;subtitles;
+Keywords=video;editor;movie;clip;ffmpeg;subtitles;vegas;timeline;
 MimeType=application/x-drift-project;x-scheme-handler/cutwire;
 StartupWMClass=drift

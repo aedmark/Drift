@@ -117,7 +117,7 @@ AndroidBottomSheet {
         },
         {
             id: "about",
-            label: qsTr("About Drift"),
+            label: qsTr("About Drift Mojave"),
             detail: qsTr("Version, licence and credits"),
             icon: Theme.icons.info
         }

@@ -1089,10 +1089,10 @@
       "id": "about-drift",
       "target": "settings:about#about-drift",
       "context": "SettingsAboutPage",
-      "source": "About Drift",
-      "keywords": "license credits version",
+      "source": "About Drift Mojave",
+      "keywords": "license credits version mojave vegas",
       "needs": [],
-      "descriptionSource": "Open-source video editor by CutWire Studios."
+      "descriptionSource": "What happens in the timeline, stays in the timeline."
     },
     {
       "id": "about-debug-info",

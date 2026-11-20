@@ -656,8 +656,8 @@ int main(int argc, char *argv[])
     for (int i = 1; i < argc; ++i) {
         if (qstrcmp(argv[i], "--mcp-stdio") == 0) {
             QCoreApplication app(argc, argv);
-            QCoreApplication::setApplicationName("CutWire Drift");
-            QCoreApplication::setOrganizationName("CutWire Drift");
+            QCoreApplication::setApplicationName("Drift Mojave");
+            QCoreApplication::setOrganizationName("Drift Mojave");
             // --mcp-instance <pid> pins the bridge to one instance from its config, for a
             // client that must always edit the same editor.
             qint64 pinnedPid = 0;
@@ -728,8 +728,23 @@ int main(int argc, char *argv[])
 
     // Names must be set before reading QSettings for ui/scale, and QT_SCALE_FACTOR
     // must be in the environment before QApplication is constructed.
-    QCoreApplication::setApplicationName("CutWire Drift");
-    QCoreApplication::setOrganizationName("CutWire Drift");
+    QCoreApplication::setApplicationName("Drift Mojave");
+    QCoreApplication::setOrganizationName("Drift Mojave");
+
+#ifndef Q_OS_ANDROID
+    // Seamless migration from upstream Drift settings on first run of Drift Mojave
+    {
+        const QString oldConf = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
+                                + QStringLiteral("/CutWire Drift/CutWire Drift.conf");
+        const QString newDir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
+                               + QStringLiteral("/Drift Mojave");
+        const QString newConf = newDir + QStringLiteral("/Drift Mojave.conf");
+        if (!QFile::exists(newConf) && QFile::exists(oldConf)) {
+            QDir().mkpath(newDir);
+            QFile::copy(oldConf, newConf);
+        }
+    }
+#endif
 #ifdef DRIFT_HAS_CRASH_HANDLER
     openStartupLog();
     drift::crash::installCrashHandler(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)

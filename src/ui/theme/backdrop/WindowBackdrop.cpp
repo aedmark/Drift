@@ -55,8 +55,8 @@ QStringList platformSupportedBackdrops()
 QSettings themeSettings()
 {
     if (QCoreApplication::organizationName().isEmpty()) {
-        return QSettings(QSettings::UserScope, QStringLiteral("CutWire Drift"),
-                         QStringLiteral("CutWire Drift"));
+        return QSettings(QSettings::UserScope, QStringLiteral("Drift Mojave"),
+                         QStringLiteral("Drift Mojave"));
     }
     return QSettings();
 }

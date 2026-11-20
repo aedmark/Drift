@@ -6,7 +6,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Oldest macOS release Drift 
 
 # C is enabled for JUCE only: its modules compile a handful of C sources (zlib, flac, oggvorbis)
 # and its CMake refuses to configure without it.
-project(Drift VERSION 0.9.2 LANGUAGES CXX C)
+project(Drift VERSION 1.0.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -128,7 +128,8 @@ if(NOT DRIFT_CHANNEL STREQUAL "stable" AND NOT DRIFT_CHANNEL STREQUAL "nightly")
 endif()
 
 set(DRIFT_APP_ID "org.cutwire.Drift")
-set(DRIFT_APP_NAME "Drift")
+set(DRIFT_APP_NAME "Drift Mojave")
+set(DRIFT_TAGLINE "What happens in the timeline, stays in the timeline.")
 set(DRIFT_VERSION_STRING "${PROJECT_VERSION}")
 if(DRIFT_CHANNEL STREQUAL "nightly")
     set(DRIFT_APP_ID "org.cutwire.Drift.Nightly")
@@ -2954,6 +2955,8 @@ target_compile_definitions(drift PRIVATE
     DRIFT_MARKET_CLIENT_KEY="${DRIFT_MARKET_CLIENT_KEY}"
     DRIFT_UPDATE_FEED_URL="${DRIFT_UPDATE_FEED_URL}"
     DRIFT_VERSION="${DRIFT_VERSION_STRING}"
+    DRIFT_APP_NAME="${DRIFT_APP_NAME}"
+    DRIFT_TAGLINE="${DRIFT_TAGLINE}"
     DRIFT_DISTRIBUTION="${DRIFT_DISTRIBUTION}"
 )
 

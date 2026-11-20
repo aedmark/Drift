@@ -57,7 +57,11 @@ ApplicationWindow {
     // Use visibility only — setting both this and `visible` makes Qt warn
     // "Conflicting properties 'visible' and 'visibility'" (Maximized + hidden).
     visibility: Window.Hidden
-    title: "CutWire Drift"
+    title: {
+        const name = EditorState.projectFile.projectName
+        const dirty = EditorState.projectDirty ? " *" : ""
+        return name.length > 0 ? (name + dirty + " — Drift Mojave") : "Drift Mojave"
+    }
     // Alpha stays 1 unless this process was started with a translucent surface.
     // backgroundOpacity is read here so the binding follows theme reloads.
     color: {

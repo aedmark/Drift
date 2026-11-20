@@ -111,11 +111,13 @@ void StartupSplash::drawContents(QPainter *painter)
     painter->setFont(m_titleFont);
     painter->setPen(m_foreground);
     painter->drawText(QRectF(textX, kMargin, kWidth - textX - kMargin, 32), Qt::AlignLeft | Qt::AlignVCenter,
-                      QStringLiteral("Drift"));
+                      QStringLiteral("Drift Mojave"));
     painter->setFont(m_bodyFont);
     painter->setPen(m_foregroundMuted);
-    painter->drawText(QRectF(textX, kMargin + 32, kWidth - textX - kMargin, 20), Qt::AlignLeft | Qt::AlignVCenter,
+    painter->drawText(QRectF(textX, kMargin + 30, kWidth - textX - kMargin, 18), Qt::AlignLeft | Qt::AlignVCenter,
                       tr("Version %1").arg(QStringLiteral(DRIFT_VERSION)));
+    painter->drawText(QRectF(textX, kMargin + 48, kWidth - textX - kMargin, 18), Qt::AlignLeft | Qt::AlignVCenter,
+                      tr("“What happens in the timeline, stays in the timeline.”"));
 
     const qreal barY = kHeight - kMargin - 3;
     const QRectF statusRect(kMargin, barY - 28, kWidth - 2 * kMargin, 20);

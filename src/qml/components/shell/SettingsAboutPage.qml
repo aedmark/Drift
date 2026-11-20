@@ -9,9 +9,9 @@ SettingsPage {
     title: qsTr("About")
 
     SettingsRow {
-        title: qsTr("Drift")
+        title: qsTr("Drift Mojave")
         searchId: "about-version"
-        description: qsTr("Version %1").arg(Updates.currentVersion)
+        description: qsTr("Version %1 — “What happens in the timeline, stays in the timeline.”").arg(Updates.currentVersion)
         query: page.query
     }
 
@@ -93,10 +93,10 @@ SettingsPage {
     }
 
     SettingsRow {
-        title: qsTr("About Drift")
+        title: qsTr("About Drift Mojave")
         searchId: "about-drift"
-        description: qsTr("Open-source video editor by CutWire Studios.")
-        keywords: "license credits version"
+        description: qsTr("High-velocity, edit-friendly video editor.")
+        keywords: "license credits version mojave vegas"
         query: page.query
 
         ThemedButton {

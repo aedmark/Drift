@@ -5,15 +5,15 @@ import Drift
 ThemedDialog {
     id: root
 
-    title: qsTr("About Drift")
-    preferredWidth: 420
+    title: qsTr("About Drift Mojave")
+    preferredWidth: 440
     showFooter: true
     showReject: false
     acceptText: qsTr("Close")
 
     contentItem: Column {
         spacing: Theme.spacingXl
-        width: parent ? parent.width : 420
+        width: parent ? parent.width : 440
 
         Row {
             spacing: Theme.spacingXl
@@ -32,7 +32,7 @@ ThemedDialog {
                 anchors.verticalCenter: parent.verticalCenter
 
                 ThemedLabel {
-                    text: qsTr("Drift")
+                    text: qsTr("Drift Mojave")
                     size: "xl"
                     font.weight: Font.DemiBold
                 }
@@ -49,8 +49,18 @@ ThemedDialog {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
+            size: "base"
+            font.weight: Font.Medium
+            text: qsTr("“What happens in the timeline, stays in the timeline.”")
+        }
+
+        ThemedLabel {
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
             size: "sm"
-            text: qsTr("Open-source video editor by CutWire Studios.")
+            tone: "muted"
+            text: qsTr("High-velocity, edit-friendly video editor with native VEGAS Pro interchange, multi-take cycling, and signature timeline ergonomics.")
         }
 
         ThemedLabel {
@@ -59,7 +69,7 @@ ThemedDialog {
             wrapMode: Text.WordWrap
             size: "xs"
             tone: "muted"
-            text: qsTr("Licensed under GPLv3. Copyright © CutWire Studios.")
+            text: qsTr("Licensed under GPLv3. Forked from Drift by CutWire Studios.")
         }
     }
 }

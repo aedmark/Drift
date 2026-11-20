@@ -48,7 +48,7 @@ ThemedDialog {
         ThemedLabel {
             width: parent.width
             wrapMode: Text.WordWrap
-            text: qsTr("Drift works best with edit-friendly intraframe codecs. Converting these clips to Apple ProRes 422 now ensures smooth timeline playback, responsive frame-accurate scrubbing, and prevents audio sync drift.\n\nTranscoding runs in the background using multi-threaded FFmpeg without modifying your original media files.")
+            text: qsTr("Drift Mojave works best with edit-friendly intraframe codecs. Converting these clips to Apple ProRes 422 now ensures smooth timeline playback, responsive frame-accurate scrubbing, and prevents audio sync drift.\n\nTranscoding runs in the background using multi-threaded FFmpeg without modifying your original media files.")
             tone: "muted"
             size: "sm"
             lineHeight: 1.35

@@ -22,7 +22,7 @@ ApplicationWindow {
     x: Screen.width / 2 - width / 2
     y: Screen.height / 2 - height / 2
     visible: true
-    title: crashed ? qsTr("Drift crashed the last time it ran") : qsTr("Drift did not close properly last time")
+    title: crashed ? qsTr("Drift Mojave crashed the last time it ran") : qsTr("Drift Mojave did not close properly last time")
     color: Theme.c.quickSetup.background
 
     ColumnLayout {
