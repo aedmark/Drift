@@ -2566,6 +2566,22 @@
         <translation>Supprimer la sélection avec ses effets</translation>
     </message>
     <message>
+        <source>Ripple delete selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Auto-Ripple</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Next Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Previous Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Undo</source>
         <translation>Annuler</translation>
     </message>
@@ -2694,6 +2710,10 @@
         <translation>Outil de sélection</translation>
     </message>
     <message>
+        <source>Slip tool</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Search…</source>
         <translation>Rechercher…</translation>
     </message>
@@ -2811,6 +2831,14 @@
     </message>
     <message>
         <source>Clip time stretched</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slip clip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clip media slipped</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3715,6 +3743,62 @@
         <translation>Rotation définie sur %1°</translation>
     </message>
     <message>
+        <source>Insert velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope modified</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add velocity envelope point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity point added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove velocity envelope point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity point removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Change velocity curve type</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity curve set to %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Clips merged</source>
         <translation>Clips fusionnés</translation>
     </message>
@@ -4575,6 +4659,102 @@
         <translation>Effet audio mis à jour</translation>
     </message>
     <message>
+        <source>Add track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>This stack uses “%1”, which isn’t installed — it won’t show. Open Extras to install it.</source>
         <translation>Cette pile utilise « %1 », qui n’est pas installé — elle ne s’affichera pas. Ouvrez Extras pour l’installer.</translation>
     </message>
@@ -5061,6 +5241,18 @@
     <message>
         <source>Clip labelled</source>
         <translation>Clip étiqueté</translation>
+    </message>
+    <message>
+        <source>Set Active Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete Active Take</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -5967,6 +6159,30 @@
     <message>
         <source>Drag to resize — double-click to fit</source>
         <translation>Faites glisser pour redimensionner — double-cliquez pour ajuster</translation>
+    </message>
+    <message>
+        <source>Master Bus FX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track FX — %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Effect</source>
+        <translation type="unfinished">Effet</translation>
+    </message>
+    <message>
+        <source> [Bypassed]</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add audio effect…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove all effects</source>
+        <translation type="unfinished">Supprimer tous les effets</translation>
     </message>
     <message>
         <source>Master</source>
@@ -14636,6 +14852,22 @@
         <source>Record voiceover on %1</source>
         <translation>Enregistrer une voix hors champ sur %1</translation>
     </message>
+    <message>
+        <source>Master FX (%1 active)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master FX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track FX on %1 (%2 active)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track FX on %1</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>MixerFader</name>
@@ -15649,6 +15881,14 @@ Matériel est recommandé pour les vidéos 4K de haute qualité et utilise un se
 En cas de saccades à la lecture, essayez un autre mode.</translation>
     </message>
     <message>
+        <source>Split Screen View (A/B Compare)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Split the preview window to compare the timeline with FX bypass, clipboard, or reference snapshot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Keep mask handles up</source>
         <translation>Garder les poignées de masque affichées</translation>
     </message>
@@ -16533,12 +16773,12 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
         <translation>Votre nom</translation>
     </message>
     <message>
-        <source>Description</source>
-        <translation>Description</translation>
+        <source>Description / Notes</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>What this project is</source>
-        <translation>À propos de ce projet</translation>
+        <source>What this project is or project notes</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Created</source>
@@ -21991,6 +22231,26 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
         <source>Render</source>
         <translation>Rendre</translation>
     </message>
+    <message>
+        <source>Velocity Envelope (VEGAS)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope active — remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Insert velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset (100%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Double-click clip line on timeline to add points. Right-click points for curve types.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SrtIO</name>
@@ -24435,6 +24695,30 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
         <translation>Déplacer vers la piste</translation>
     </message>
     <message>
+        <source>Take %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Next Take (T)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Previous Take (Shift+T)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete Active Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add Take…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Properties</source>
         <translation>Propriétés</translation>
     </message>
@@ -24623,6 +24907,14 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
         <translation>Modifier les images clés…</translation>
     </message>
     <message>
+        <source>Remove velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Insert velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Mask &amp; track…</source>
         <translation>Masquer et suivre…</translation>
     </message>
@@ -24637,6 +24929,10 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
     <message>
         <source>Delete</source>
         <translation>Supprimer</translation>
+    </message>
+    <message>
+        <source>Ripple Delete</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Delete with effects</source>
@@ -24936,6 +25232,10 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
         <translation>Remplacer par…</translation>
     </message>
     <message>
+        <source>Add Take with…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Cancel</source>
         <translation>Annuler</translation>
     </message>
@@ -25007,8 +25307,40 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
         <translation>Magnétisme : aligne les bords vidéo et audio d’une piste à l’autre</translation>
     </message>
     <message>
-        <source>Ripple editing: keep following clips together when trimming</source>
-        <translation>Montage avec propagation : maintient les clips suivants ensemble lors du découpage</translation>
+        <source>Off</source>
+        <translation type="unfinished">Désactivé</translation>
+    </message>
+    <message>
+        <source>All Tracks, Markers, and Regions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Affected Tracks, Markers, and Regions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Affected Tracks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto-Ripple: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto-Ripple mode options</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable Auto-Ripple</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable Auto-Ripple (Ctrl+L)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ripple Delete (Shift+Del)</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Toggle audio mixer strip</source>
@@ -25044,6 +25376,14 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
     <message>
         <source>Cut mode — click a clip to split it</source>
         <translation>Diviser — cliquez sur un clip pour le diviser</translation>
+    </message>
+    <message>
+        <source>Slip mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slip mode — drag within clip boundaries to shift media (Alt+drag)</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Show audio on separate track</source>
@@ -25257,6 +25597,10 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
         <translation>Paquet procédural introuvable. Le clip ne rend rien tant qu’il n’est pas réinstallé.</translation>
     </message>
     <message>
+        <source>Take %1 of %2 (Press T or Shift+T to cycle)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Effect</source>
         <translation>Effet</translation>
     </message>
@@ -25283,6 +25627,10 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
     <message>
         <source>Subtitles</source>
         <translation>Sous-titres</translation>
+    </message>
+    <message>
+        <source>Slip clip</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%1, track %2</source>
@@ -25317,6 +25665,61 @@ En cas de saccades à la lecture, essayez un autre mode.</translation>
     <message>
         <source>Trim clip</source>
         <translation>Raccourcir le clip</translation>
+    </message>
+</context>
+<context>
+    <name>TimelineVelocityEnvelope</name>
+    <message>
+        <source>Reverse %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Freeze Frame (0%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Smooth (Spline)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Linear</source>
+        <translation type="unfinished">Linéaire</translation>
+    </message>
+    <message>
+        <source>Fast Fade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slow Fade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Sharp Fade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation type="unfinished">Maintenez</translation>
+    </message>
+    <message>
+        <source>Set to 100% (Normal)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set to 0% (Freeze Frame)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set to -100% (Reverse)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete point</source>
+        <translation type="unfinished">Supprimer le point</translation>
     </message>
 </context>
 <context>

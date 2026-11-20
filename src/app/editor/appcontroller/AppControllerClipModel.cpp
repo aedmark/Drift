@@ -1166,6 +1166,19 @@ TimelineClipsModel::Row AppController::clipRow(const drift::Clip &clip,
     row.velocityEnvelopeEnabled = clip.velocityEnvelope.enabled();
     row.velocityEnvelope = clip.velocityEnvelope;
     row.velocityPoints = velocityPointsToVariant(clip.velocityEnvelope);
+    row.activeTakeIndex = clip.activeTakeIndex;
+    row.takeCount = clip.takes.size();
+    for (int i = 0; i < clip.takes.size(); ++i) {
+        const drift::ClipTake &t = clip.takes.at(i);
+        row.takes.append(QVariantMap{
+            {QStringLiteral("index"), i},
+            {QStringLiteral("id"), t.id},
+            {QStringLiteral("name"), t.name},
+            {QStringLiteral("path"), t.path},
+            {QStringLiteral("assetId"), t.assetId},
+            {QStringLiteral("isActive"), i == clip.activeTakeIndex},
+        });
+    }
     QStringList effectNames;
     for (const QVariantList *list : {&row.effects, &row.audioEffects}) {
         for (const QVariant &value : *list) {
@@ -1786,6 +1799,8 @@ QVariantList AppController::actions() const
         action(QStringLiteral("deleteWithEffects"), tr("Delete selection with its effects")),
         action(QStringLiteral("rippleDelete"), tr("Ripple delete selection")),
         action(QStringLiteral("toggleAutoRipple"), tr("Toggle Auto-Ripple")),
+        action(QStringLiteral("nextTake"), tr("Next Take")),
+        action(QStringLiteral("previousTake"), tr("Previous Take")),
         action(QStringLiteral("undo"), tr("Undo")),
         action(QStringLiteral("redo"), tr("Redo")),
         action(QStringLiteral("copy"), tr("Copy selection")),

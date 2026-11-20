@@ -9,10 +9,11 @@ ThemedDialog {
 
     property int trackIndex: -1
     property int clipIndex: -1
+    property bool isAddTake: false
     property var candidates: []
     property var shown: []
 
-    title: qsTr("Replace with…")
+    title: isAddTake ? qsTr("Add Take with…") : qsTr("Replace with…")
     showAccept: false
     rejectText: qsTr("Cancel")
     preferredWidth: Theme.dialogWidthMd
@@ -21,6 +22,17 @@ ThemedDialog {
     function openFor(track, clip) {
         trackIndex = track
         clipIndex = clip
+        isAddTake = false
+        candidates = EditorState.replaceCandidatesForClip(track, clip)
+        searchField.text = ""
+        refilter()
+        open()
+    }
+
+    function openForAddTake(track, clip) {
+        trackIndex = track
+        clipIndex = clip
+        isAddTake = true
         candidates = EditorState.replaceCandidatesForClip(track, clip)
         searchField.text = ""
         refilter()
@@ -39,7 +51,11 @@ ThemedDialog {
             return
         const assetIndex = shown[row].assetIndex
         close()
-        EditorState.replaceClipMedia(trackIndex, clipIndex, assetIndex)
+        if (isAddTake) {
+            EditorState.addTakeFromAsset(trackIndex, clipIndex, assetIndex)
+        } else {
+            EditorState.replaceClipMedia(trackIndex, clipIndex, assetIndex)
+        }
     }
 
     onOpened: searchField.forceActiveFocus()

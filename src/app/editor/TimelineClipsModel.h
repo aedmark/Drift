@@ -68,6 +68,9 @@ public:
         HasVelocityEnvelopeRole,
         VelocityEnvelopeEnabledRole,
         VelocityPointsRole,
+        TakesRole,
+        ActiveTakeIndexRole,
+        TakeCountRole,
     };
     Q_ENUM(Role)
 
@@ -111,6 +114,9 @@ public:
         bool hasVelocityEnvelope = false;
         bool velocityEnvelopeEnabled = false;
         QVariantList velocityPoints;
+        int activeTakeIndex = 0;
+        int takeCount = 0;
+        QVariantList takes;
 
         // Not roles: typed copies for the scene-graph renderer, derived from the fields above so
         // any change to them already arrives as a changed row.

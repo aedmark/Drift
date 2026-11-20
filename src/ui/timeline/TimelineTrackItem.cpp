@@ -1180,12 +1180,18 @@ void TimelineTrackItem::appendClip(int index, const QRectF &baseRect, bool selec
         };
         const QSizeF proxySize = pillSize(s.proxyLabel);
         const QSizeF editSize = pillSize(s.editFriendlyLabel);
+        const QString takeLabel = QStringLiteral("T %1/%2").arg(row.activeTakeIndex + 1).arg(row.takeCount);
+        const QSizeF takeSize = pillSize(takeLabel);
         const bool showProxyPill = proxy && rowWidth > proxySize.width() * 2.5;
         const bool showEditPill =
             editFriendly
             && rowWidth > editSize.width() * 2.5 + (showProxyPill ? proxySize.width() : 0.0);
+        const bool showTakePill = row.takeCount > 1
+            && rowWidth > takeSize.width() * 2.5 + (showProxyPill ? proxySize.width() : 0.0)
+                                                 + (showEditPill ? editSize.width() : 0.0);
         const double pillsWidth = (showProxyPill ? proxySize.width() + spacing : 0.0)
-                                  + (showEditPill ? editSize.width() + spacing : 0.0);
+                                  + (showEditPill ? editSize.width() + spacing : 0.0)
+                                  + (showTakePill ? takeSize.width() + spacing : 0.0);
 
         double x = rowLeft;
         const auto drawBadge = [&](const QColor &fill, const QString &tip) {
@@ -1236,6 +1242,9 @@ void TimelineTrackItem::appendClip(int index, const QRectF &baseRect, bool selec
         if (showEditPill)
             appendPill(s.editFriendlyLabel, editSize, s.editFriendlyPill,
                        s.editFriendlyPillForeground, s.editFriendlyTooltip);
+        if (showTakePill)
+            appendPill(takeLabel, takeSize, s.proxyPill, s.proxyPillForeground,
+                       tr("Take %1 of %2 (Press T or Shift+T to cycle)").arg(row.activeTakeIndex + 1).arg(row.takeCount));
         if (showVolume) {
             m_labels.append({row.volumeLabel,
                              QPointF(rect.right() - 6.0 - volumeWidth - ox,

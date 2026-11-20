@@ -387,6 +387,27 @@ QJsonObject clipToJson(const Clip &clip)
         json.insert(QStringLiteral("anchorZ"), keyframesToJson(clip.anchorZ));
     if (!clip.label.isEmpty())
         json.insert(QStringLiteral("label"), clip.label);
+    if (!clip.takes.isEmpty()) {
+        QJsonArray takesArray;
+        for (const ClipTake &take : clip.takes) {
+            QJsonObject takeObj{
+                {QStringLiteral("id"), take.id},
+                {QStringLiteral("name"), take.name},
+                {QStringLiteral("assetId"), take.assetId},
+                {QStringLiteral("path"), take.path},
+                {QStringLiteral("srcInUs"), static_cast<double>(take.srcIn)},
+                {QStringLiteral("srcOutUs"), static_cast<double>(take.srcOut)},
+                {QStringLiteral("audioStreamIndex"), take.audioStreamIndex},
+                {QStringLiteral("thumbnailPath"), take.thumbnailPath},
+                {QStringLiteral("filmstripPath"), take.filmstripPath},
+            };
+            if (!take.effects.isEmpty())
+                takeObj.insert(QStringLiteral("effects"), effectsToJson(take.effects));
+            takesArray.append(takeObj);
+        }
+        json.insert(QStringLiteral("takes"), takesArray);
+        json.insert(QStringLiteral("activeTakeIndex"), clip.activeTakeIndex);
+    }
     return json;
 }
 
@@ -560,6 +581,26 @@ Clip clipFromJsonV2(const QJsonObject &object, int version, int canvasW = 1920, 
     clip.rotationY = keyframesFromJson(object.value(QStringLiteral("rotationY")).toObject());
     clip.positionZ = keyframesFromJson(object.value(QStringLiteral("z")).toObject());
     clip.perspective = keyframesFromJson(object.value(QStringLiteral("perspective")).toObject());
+
+    const QJsonArray takesArray = object.value(QStringLiteral("takes")).toArray();
+    for (const QJsonValue &v : takesArray) {
+        const QJsonObject to = v.toObject();
+        ClipTake take;
+        take.id = to.value(QStringLiteral("id")).toString();
+        take.name = to.value(QStringLiteral("name")).toString();
+        take.assetId = to.value(QStringLiteral("assetId")).toString();
+        take.path = to.value(QStringLiteral("path")).toString();
+        take.srcIn = static_cast<TimeUs>(to.value(QStringLiteral("srcInUs")).toDouble(0.0));
+        take.srcOut = static_cast<TimeUs>(to.value(QStringLiteral("srcOutUs")).toDouble(0.0));
+        take.audioStreamIndex = to.value(QStringLiteral("audioStreamIndex")).toInt(0);
+        take.thumbnailPath = to.value(QStringLiteral("thumbnailPath")).toString();
+        take.filmstripPath = to.value(QStringLiteral("filmstripPath")).toString();
+        take.effects = effectsFromJson(to.value(QStringLiteral("effects")).toArray());
+        clip.takes.append(take);
+    }
+    clip.activeTakeIndex = object.value(QStringLiteral("activeTakeIndex")).toInt(0);
+    if (clip.activeTakeIndex < 0 || clip.activeTakeIndex >= clip.takes.size())
+        clip.activeTakeIndex = 0;
     clip.anchorX = keyframesFromJson(object.value(QStringLiteral("anchorX")).toObject());
     clip.anchorY = keyframesFromJson(object.value(QStringLiteral("anchorY")).toObject());
     clip.anchorZ = keyframesFromJson(object.value(QStringLiteral("anchorZ")).toObject());

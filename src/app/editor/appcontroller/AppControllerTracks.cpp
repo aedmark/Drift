@@ -118,12 +118,13 @@ QHash<QString, QString> defaultShortcuts()
         {QStringLiteral("speedDown"), QStringLiteral("J")},
         {QStringLiteral("toggleGuides"), QStringLiteral("G")},
         {QStringLiteral("toggleTrackHidden"), QStringLiteral("Shift+E")},
-        // The 3D gizmo's tools. Blender's G/R/S and W/E/R are taken by guides, split and the
-        // ripple deletes, so these sit on T(ranslate), R(otate) and E (next to R).
-        {QStringLiteral("gizmoMove"), QStringLiteral("T")},
+        // The 3D gizmo's tools.
+        {QStringLiteral("gizmoMove"), QStringLiteral("Alt+G")},
         {QStringLiteral("gizmoRotate"), QStringLiteral("R")},
         {QStringLiteral("gizmoScale"), QStringLiteral("E")},
-        {QStringLiteral("gizmoOrientation"), QStringLiteral("Shift+T")},
+        {QStringLiteral("gizmoOrientation"), QStringLiteral("Alt+Shift+O")},
+        {QStringLiteral("nextTake"), QStringLiteral("T")},
+        {QStringLiteral("previousTake"), QStringLiteral("Shift+T")},
         {QStringLiteral("toggleBookmark"), QStringLiteral("M")},
         {QStringLiteral("nextBookmark"), QStringLiteral("Shift+M")},
         {QStringLiteral("previousBookmark"), QStringLiteral("Ctrl+Shift+M")},
@@ -1755,6 +1756,10 @@ void AppController::triggerAction(const QString &actionId)
         rippleDelete();
     else if (actionId == QStringLiteral("toggleAutoRipple"))
         toggleAutoRipple();
+    else if (actionId == QStringLiteral("nextTake"))
+        nextTake();
+    else if (actionId == QStringLiteral("previousTake"))
+        previousTake();
     else if (actionId == QStringLiteral("undo"))
         undo();
     else if (actionId == QStringLiteral("redo"))

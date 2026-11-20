@@ -930,6 +930,15 @@ public:
     // thumbnail}. Empty for anything that is not a plain video, image or audio clip.
     Q_INVOKABLE QVariantList replaceCandidatesForClip(int trackIndex, int clipIndex) const;
     Q_INVOKABLE bool replaceClipMedia(int trackIndex, int clipIndex, int assetIndex);
+
+    // Multi-Take Management (VEGAS event takes: T / Shift+T to cycle active take)
+    Q_INVOKABLE void nextTake();
+    Q_INVOKABLE void previousTake();
+    Q_INVOKABLE void cycleTake(int direction);
+    Q_INVOKABLE void setActiveTake(int trackIndex, int clipIndex, int takeIndex);
+    Q_INVOKABLE bool addTakeFromAsset(int trackIndex, int clipIndex, int assetIndex);
+    Q_INVOKABLE bool deleteActiveTake(int trackIndex, int clipIndex);
+    Q_INVOKABLE QVariantList takesForClip(int trackIndex, int clipIndex) const;
     // Shifts every clip on `trackIndex` starting at/after `gapStartSeconds` left by the
     // width of the gap immediately following that position, closing it. Linked partner
     // clips on other tracks (e.g. a companion audio clip) follow along to stay in sync.

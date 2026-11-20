@@ -52,6 +52,34 @@ enum class StabilizeMode { Bake, Keyframes };
 QString stabilizeModeToString(StabilizeMode mode);
 StabilizeMode stabilizeModeFromString(const QString &mode);
 
+struct ClipTake
+{
+    QString id;
+    QString name;
+    QString assetId;
+    QString path;
+    TimeUs srcIn = 0;
+    TimeUs srcOut = 0;
+    int audioStreamIndex = 0;
+    QString thumbnailPath;
+    QString filmstripPath;
+    QList<Effect> effects;
+
+    bool operator==(const ClipTake &other) const
+    {
+        return id == other.id
+            && name == other.name
+            && assetId == other.assetId
+            && path == other.path
+            && srcIn == other.srcIn
+            && srcOut == other.srcOut
+            && audioStreamIndex == other.audioStreamIndex
+            && thumbnailPath == other.thumbnailPath
+            && filmstripPath == other.filmstripPath;
+    }
+    bool operator!=(const ClipTake &other) const { return !(*this == other); }
+};
+
 struct Clip
 {
     QString id;
@@ -117,6 +145,10 @@ struct Clip
     QString path;
     QString thumbnailPath;
     QString filmstripPath;
+
+    // Multi-take management (VEGAS-style event takes: T / Shift+T to cycle active take)
+    QList<ClipTake> takes;
+    int activeTakeIndex = 0;
 
     // Set on image clips added from the emoji picker. `path` points at a rasterised glyph in the
     // app data cache, which another machine will not have — keeping the sequence lets the load

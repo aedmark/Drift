@@ -56,6 +56,9 @@ QList<int> changedRoles(const TimelineClipsModel::Row &a, const TimelineClipsMod
     diff(a.hasVelocityEnvelope != b.hasVelocityEnvelope, TimelineClipsModel::HasVelocityEnvelopeRole);
     diff(a.velocityEnvelopeEnabled != b.velocityEnvelopeEnabled, TimelineClipsModel::VelocityEnvelopeEnabledRole);
     diff(a.velocityPoints != b.velocityPoints, TimelineClipsModel::VelocityPointsRole);
+    diff(a.activeTakeIndex != b.activeTakeIndex, TimelineClipsModel::ActiveTakeIndexRole);
+    diff(a.takeCount != b.takeCount, TimelineClipsModel::TakeCountRole);
+    diff(a.takes != b.takes, TimelineClipsModel::TakesRole);
     return roles;
 }
 
@@ -235,6 +238,9 @@ QVariant TimelineClipsModel::data(const QModelIndex &index, int role) const
     case HasVelocityEnvelopeRole: return row.hasVelocityEnvelope;
     case VelocityEnvelopeEnabledRole: return row.velocityEnvelopeEnabled;
     case VelocityPointsRole: return row.velocityPoints;
+    case ActiveTakeIndexRole: return row.activeTakeIndex;
+    case TakeCountRole: return row.takeCount;
+    case TakesRole: return row.takes;
     default: return {};
     }
 }
@@ -278,6 +284,9 @@ QHash<int, QByteArray> TimelineClipsModel::roleNames() const
         {HasVelocityEnvelopeRole, "hasVelocityEnvelope"},
         {VelocityEnvelopeEnabledRole, "velocityEnvelopeEnabled"},
         {VelocityPointsRole, "velocityPoints"},
+        {ActiveTakeIndexRole, "activeTakeIndex"},
+        {TakeCountRole, "takeCount"},
+        {TakesRole, "takes"},
     };
 }
 

@@ -1919,6 +1919,12 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                                     quint32 eventId = 0;
                                     QList<Effect> takeEffects;
                                     PanCropData panCropData;
+                                    struct VegasParsedTake {
+                                        quint64 srcInTicks = 0;
+                                        quint32 mid = 0;
+                                        QList<Effect> effects;
+                                    };
+                                    QList<VegasParsedTake> parsedTakes;
 
                                     while (cpos + 24 <= cend) {
                                         const uint8_t *cptr = bytes + cpos;
@@ -1945,6 +1951,7 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                                             if (cpayloadSize >= 40) {
                                                 srcInTicks = readU64LE(cpayload + 16);
                                                 mid = readU32LE(cpayload + 36);
+                                                parsedTakes.append({srcInTicks, mid, {}});
                                             }
                                         } else if ((std::memcmp(cptr, kGuidW64List, 16) == 0 && cpayloadSize >= 16
                                                     && std::memcmp(cpayload, kListEventFx, 16) == 0)
@@ -1961,6 +1968,8 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                                                 const QList<Effect> fx = extractVideoEffects(fpayload, fpayloadSize);
                                                 if (!fx.isEmpty()) {
                                                     takeEffects.append(fx);
+                                                    if (!parsedTakes.isEmpty())
+                                                        parsedTakes.last().effects.append(fx);
                                                 }
                                                 fpos += (fsize + 7) & ~7;
                                             }
@@ -1968,6 +1977,11 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                                             panCropData = parsePanCropChunk(cpayload, cpayloadSize);
                                         }
                                         cpos += (csize + 7) & ~7;
+                                    }
+
+                                    if (!parsedTakes.isEmpty()) {
+                                        srcInTicks = parsedTakes.first().srcInTicks;
+                                        mid = parsedTakes.first().mid;
                                     }
 
                                     if (durTicks > 0) {
@@ -2046,6 +2060,27 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                                                 }
                                             }
                                             applyPanCropToClip(clip, panCropData, canvasWidth, canvasHeight);
+                                        }
+
+                                        if (parsedTakes.size() > 1) {
+                                            for (int ti = 0; ti < parsedTakes.size(); ++ti) {
+                                                const VegasParsedTake &pt = parsedTakes.at(ti);
+                                                ClipTake take;
+                                                take.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                                                if (mediaPool.contains(pt.mid)) {
+                                                    const MediaEntry &m = mediaPool[pt.mid];
+                                                    take.assetId = m.assetId;
+                                                    take.path = m.resolvedPath;
+                                                    take.name = m.rawFilename.isEmpty() ? QFileInfo(m.resolvedPath).fileName() : m.rawFilename;
+                                                } else {
+                                                    take.name = QStringLiteral("Take %1").arg(ti + 1);
+                                                }
+                                                take.srcIn = static_cast<TimeUs>(pt.srcInTicks / 10);
+                                                take.srcOut = static_cast<TimeUs>((pt.srcInTicks + durTicks) / 10);
+                                                take.effects = pt.effects;
+                                                clip.takes.append(take);
+                                            }
+                                            clip.activeTakeIndex = 0;
                                         }
 
                                         track.clips.append(clip);

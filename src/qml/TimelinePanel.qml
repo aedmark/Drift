@@ -1154,6 +1154,10 @@ PanelFrame {
         replaceClipDialog.openFor(trackIndex, clipIndex)
     }
 
+    function requestAddTake(trackIndex, clipIndex) {
+        replaceClipDialog.openForAddTake(trackIndex, clipIndex)
+    }
+
     function requestRenameClip(trackIndex, clipIndex) {
         if (trackIndex < 0 || clipIndex < 0)
             return

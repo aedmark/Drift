@@ -360,6 +360,7 @@ private slots:
     void velocityEnvelopeEditorStateActionsAndUndo();
     void splitPreviewVideoComparisonWipeActionsAndRendering();
     void vegasAutoRippleModesAndRippleDelete();
+    void vegasMultiTakeManagementAndCycling();
     void customFadeCurveSessionApplyAndCancel();
     void animationCurveSessionIsSeparateFromFade();
     void clipAnimationKindsListsBuiltins();
@@ -8355,6 +8356,175 @@ void EditorStateTest::vegasAutoRippleModesAndRippleDelete()
     // Bookmarks at/after 4.0s shift left by 2.0s: M2 was at 5.0s -> 3.0s, M3 was at 8.0s -> 6.0s
     QCOMPARE(state.project()->bookmarks().at(1).timeUs, drift::secondsToUs(3.0));
     QCOMPARE(state.project()->bookmarks().at(2).timeUs, drift::secondsToUs(6.0));
+}
+
+void EditorStateTest::vegasMultiTakeManagementAndCycling()
+{
+    AssetLibrary library;
+    AppController state(&library);
+
+    // 1. Setup media assets
+    drift::MediaAsset a1;
+    a1.id = QStringLiteral("asset-cam-a");
+    a1.name = QStringLiteral("Camera A");
+    a1.path = QStringLiteral("/media/cam_a.mp4");
+    a1.kind = drift::MediaKind::Video;
+    a1.durationUs = drift::secondsToUs(10.0);
+    state.project()->addAsset(a1);
+    library.addGeneratedAsset(a1);
+
+    drift::MediaAsset a2;
+    a2.id = QStringLiteral("asset-cam-b");
+    a2.name = QStringLiteral("Camera B");
+    a2.path = QStringLiteral("/media/cam_b.mp4");
+    a2.kind = drift::MediaKind::Video;
+    a2.durationUs = drift::secondsToUs(10.0);
+    state.project()->addAsset(a2);
+    library.addGeneratedAsset(a2);
+
+    drift::MediaAsset a3;
+    a3.id = QStringLiteral("asset-cam-c");
+    a3.name = QStringLiteral("Camera C");
+    a3.path = QStringLiteral("/media/cam_c.mp4");
+    a3.kind = drift::MediaKind::Video;
+    a3.durationUs = drift::secondsToUs(10.0);
+    state.project()->addAsset(a3);
+    library.addGeneratedAsset(a3);
+
+    // 2. Setup timeline: 1 track with 1 clip pointing to a1
+    drift::Track track;
+    track.id = QStringLiteral("track-v1");
+    track.type = drift::TrackType::Video;
+
+    drift::Clip clip;
+    clip.id = QStringLiteral("clip-1");
+    clip.name = a1.name;
+    clip.assetId = a1.id;
+    clip.path = a1.path;
+    clip.type = drift::ClipType::Video;
+    clip.timelineStart = 0;
+    clip.timelineDuration = drift::secondsToUs(4.0);
+    clip.srcIn = 0;
+    clip.srcOut = drift::secondsToUs(4.0);
+    track.clips.append(clip);
+    state.project()->tracks() = {track};
+    state.syncClipModels();
+
+    // Verify initial single-take state
+    QVERIFY(state.project()->tracks().at(0).clips.at(0).takes.isEmpty());
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 0);
+    QCOMPARE(state.takesForClip(0, 0).size(), 0);
+
+    // 3. Add second take from Asset 2 (Camera B, assetIndex 1)
+    QVERIFY(state.addTakeFromAsset(0, 0, 1));
+    const auto &cAfterTake2 = state.project()->tracks().at(0).clips.at(0);
+    QCOMPARE(cAfterTake2.takes.size(), 2);
+    QCOMPARE(cAfterTake2.activeTakeIndex, 1);
+    QCOMPARE(cAfterTake2.assetId, a2.id);
+    QCOMPARE(cAfterTake2.path, a2.path);
+    QCOMPARE(cAfterTake2.name, a2.name);
+    QCOMPARE(state.takesForClip(0, 0).size(), 2);
+    QCOMPARE(state.takesForClip(0, 0).at(0).toMap().value(QStringLiteral("name")).toString(), a1.name);
+    QCOMPARE(state.takesForClip(0, 0).at(1).toMap().value(QStringLiteral("name")).toString(), a2.name);
+    QCOMPARE(state.takesForClip(0, 0).at(1).toMap().value(QStringLiteral("isActive")).toBool(), true);
+
+    // 4. Add third take from Asset 3 (Camera C, assetIndex 2)
+    QVERIFY(state.addTakeFromAsset(0, 0, 2));
+    const auto &cAfterTake3 = state.project()->tracks().at(0).clips.at(0);
+    QCOMPARE(cAfterTake3.takes.size(), 3);
+    QCOMPARE(cAfterTake3.activeTakeIndex, 2);
+    QCOMPARE(cAfterTake3.assetId, a3.id);
+
+    // 5. Interactive Cycling (T: nextTake, Shift+T: previousTake)
+    state.selectClip(0, 0);
+
+    // Next take: cycles from index 2 -> 0 (wrapping around)
+    state.nextTake();
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).assetId, a1.id);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).name, a1.name);
+
+    // Next take: cycles 0 -> 1
+    state.nextTake();
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 1);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).assetId, a2.id);
+
+    // Previous take: cycles 1 -> 0
+    state.previousTake();
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).assetId, a1.id);
+
+    // Previous take: cycles 0 -> 2
+    state.previousTake();
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 2);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).assetId, a3.id);
+
+    // 6. Direct Take Selection (setActiveTake)
+    state.setActiveTake(0, 0, 1);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 1);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).assetId, a2.id);
+
+    // 7. Companion Synchronized Take Switching
+    const QString linkId = QStringLiteral("companion-link-1");
+    state.project()->tracks()[0].clips[0].linkId = linkId;
+
+    drift::Track audioTrack;
+    audioTrack.id = QStringLiteral("track-a1");
+    audioTrack.type = drift::TrackType::Audio;
+
+    drift::Clip audioClip;
+    audioClip.id = QStringLiteral("clip-audio-1");
+    audioClip.linkId = linkId;
+    audioClip.type = drift::ClipType::Audio;
+    audioClip.timelineStart = 0;
+    audioClip.timelineDuration = drift::secondsToUs(4.0);
+    drift::ClipTake at0; at0.id = QStringLiteral("at0"); at0.name = QStringLiteral("Audio Take 1");
+    drift::ClipTake at1; at1.id = QStringLiteral("at1"); at1.name = QStringLiteral("Audio Take 2");
+    drift::ClipTake at2; at2.id = QStringLiteral("at2"); at2.name = QStringLiteral("Audio Take 3");
+    audioClip.takes = {at0, at1, at2};
+    audioClip.activeTakeIndex = 1;
+    audioTrack.clips.append(audioClip);
+    state.project()->tracks().append(audioTrack);
+    state.syncClipModels();
+
+    // Cycle video clip take to index 2
+    state.selectClip(0, 0);
+    state.nextTake();
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 2);
+    // Companion audio clip on track 1 switched in lockstep to take 2!
+    QCOMPARE(state.project()->tracks().at(1).clips.at(0).activeTakeIndex, 2);
+
+    // 8. Event Splitting with Takes
+    state.splitClipAt(0, 0, 2.0);
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 2);
+    const auto &head = state.project()->tracks().at(0).clips.at(0);
+    const auto &tail = state.project()->tracks().at(0).clips.at(1);
+    QCOMPARE(head.takes.size(), 3);
+    QCOMPARE(tail.takes.size(), 3);
+    QCOMPARE(head.activeTakeIndex, 2);
+    QCOMPARE(tail.activeTakeIndex, 2);
+    QCOMPARE(head.timelineDuration, drift::secondsToUs(2.0));
+    QCOMPARE(tail.timelineDuration, drift::secondsToUs(2.0));
+
+    // 9. Delete Active Take
+    QVERIFY(state.deleteActiveTake(0, 0));
+    const auto &headAfterDel = state.project()->tracks().at(0).clips.at(0);
+    QCOMPARE(headAfterDel.takes.size(), 2);
+    QVERIFY(headAfterDel.activeTakeIndex < headAfterDel.takes.size());
+
+    // 10. Undo / Redo
+    state.undo(); // undo delete take
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).takes.size(), 3);
+
+    state.redo(); // redo delete take
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).takes.size(), 2);
+
+    // 11. Project JSON Serialization Roundtrip
+    const QJsonObject json = state.project()->toJson();
+    const drift::Project restored = drift::Project::fromJson(json);
+    QCOMPARE(restored.tracks().at(0).clips.at(0).takes.size(), 2);
+    QCOMPARE(restored.tracks().at(0).clips.at(0).activeTakeIndex,
+             state.project()->tracks().at(0).clips.at(0).activeTakeIndex);
 }
 
 void EditorStateTest::customFadeCurveSessionApplyAndCancel()

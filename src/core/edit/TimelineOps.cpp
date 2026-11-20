@@ -1892,6 +1892,17 @@ bool splitClipAtOffsetMin(Clip &head, Clip &tail, TimeUs offset, TimeUs minEdgeU
         head.srcOut = head.srcIn + sourceOffset;
     }
 
+    if (!head.takes.isEmpty()) {
+        for (ClipTake &t : head.takes) {
+            if (!looped && !head.reverse)
+                t.srcOut = t.srcIn + sourceOffset;
+        }
+        for (ClipTake &t : tail.takes) {
+            if (!looped && !head.reverse)
+                t.srcIn = t.srcIn + sourceOffset;
+        }
+    }
+
     // Cue times are relative to the parent clip's timeline start, so the tail's copies have to be
     // rebased onto its new start; a cue straddling the cut is truncated on the left and resumes on
     // the right.

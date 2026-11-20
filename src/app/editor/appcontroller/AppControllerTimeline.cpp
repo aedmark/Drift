@@ -182,25 +182,6 @@ void splitLinkedAdjustmentsAt(drift::Project &project, int parentTrackIndex, con
         }
     }
 }
-
-void expandSelectionWithLinkedPartners(const drift::Project &project, QList<QPair<int, int>> &pairs)
-{
-    QList<QPair<int, int>> expanded = pairs;
-    for (const QPair<int, int> &pair : pairs) {
-        if (pair.first < 0 || pair.first >= project.tracks().size())
-            continue;
-        const drift::Track &track = project.tracks().at(pair.first);
-        if (pair.second < 0 || pair.second >= track.clips.size())
-            continue;
-
-        for (const drift::ClipRef &ref : drift::linkedPartners(project, track.clips.at(pair.second))) {
-            const QPair<int, int> linked(ref.trackIndex, ref.clipIndex);
-            if (!expanded.contains(linked))
-                expanded.append(linked);
-        }
-    }
-    pairs = expanded;
-}
 } // namespace
 
 QVariantList AppController::audioOutputDevices() const

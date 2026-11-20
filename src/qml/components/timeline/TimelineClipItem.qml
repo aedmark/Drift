@@ -53,6 +53,13 @@ Item {
                 EditorState.deleteSelectedClip()
             }
             event.accepted = true
+        } else if (event.key === Qt.Key_T && clipItem.selected) {
+            if (event.modifiers & Qt.ShiftModifier) {
+                EditorState.previousTake()
+            } else if (event.modifiers === Qt.NoModifier) {
+                EditorState.nextTake()
+            }
+            event.accepted = true
         }
     }
 

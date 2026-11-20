@@ -2747,6 +2747,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Slip clip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clip media slipped</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Trim clip</source>
         <translation>クリップをトリム</translation>
     </message>
@@ -3037,6 +3045,22 @@
         <translation>名前を付けてプロジェクトを保存…</translation>
     </message>
     <message>
+        <source>Ripple delete selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle Auto-Ripple</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Next Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Previous Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Paste attributes…</source>
         <translation>属性を貼り付け…</translation>
     </message>
@@ -3131,6 +3155,10 @@
     <message>
         <source>Cut tool / Brush mask</source>
         <translation>カットツール / ブラシマスク</translation>
+    </message>
+    <message>
+        <source>Slip tool</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Brush: switch paint / erase</source>
@@ -3703,6 +3731,62 @@
     <message>
         <source>Rotation set to %1°</source>
         <translation>回転を %1° に設定しました</translation>
+    </message>
+    <message>
+        <source>Insert velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope modified</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add velocity envelope point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity point added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove velocity envelope point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity point removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Change velocity curve type</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity curve set to %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope removed</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clips merged</source>
@@ -4561,6 +4645,102 @@
         <translation>オーディオエフェクトを更新しました</translation>
     </message>
     <message>
+        <source>Add track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit track audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track audio effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit master audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master audio effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>This stack uses “%1”, which isn’t installed — it won’t show. Open Extras to install it.</source>
         <translation>このスタックはインストールされていない「%1」を使用しています — 表示されません。拡張機能を開いてインストールしてください。</translation>
     </message>
@@ -5047,6 +5227,18 @@
     <message>
         <source>Clip labelled</source>
         <translation>クリップにラベルを付けました</translation>
+    </message>
+    <message>
+        <source>Set Active Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete Active Take</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -5944,6 +6136,30 @@
     <message>
         <source>Drag to resize — double-click to fit</source>
         <translation>ドラッグしてリサイズ — ダブルクリックでフィット</translation>
+    </message>
+    <message>
+        <source>Master Bus FX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track FX — %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Effect</source>
+        <translation type="unfinished">エフェクト</translation>
+    </message>
+    <message>
+        <source> [Bypassed]</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add audio effect…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove all effects</source>
+        <translation type="unfinished">すべてのエフェクトを削除</translation>
     </message>
     <message>
         <source>Master</source>
@@ -14569,6 +14785,22 @@
         <source>Record voiceover on %1</source>
         <translation>%1 にボイスオーバーを録音</translation>
     </message>
+    <message>
+        <source>Master FX (%1 active)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master FX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track FX on %1 (%2 active)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track FX on %1</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>MixerFader</name>
@@ -15577,6 +15809,14 @@ If playback stutters, try another.</source>
 再生がカクつく場合は、別の設定を試してください。</translation>
     </message>
     <message>
+        <source>Split Screen View (A/B Compare)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Split the preview window to compare the timeline with FX bypass, clipboard, or reference snapshot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Keep mask handles up</source>
         <translation>マスクハンドルを常に表示</translation>
     </message>
@@ -16457,12 +16697,12 @@ If playback stutters, try another.</source>
         <translation>あなたの名前</translation>
     </message>
     <message>
-        <source>Description</source>
-        <translation>説明</translation>
+        <source>Description / Notes</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>What this project is</source>
-        <translation>このプロジェクトの内容</translation>
+        <source>What this project is or project notes</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Created</source>
@@ -21912,6 +22152,26 @@ If playback stutters, try another.</source>
         <source>Render</source>
         <translation>レンダリング</translation>
     </message>
+    <message>
+        <source>Velocity Envelope (VEGAS)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity envelope active — remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Insert velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset (100%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Double-click clip line on timeline to add points. Right-click points for curve types.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SrtIO</name>
@@ -24348,6 +24608,30 @@ If playback stutters, try another.</source>
         <translation>トラックに移動</translation>
     </message>
     <message>
+        <source>Take %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Next Take (T)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Previous Take (Shift+T)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete Active Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add Take…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Properties</source>
         <translation>プロパティ</translation>
     </message>
@@ -24536,6 +24820,14 @@ If playback stutters, try another.</source>
         <translation>キーフレームを編集…</translation>
     </message>
     <message>
+        <source>Remove velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Insert velocity envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Mask &amp; track…</source>
         <translation>マスク &amp; トラック…</translation>
     </message>
@@ -24550,6 +24842,10 @@ If playback stutters, try another.</source>
     <message>
         <source>Delete</source>
         <translation>削除</translation>
+    </message>
+    <message>
+        <source>Ripple Delete</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Delete with effects</source>
@@ -24849,6 +25145,10 @@ If playback stutters, try another.</source>
         <translation>置き換え…</translation>
     </message>
     <message>
+        <source>Add Take with…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Cancel</source>
         <translation>キャンセル</translation>
     </message>
@@ -24919,8 +25219,40 @@ If playback stutters, try another.</source>
         <translation>マグネティックスナップ: トラック間で動画と音声の端を揃える</translation>
     </message>
     <message>
-        <source>Ripple editing: keep following clips together when trimming</source>
-        <translation>リップル編集: トリミング時に後続のクリップを詰める</translation>
+        <source>Off</source>
+        <translation type="unfinished">オフ</translation>
+    </message>
+    <message>
+        <source>All Tracks, Markers, and Regions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Affected Tracks, Markers, and Regions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Affected Tracks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto-Ripple: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto-Ripple mode options</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable Auto-Ripple</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable Auto-Ripple (Ctrl+L)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ripple Delete (Shift+Del)</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Toggle audio mixer strip</source>
@@ -24956,6 +25288,14 @@ If playback stutters, try another.</source>
     <message>
         <source>Cut mode — click a clip to split it</source>
         <translation>切り取りモード — クリップをクリックして分割</translation>
+    </message>
+    <message>
+        <source>Slip mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slip mode — drag within clip boundaries to shift media (Alt+drag)</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Show audio on separate track</source>
@@ -25169,6 +25509,10 @@ If playback stutters, try another.</source>
         <translation>プロシージャルパッケージが見つかりません。再インストールされるまで、クリップは何も表示されません。</translation>
     </message>
     <message>
+        <source>Take %1 of %2 (Press T or Shift+T to cycle)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Effect</source>
         <translation>エフェクト</translation>
     </message>
@@ -25195,6 +25539,10 @@ If playback stutters, try another.</source>
     <message>
         <source>Subtitles</source>
         <translation>字幕</translation>
+    </message>
+    <message>
+        <source>Slip clip</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%1, track %2</source>
@@ -25229,6 +25577,61 @@ If playback stutters, try another.</source>
     <message>
         <source>Trim clip</source>
         <translation>クリップをトリム</translation>
+    </message>
+</context>
+<context>
+    <name>TimelineVelocityEnvelope</name>
+    <message>
+        <source>Reverse %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Freeze Frame (0%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Velocity %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Smooth (Spline)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Linear</source>
+        <translation type="unfinished">リニア</translation>
+    </message>
+    <message>
+        <source>Fast Fade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slow Fade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Sharp Fade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation type="unfinished">ホールド</translation>
+    </message>
+    <message>
+        <source>Set to 100% (Normal)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set to 0% (Freeze Frame)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set to -100% (Reverse)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete point</source>
+        <translation type="unfinished">ポイントを削除</translation>
     </message>
 </context>
 <context>

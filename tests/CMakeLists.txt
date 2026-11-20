@@ -252,6 +252,7 @@ qt_add_executable(tst_mcp
     ../src/app/editor/appcontroller/AppControllerClipModel.cpp
     ../src/app/editor/appcontroller/AppControllerInternal.cpp
     ../src/app/editor/appcontroller/AppControllerTimeline.cpp
+    ../src/app/editor/appcontroller/AppControllerTakes.cpp
     ../src/app/editor/appcontroller/AppControllerSubtitleMulticam.cpp
     ../src/app/editor/appcontroller/AppControllerAdjustments.cpp
     ../src/app/editor/appcontroller/AppControllerClipProps.cpp

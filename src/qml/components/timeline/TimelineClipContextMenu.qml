@@ -27,6 +27,7 @@ ThemedContextMenu {
         canMergeTrackSubtitles = owner.trackType === "subtitle"
                 && EditorState.canMergeAllSubtitlesOnTrack(owner.trackIndex)
         rebuildMoveToTrackMenu()
+        rebuildTakeMenu()
     }
 
     property var moveToTrackMenu: null
@@ -72,9 +73,106 @@ ThemedContextMenu {
                                                      clipContextMenu.owner.clipData.start || 0)
         }
     }
+
+    property var takeMenu: null
+
+    function rebuildTakeMenu() {
+        if (takeMenu) {
+            removeMenu(takeMenu)
+            takeMenu = null
+        }
+        if (owner.trackType !== "video" && owner.trackType !== "audio")
+            return
+        if (owner.isTransformClip || owner.clipData.kind === "adjustment")
+            return
+
+        const sub = takeMenuComponent.createObject(null)
+        const takes = owner.clipData.takes || []
+        const activeIdx = owner.clipData.activeTakeIndex || 0
+
+        if (takes.length > 0) {
+            for (let i = 0; i < takes.length; i++) {
+                const t = takes[i]
+                const name = t.name || (qsTr("Take %1").arg(i + 1))
+                sub.addItem(takeMenuItemComponent.createObject(null, {
+                    text: (i === activeIdx ? "✓  " : "    ") + name,
+                    takeIndex: i
+                }))
+            }
+            sub.addItem(takeSeparatorComponent.createObject(null))
+            sub.addItem(takeActionComponent.createObject(null, {
+                text: qsTr("Next Take (T)"),
+                actionMethod: function() { EditorState.nextTake() }
+            }))
+            sub.addItem(takeActionComponent.createObject(null, {
+                text: qsTr("Previous Take (Shift+T)"),
+                actionMethod: function() { EditorState.previousTake() }
+            }))
+            sub.addItem(takeActionComponent.createObject(null, {
+                text: qsTr("Delete Active Take"),
+                actionMethod: function() { EditorState.deleteActiveTake(owner.trackIndex, owner.clipIndex) }
+            }))
+            sub.addItem(takeSeparatorComponent.createObject(null))
+        }
+
+        sub.addItem(takeActionComponent.createObject(null, {
+            text: qsTr("Add Take…"),
+            actionMethod: function() {
+                if (typeof owner.panel.requestAddTake === "function") {
+                    owner.panel.requestAddTake(owner.trackIndex, owner.clipIndex)
+                }
+            }
+        }))
+
+        let at = count
+        for (let i = 0; i < count; i++) {
+            if (itemAt(i) === replaceItem) {
+                at = i + 1
+                break
+            }
+        }
+        insertMenu(at, sub)
+        takeMenu = sub
+    }
+
+    Component {
+        id: takeMenuComponent
+        ThemedContextMenu {
+            title: qsTr("Take")
+        }
+    }
+
+    Component {
+        id: takeMenuItemComponent
+        ThemedMenuItem {
+            required property int takeIndex
+            onTriggered: EditorState.setActiveTake(clipContextMenu.owner.trackIndex,
+                                                   clipContextMenu.owner.clipIndex,
+                                                   takeIndex)
+        }
+    }
+
+    Component {
+        id: takeActionComponent
+        ThemedMenuItem {
+            required property var actionMethod
+            onTriggered: actionMethod()
+        }
+    }
+
+    Component {
+        id: takeSeparatorComponent
+        ThemedMenuSeparator {}
+    }
     // Deferred: onClosed runs inside the Popup's own close path, and dropping the
     // Loader's item there would destroy an object still unwinding.
-    onClosed: unloadRequested()
+    onClosed: {
+        if (takeMenu) {
+            removeMenu(takeMenu)
+            takeMenu = null
+        }
+        unloadRequested()
+    }
 
     ThemedMenuItem {
         text: qsTr("Properties")
@@ -336,6 +434,7 @@ ThemedContextMenu {
         onTriggered: owner.panel.requestRenameClip(owner.trackIndex, owner.clipIndex)
     }
     ThemedMenuItem {
+        id: replaceItem
         text: qsTr("Replace with…")
         icon.name: Theme.icons.repeat
         visible: clipContextMenu.canReplaceMedia

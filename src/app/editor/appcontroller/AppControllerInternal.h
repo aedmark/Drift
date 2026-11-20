@@ -282,6 +282,8 @@ QList<StreamInfo> cachedAudioStreams(const QString &path);
 
 bool clipHasEmbeddedAudio(const drift::Project &project, AssetLibrary *library, const drift::Clip &clip);
 
+void expandSelectionWithLinkedPartners(const drift::Project &project, QList<QPair<int, int>> &pairs);
+
 drift::Clip makeAudioCompanionFromVideo(const drift::Clip &videoClip, const QString &linkId = {},
                                         int audioStreamIndex = 0, const QString &customName = {});
 
