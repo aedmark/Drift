@@ -23,15 +23,15 @@
 #endif
 
 #ifdef Nightly
-  #define MyAppName "Drift Nightly"
-  #define MyAppId "1699D9B5-080B-4892-ACEE-EC56B595E89B"
+  #define MyAppName "Drift Mojave Nightly"
+  #define MyAppId "9C2E7B44-1F86-4D30-A5B8-3E6D0F92C14A"
   #define MyOutputBase "Drift-Setup-Nightly-" + Arch
 #else
-  #define MyAppName "Drift"
-  #define MyAppId "1FC80696-7700-464A-8E35-CCBB3239EDFB"
+  #define MyAppName "Drift Mojave"
+  #define MyAppId "D7A4F2B1-8E3C-4A95-B612-9F4C1E8A703D"
   #define MyOutputBase "Drift-Setup-" + Arch
 #endif
-#define MyAppPublisher "CutWire Studios"
+#define MyAppPublisher "Drift Mojave"
 #define MyAppExeName "drift.exe"
 
 [Setup]
@@ -39,7 +39,7 @@ AppId={{{#MyAppId}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppSupportURL=https://github.com/CutWire-Studios/Drift/issues
+AppSupportURL=https://github.com/aedmark/Drift/issues
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 ArchitecturesAllowed={#MyArchSpec}

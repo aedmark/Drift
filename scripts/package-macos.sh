@@ -85,8 +85,8 @@ ARCH="$(uname -m)"
 # "Drift Nightly.app" with bundle id org.cutwire.Drift.Nightly, which is what lets the two sit in
 # /Applications together.
 case "$CHANNEL" in
-  stable)  APP_NAME="Drift" ;;
-  nightly) APP_NAME="Drift Nightly"; VERSION="$VERSION-nightly.${BUILD_ID:-dev}" ;;
+  stable)  APP_NAME="Drift Mojave" ;;
+  nightly) APP_NAME="Drift Mojave Nightly"; VERSION="$VERSION-nightly.${BUILD_ID:-dev}" ;;
   *) echo "--channel must be stable or nightly, not: $CHANNEL" >&2; exit 2 ;;
 esac
 

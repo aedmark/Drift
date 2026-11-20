@@ -744,8 +744,8 @@ QString UpdateChecker::appImagePath() const
 QString UpdateChecker::macBundleName() const
 {
     if (kCurrentVersion.contains(QLatin1String("-nightly.")))
-        return QStringLiteral("Drift Nightly");
-    return QStringLiteral("Drift");
+        return QStringLiteral("Drift Mojave Nightly");
+    return QStringLiteral("Drift Mojave");
 }
 
 void UpdateChecker::cancelDownload()

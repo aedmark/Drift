@@ -30,11 +30,19 @@ bool AppController::canGroupSelection() const
         pairs.append(qMakePair(m_selectedTrack, m_selectedClip));
 
     int valid = 0;
+    QSet<QString> linkIds;
+    bool anyUnlinked = false;
     for (const QPair<int, int> &pair : pairs) {
-        if (isValidClipIndex(pair.first, pair.second) && !m_project.tracks().at(pair.first).locked)
-            ++valid;
+        if (!isValidClipIndex(pair.first, pair.second) || m_project.tracks().at(pair.first).locked)
+            continue;
+        ++valid;
+        const QString &linkId = m_project.tracks().at(pair.first).clips.at(pair.second).linkId;
+        if (linkId.isEmpty())
+            anyUnlinked = true;
+        else
+            linkIds.insert(linkId);
     }
-    return valid >= 2;
+    return valid >= 2 && (anyUnlinked || linkIds.size() > 1);
 }
 
 void AppController::groupSelectedClips()
@@ -142,6 +150,11 @@ void AppController::ungroupSelectedClips()
             m_project.tracks()[loneClip.first].clips[loneClip.second].linkId.clear();
             m_project.tracks()[loneClip.first].clips[loneClip.second].linkLoose = false;
         }
+    }
+
+    if (m_selectedTrack >= 0 && m_selectedClip >= 0) {
+        m_selection = {qMakePair(m_selectedTrack, m_selectedClip)};
+        notifySelectionChanged();
     }
 
     const QString label = tr("Ungroup Events");

@@ -4532,7 +4532,9 @@ void AppController::moveClipToTrack(int trackIndex, int clipIndex, int newTrackI
             for (ClipToMove &item : toMove)
                 item.newTimelineStart = qMax<drift::TimeUs>(0, item.newTimelineStart + *shift);
         }
+    }
 
+    if (!m_allowClipOverlap) {
         const auto slotFree = [&](int trackIdx, const ClipToMove &self) {
             const drift::TimeUs end = self.newTimelineStart + self.clip.timelineDuration;
             for (const drift::Clip &other : m_project.tracks().at(trackIdx).clips) {

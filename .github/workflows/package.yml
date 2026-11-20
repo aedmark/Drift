@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       platforms:
-        description: "all, flatpak, linux, windows, macos, arch or android"
+        description: "all, desktop, flatpak, linux, windows, macos, arch or android"
         required: false
         default: all
         type: string
@@ -211,7 +211,7 @@ jobs:
     permissions:
       contents: read
       actions: write
-    if: inputs.platforms == 'all' || inputs.platforms == 'linux'
+    if: inputs.platforms == 'all' || inputs.platforms == 'desktop' || inputs.platforms == 'linux'
     strategy:
       # Each arch reports its own result: a failing aarch64 build should not hide x86_64's.
       fail-fast: false
@@ -477,14 +477,14 @@ jobs:
         shell: bash
         run: |
           if [ "${{ inputs.channel }}" = "nightly" ]; then
-            icon="${RUNNER_TEMP}/org.cutwire.Drift.Nightly.png"
-            cp flatpak/share/icons/hicolor/256x256/apps/org.cutwire.Drift.png "${icon}"
-            echo "desktop=build/metadata/org.cutwire.Drift.Nightly.desktop" >> "$GITHUB_OUTPUT"
-            echo "icon=${icon}" >> "$GITHUB_OUTPUT"
+            app_id="org.driftmojave.Drift.Nightly"
           else
-            echo "desktop=flatpak/org.cutwire.Drift.desktop" >> "$GITHUB_OUTPUT"
-            echo "icon=flatpak/share/icons/hicolor/256x256/apps/org.cutwire.Drift.png" >> "$GITHUB_OUTPUT"
+            app_id="org.driftmojave.Drift"
           fi
+          icon="${RUNNER_TEMP}/${app_id}.png"
+          cp flatpak/share/icons/hicolor/256x256/apps/org.cutwire.Drift.png "${icon}"
+          echo "desktop=build/metadata/${app_id}.desktop" >> "$GITHUB_OUTPUT"
+          echo "icon=${icon}" >> "$GITHUB_OUTPUT"
 
       - name: Build AppImage
         shell: bash
@@ -564,7 +564,7 @@ jobs:
     permissions:
       contents: read
       actions: write
-    if: inputs.platforms == 'all' || inputs.platforms == 'windows'
+    if: inputs.platforms == 'all' || inputs.platforms == 'desktop' || inputs.platforms == 'windows'
     strategy:
       # Each arch reports its own result: a failing arm64 build should not hide x64's.
       fail-fast: false
@@ -1037,7 +1037,7 @@ jobs:
       - name: Build portable zip
         shell: pwsh
         env:
-          FOLDER: ${{ inputs.channel == 'nightly' && 'Drift Nightly' || 'Drift' }}
+          FOLDER: ${{ inputs.channel == 'nightly' && 'Drift Mojave Nightly' || 'Drift Mojave' }}
         run: |
           New-Item -ItemType Directory -Force -Path "portable\$env:FOLDER", dist\portable | Out-Null
           Copy-Item dist\bin\* "portable\$env:FOLDER" -Recurse -Force
@@ -1056,7 +1056,7 @@ jobs:
     permissions:
       contents: read
       actions: write
-    if: inputs.platforms == 'all' || inputs.platforms == 'macos'
+    if: inputs.platforms == 'all' || inputs.platforms == 'desktop' || inputs.platforms == 'macos'
     strategy:
       # Separate per-arch images, not a universal one: Homebrew bottles are single-architecture.
       # Each arch reports its own result: a failing x86_64 build should not hide arm64's.

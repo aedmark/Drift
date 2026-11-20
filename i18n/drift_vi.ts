@@ -4,28 +4,32 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <source>About Drift</source>
-        <translation>Thông tin về Drift</translation>
+        <source>About Drift Mojave</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Close</source>
         <translation>Đóng</translation>
     </message>
     <message>
-        <source>Drift</source>
-        <translation>Drift</translation>
+        <source>Drift Mojave</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>“What happens in the timeline, stays in the timeline.”</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>High-velocity, edit-friendly video editor with native VEGAS Pro interchange, multi-take cycling, and signature timeline ergonomics.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Licensed under GPLv3. Forked from Drift by CutWire Studios.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Version %1</source>
         <translation>Phiên bản %1</translation>
-    </message>
-    <message>
-        <source>Open-source video editor by CutWire Studios.</source>
-        <translation>Trình chỉnh sửa video mã nguồn mở của CutWire Studios.</translation>
-    </message>
-    <message>
-        <source>Licensed under GPLv3. Copyright © CutWire Studios.</source>
-        <translation>Được cấp phép theo GPLv3. Bản quyền © CutWire Studios.</translation>
     </message>
 </context>
 <context>
@@ -2022,8 +2026,8 @@
         <translation>Phiên bản mới hơn của Drift đã sẵn sàng</translation>
     </message>
     <message>
-        <source>About Drift</source>
-        <translation>Thông tin về Drift</translation>
+        <source>About Drift Mojave</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Version, licence and credits</source>
@@ -7535,12 +7539,12 @@
 <context>
     <name>CrashReport</name>
     <message>
-        <source>Drift crashed the last time it ran</source>
-        <translation>Drift đã gặp sự cố trong lần chạy trước</translation>
+        <source>Drift Mojave crashed the last time it ran</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Drift did not close properly last time</source>
-        <translation>Drift đã không đóng đúng cách trong lần chạy trước</translation>
+        <source>Drift Mojave did not close properly last time</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>If it keeps happening, you can start in safe mode, which uses the default graphics backend and loads no add-ons for this session.</source>
@@ -12310,8 +12314,8 @@
         <translation>Dán Thuộc tính…</translation>
     </message>
     <message>
-        <source>About Drift</source>
-        <translation>Thông tin về Drift</translation>
+        <source>About Drift Mojave</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Settings…</source>
@@ -16030,6 +16034,85 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
     </message>
 </context>
 <context>
+    <name>PreviewOsdSplitButton</name>
+    <message>
+        <source>Toggle Split Screen View (A/B Compare)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Split Screen options</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable Split Screen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable Split Screen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source: FX Bypass</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source: Clipboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source: Reference Frame</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source: Track 1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mode: Vertical Wipe (Left / Right)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mode: Horizontal Wipe (Top / Bottom)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mode: Side by Side</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy Snapshot to Clipboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Snapshot copied to clipboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to capture snapshot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capture Reference Frame</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reference frame captured</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to capture reference</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Swap Sides (Invert)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset Divider (50%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>PreviewOsdZoomChip</name>
     <message>
         <source>Zoom out</source>
@@ -16053,6 +16136,29 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
     <message>
         <source>Seek</source>
         <translation>Tua</translation>
+    </message>
+</context>
+<context>
+    <name>PreviewSplitWipe</name>
+    <message>
+        <source>A: Timeline</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>B: Clipboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>B: Reference</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>B: Track %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>B: FX Bypass</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -17445,8 +17551,8 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
 <context>
     <name>QuickSetup</name>
     <message>
-        <source>Drift setup</source>
-        <translation>Cài đặt Drift</translation>
+        <source>Drift Mojave setup</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Back</source>
@@ -17585,8 +17691,8 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
 <context>
     <name>QuickSetupMockEditor</name>
     <message>
-        <source>Drift</source>
-        <translation>Drift</translation>
+        <source>Drift Mojave</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Export</source>
@@ -18773,12 +18879,12 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
         <translation>Giới thiệu</translation>
     </message>
     <message>
-        <source>Drift</source>
-        <translation>Drift</translation>
+        <source>Drift Mojave</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Version %1</source>
-        <translation>Phiên bản %1</translation>
+        <source>Version %1 — “What happens in the timeline, stays in the timeline.”</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Updates</source>
@@ -18837,12 +18943,12 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
         <translation>Chạy lần nữa</translation>
     </message>
     <message>
-        <source>About Drift</source>
-        <translation>Thông tin về Drift</translation>
+        <source>About Drift Mojave</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Open-source video editor by CutWire Studios.</source>
-        <translation>Trình chỉnh sửa video mã nguồn mở của CutWire Studios.</translation>
+        <source>High-velocity, edit-friendly video editor.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Show about dialog</source>
@@ -22658,8 +22764,8 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
 <context>
     <name>StartScreenTitle</name>
     <message>
-        <source>Create polished videos fast</source>
-        <translation>Tạo video ấn tượng nhanh</translation>
+        <source>What happens in the timeline, stays in the timeline.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -22699,6 +22805,10 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
     <message>
         <source>Version %1</source>
         <translation>Phiên bản %1</translation>
+    </message>
+    <message>
+        <source>“What happens in the timeline, stays in the timeline.”</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -27589,6 +27699,10 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
         <translation>Không thể kiểm tra cập nhật: %1</translation>
     </message>
     <message>
+        <source>Drift Mojave %1 is the latest version.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Couldn’t check for updates: unexpected response.</source>
         <translation>Không thể kiểm tra cập nhật: phản hồi bất thường.</translation>
     </message>
@@ -28078,7 +28192,7 @@ Nếu phát lại bị giật, hãy thử cách khác.</translation>
         </translation>
     </message>
     <message>
-        <source>Drift works best with edit-friendly intraframe codecs. Converting these clips to Apple ProRes 422 now ensures smooth timeline playback, responsive frame-accurate scrubbing, and prevents audio sync drift.
+        <source>Drift Mojave works best with edit-friendly intraframe codecs. Converting these clips to Apple ProRes 422 now ensures smooth timeline playback, responsive frame-accurate scrubbing, and prevents audio sync drift.
 
 Transcoding runs in the background using multi-threaded FFmpeg without modifying your original media files.</source>
         <translation type="unfinished"></translation>
@@ -28974,8 +29088,8 @@ Transcoding runs in the background using multi-threaded FFmpeg without modifying
 <context>
     <name>WorkspaceWindow</name>
     <message>
-        <source>Drift</source>
-        <translation>Drift</translation>
+        <source>Drift Mojave</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
