@@ -954,6 +954,8 @@ QString resolveMediaFile(const QString &winPath, const QString &diskName,
     const QString baseName = diskInfo.completeBaseName();
     const QString ext = diskInfo.suffix().toLower();
     const QString movName = baseName + QStringLiteral(".mov");
+    const QString remapFrom = qEnvironmentVariable("DRIFT_MEDIA_REMAP_FROM");
+    const QString remapTo = qEnvironmentVariable("DRIFT_MEDIA_REMAP_TO");
 
     const bool isMov = (ext == QLatin1String("mov"));
     // Audio, images, or documents should not be redirected to .mov
@@ -1007,13 +1009,11 @@ QString resolveMediaFile(const QString &winPath, const QString &diskName,
             }
         }
 
-        // Cross-drive fallback (Jellyfish <-> HAL) for .mov
-        if (!sourceDir.isEmpty()) {
+        // Environment-configured remap fallback for .mov
+        if (!remapFrom.isEmpty() && !remapTo.isEmpty() && !sourceDir.isEmpty()) {
             QString altSource = sourceDir;
-            if (altSource.startsWith(QStringLiteral("/mnt/Jellyfish")))
-                altSource.replace(0, 14, QStringLiteral("/mnt/HAL"));
-            else if (altSource.startsWith(QStringLiteral("/mnt/HAL")))
-                altSource.replace(0, 8, QStringLiteral("/mnt/Jellyfish"));
+            if (altSource.startsWith(remapFrom))
+                altSource.replace(0, remapFrom.size(), remapTo);
 
             if (altSource != sourceDir && QDir(altSource).exists()) {
                 const QDir altDir(altSource);
@@ -1061,13 +1061,11 @@ QString resolveMediaFile(const QString &winPath, const QString &diskName,
         return candidates.first();
     }
 
-    // 5. Cross-drive fallback for original file
-    if (!sourceDir.isEmpty()) {
+    // 5. Environment-configured remap fallback for original file
+    if (!remapFrom.isEmpty() && !remapTo.isEmpty() && !sourceDir.isEmpty()) {
         QString altSource = sourceDir;
-        if (altSource.startsWith(QStringLiteral("/mnt/Jellyfish")))
-            altSource.replace(0, 14, QStringLiteral("/mnt/HAL"));
-        else if (altSource.startsWith(QStringLiteral("/mnt/HAL")))
-            altSource.replace(0, 8, QStringLiteral("/mnt/Jellyfish"));
+        if (altSource.startsWith(remapFrom))
+            altSource.replace(0, remapFrom.size(), remapTo);
 
         if (altSource != sourceDir && QDir(altSource).exists()) {
             const QDir altDir(altSource);
@@ -1504,10 +1502,15 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
         searchDirs.append(QDir(dir.filePath(QStringLiteral("../../Transcodes_ProRes"))));
         searchDirs.append(QDir(dir.filePath(QStringLiteral(".."))));
         searchDirs.append(QDir(dir.filePath(QStringLiteral("../.."))));
-        searchDirs.append(QDir(QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Transcodes_ProRes/") + dir.dirName()));
-        searchDirs.append(QDir(QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Transcodes_ProRes")));
-        searchDirs.append(QDir(QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Transcodes_ProRes/") + dir.dirName()));
-        searchDirs.append(QDir(QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Transcodes_ProRes")));
+
+        const QString extraPaths = qEnvironmentVariable("DRIFT_MEDIA_SEARCH_PATH");
+        if (!extraPaths.isEmpty()) {
+            const QStringList paths = extraPaths.split(QDir::listSeparator(), Qt::SkipEmptyParts);
+            for (const QString &p : paths) {
+                searchDirs.append(QDir(p));
+                searchDirs.append(QDir(QDir(p).filePath(QStringLiteral("Transcodes_ProRes"))));
+            }
+        }
     }
 
     // Index filenames in sourceDir and nearby project directories for fast resolution
@@ -1534,17 +1537,19 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                 indexDirectory(grandParent.absolutePath());
         }
 
-        // Cross-drive index (Jellyfish <-> HAL)
-        QString altDir = sourceDir;
-        if (altDir.startsWith(QStringLiteral("/mnt/Jellyfish")))
-            altDir.replace(0, 14, QStringLiteral("/mnt/HAL"));
-        else if (altDir.startsWith(QStringLiteral("/mnt/HAL")))
-            altDir.replace(0, 8, QStringLiteral("/mnt/Jellyfish"));
-        if (altDir != sourceDir && QDir(altDir).exists()) {
-            indexDirectory(altDir);
-            QDir altParent(altDir);
-            if (altParent.cdUp())
-                indexDirectory(altParent.absolutePath());
+        // Remap index if environment remap is specified
+        const QString remapFrom = qEnvironmentVariable("DRIFT_MEDIA_REMAP_FROM");
+        const QString remapTo = qEnvironmentVariable("DRIFT_MEDIA_REMAP_TO");
+        if (!remapFrom.isEmpty() && !remapTo.isEmpty()) {
+            QString altDir = sourceDir;
+            if (altDir.startsWith(remapFrom))
+                altDir.replace(0, remapFrom.size(), remapTo);
+            if (altDir != sourceDir && QDir(altDir).exists()) {
+                indexDirectory(altDir);
+                QDir altParent(altDir);
+                if (altParent.cdUp())
+                    indexDirectory(altParent.absolutePath());
+            }
         }
     }
 
@@ -1720,8 +1725,6 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                                     if (MediaProbe::isEditFriendlyCodec(st.codecName)
                                         || resolved.endsWith(QLatin1String(".mov"), Qt::CaseInsensitive)) {
                                         asset.editFriendly = true;
-                                        asset.frameRateKnown = true;
-                                        asset.variableFrameRate = false;
                                     }
                                 } else if (st.type == StreamInfo::Type::Audio) {
                                     asset.channels = st.channels;

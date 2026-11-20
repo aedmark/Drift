@@ -9,6 +9,20 @@
 #include "core/project/Track.h"
 #include "core/project/clip/Clip.h"
 
+static QString findExtendedVeg(const QString &subPath)
+{
+    const QString extendedDir = qEnvironmentVariable("DRIFT_EXTENDED_VEGAS_TESTS_DIR");
+    if (extendedDir.isEmpty())
+        return QString();
+    const QString candidate = QDir(extendedDir).filePath(subPath);
+    if (QFile::exists(candidate))
+        return candidate;
+    const QString candidateOdds = QDir(extendedDir).filePath(QStringLiteral("Videos/Odds/") + subPath);
+    if (QFile::exists(candidateOdds))
+        return candidateOdds;
+    return QString();
+}
+
 class TestInterchangeVegas : public QObject
 {
     Q_OBJECT
@@ -38,11 +52,8 @@ void TestInterchangeVegas::detectsVegasProject()
         QVERIFY(drift::vegas::isVegasProject(fixtureVeg));
     }
 
-    QString realVeg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 1/e3s1.veg");
-    if (!QFile::exists(realVeg)) {
-        realVeg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 1/e3s1.veg");
-    }
-    if (QFile::exists(realVeg)) {
+    const QString realVeg = findExtendedVeg(QStringLiteral("Episode 3/Remaster/Scene 1/e3s1.veg"));
+    if (!realVeg.isEmpty()) {
         QVERIFY(drift::vegas::isVegasProject(realVeg));
     }
 
@@ -101,12 +112,9 @@ void TestInterchangeVegas::readsFixtureVegasProject()
 
 void TestInterchangeVegas::readsRealVegasProject()
 {
-    QString realVeg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 1/e3s1.veg");
-    if (!QFile::exists(realVeg)) {
-        realVeg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 1/e3s1.veg");
-    }
-    if (!QFile::exists(realVeg)) {
-        QSKIP("Sample .veg file not present on Jellyfish or HAL");
+    const QString realVeg = findExtendedVeg(QStringLiteral("Episode 3/Remaster/Scene 1/e3s1.veg"));
+    if (realVeg.isEmpty()) {
+        QSKIP("Extended test .veg file not present (set DRIFT_EXTENDED_VEGAS_TESTS_DIR to run)");
     }
 
     QString error;
@@ -170,12 +178,9 @@ void TestInterchangeVegas::readsRealVegasProject()
 
 void TestInterchangeVegas::readsScene2VegasProjectWithMts()
 {
-    QString scene2Veg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 2/E3S2.veg");
-    if (!QFile::exists(scene2Veg)) {
-        scene2Veg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 2/E3S2.veg");
-    }
-    if (!QFile::exists(scene2Veg)) {
-        QSKIP("Scene 2 .veg file not present");
+    const QString scene2Veg = findExtendedVeg(QStringLiteral("Episode 3/Remaster/Scene 2/E3S2.veg"));
+    if (scene2Veg.isEmpty()) {
+        QSKIP("Extended test .veg file not present (set DRIFT_EXTENDED_VEGAS_TESTS_DIR to run)");
     }
 
     QString error;
@@ -215,12 +220,9 @@ void TestInterchangeVegas::readsScene2VegasProjectWithMts()
 
 void TestInterchangeVegas::readsEpisode4VegasProjectWithOffset96AndSubdirectories()
 {
-    QString ep4Veg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/1.1.veg");
-    if (!QFile::exists(ep4Veg)) {
-        ep4Veg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/1.1.veg");
-    }
-    if (!QFile::exists(ep4Veg)) {
-        QSKIP("Episode 4 1.1.veg not present");
+    const QString ep4Veg = findExtendedVeg(QStringLiteral("Episode 4/1.1.veg"));
+    if (ep4Veg.isEmpty()) {
+        QSKIP("Extended test .veg file not present (set DRIFT_EXTENDED_VEGAS_TESTS_DIR to run)");
     }
 
     QString error;
@@ -283,8 +285,8 @@ void TestInterchangeVegas::readsEpisode4VegasProjectWithOffset96AndSubdirectorie
 
 void TestInterchangeVegas::readsEpisode4WorkprintWithNestedTimelines()
 {
-    QString sceneVeg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/10.1b.veg");
-    if (QFile::exists(sceneVeg)) {
+    const QString sceneVeg = findExtendedVeg(QStringLiteral("Episode 4/10.1b.veg"));
+    if (!sceneVeg.isEmpty()) {
         QString err;
         auto optScene = drift::vegas::readProject(sceneVeg, &err);
         QVERIFY2(optScene.has_value(), qPrintable(err));
@@ -292,12 +294,9 @@ void TestInterchangeVegas::readsEpisode4WorkprintWithNestedTimelines()
                  << "Assets:" << optScene->assets().size();
     }
 
-    QString workprintVeg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/Workprint.veg");
-    if (!QFile::exists(workprintVeg)) {
-        workprintVeg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/Workprint.veg");
-    }
-    if (!QFile::exists(workprintVeg)) {
-        QSKIP("Episode 4 Workprint.veg not present");
+    const QString workprintVeg = findExtendedVeg(QStringLiteral("Episode 4/Workprint.veg"));
+    if (workprintVeg.isEmpty()) {
+        QSKIP("Extended test .veg file not present (set DRIFT_EXTENDED_VEGAS_TESTS_DIR to run)");
     }
 
     QString error;
@@ -349,11 +348,8 @@ void TestInterchangeVegas::readsEpisode4WorkprintWithNestedTimelines()
 void TestInterchangeVegas::readsTrackMetadataStateAndProperties()
 {
     // 1. Test mute states, volume levels, and names on 6.1a.veg
-    QString veg61a = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/OLD/6.1a.veg");
-    if (!QFile::exists(veg61a)) {
-        veg61a = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/OLD/6.1a.veg");
-    }
-    if (QFile::exists(veg61a)) {
+    const QString veg61a = findExtendedVeg(QStringLiteral("Episode 4/OLD/6.1a.veg"));
+    if (!veg61a.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(veg61a, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -384,11 +380,8 @@ void TestInterchangeVegas::readsTrackMetadataStateAndProperties()
     }
 
     // 2. Test solo states on BEACH PARTY B.veg
-    QString vegBeach = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/BEACH PARTY B.veg");
-    if (!QFile::exists(vegBeach)) {
-        vegBeach = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/BEACH PARTY B.veg");
-    }
-    if (QFile::exists(vegBeach)) {
+    const QString vegBeach = findExtendedVeg(QStringLiteral("Episode 4/BEACH PARTY B.veg"));
+    if (!vegBeach.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegBeach, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -404,11 +397,8 @@ void TestInterchangeVegas::readsTrackMetadataStateAndProperties()
     }
 
     // 3. Test stereo pan on 9.4c.veg
-    QString vegPan = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/Intermediates/9.4c.veg");
-    if (!QFile::exists(vegPan)) {
-        vegPan = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/Intermediates/9.4c.veg");
-    }
-    if (QFile::exists(vegPan)) {
+    const QString vegPan = findExtendedVeg(QStringLiteral("Episode 4/Intermediates/9.4c.veg"));
+    if (!vegPan.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegPan, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -425,11 +415,8 @@ void TestInterchangeVegas::readsTrackMetadataStateAndProperties()
 void TestInterchangeVegas::readsTimelineMarkersAndRegions()
 {
     // 1. Test Previously On.veg for take region (Record Take 1)
-    QString vegPrev = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/Previously On.veg");
-    if (!QFile::exists(vegPrev)) {
-        vegPrev = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/Previously On.veg");
-    }
-    if (QFile::exists(vegPrev)) {
+    const QString vegPrev = findExtendedVeg(QStringLiteral("Episode 4/Previously On.veg"));
+    if (!vegPrev.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegPrev, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -448,11 +435,8 @@ void TestInterchangeVegas::readsTimelineMarkersAndRegions()
     }
 
     // 2. Test Acid's Story B.veg for marker (Marker 5) and source marker
-    QString vegAcid = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 5 & 6/Episode 5/Acid's Story B.veg");
-    if (!QFile::exists(vegAcid)) {
-        vegAcid = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 5 & 6/Episode 5/Acid's Story B.veg");
-    }
-    if (QFile::exists(vegAcid)) {
+    const QString vegAcid = findExtendedVeg(QStringLiteral("Episode 5 & 6/Episode 5/Acid's Story B.veg"));
+    if (!vegAcid.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegAcid, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -612,11 +596,8 @@ void TestInterchangeVegas::readsTimelineMarkersAndRegions()
 void TestInterchangeVegas::detectsCrossfadesAndTransitions()
 {
     // 1. Test e3s5.veg for track transitions
-    QString vegE3S5 = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 5/e3s5.veg");
-    if (!QFile::exists(vegE3S5)) {
-        vegE3S5 = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 5/e3s5.veg");
-    }
-    if (QFile::exists(vegE3S5)) {
+    const QString vegE3S5 = findExtendedVeg(QStringLiteral("Episode 3/Remaster/Scene 5/e3s5.veg"));
+    if (!vegE3S5.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegE3S5, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -645,11 +626,8 @@ void TestInterchangeVegas::detectsCrossfadesAndTransitions()
     }
 
     // 2. Test e3s8-9-10.veg for crossfades
-    QString vegE3S8 = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 8,9,10/e3s8-9-10.veg");
-    if (!QFile::exists(vegE3S8)) {
-        vegE3S8 = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 8,9,10/e3s8-9-10.veg");
-    }
-    if (QFile::exists(vegE3S8)) {
+    const QString vegE3S8 = findExtendedVeg(QStringLiteral("Episode 3/Remaster/Scene 8,9,10/e3s8-9-10.veg"));
+    if (!vegE3S8.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegE3S8, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -771,11 +749,8 @@ void TestInterchangeVegas::detectsCrossfadesAndTransitions()
 void TestInterchangeVegas::readsTitlesAndTextGenerators()
 {
     // 1. Test Workprint.veg for Titles & Text generator clips
-    QString vegWorkprint = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/Workprint.veg");
-    if (!QFile::exists(vegWorkprint)) {
-        vegWorkprint = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/Workprint.veg");
-    }
-    if (QFile::exists(vegWorkprint)) {
+    const QString vegWorkprint = findExtendedVeg(QStringLiteral("Episode 4/Workprint.veg"));
+    if (!vegWorkprint.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegWorkprint, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -818,11 +793,8 @@ void TestInterchangeVegas::readsTitlesAndTextGenerators()
     }
 
     // 2. Test Previously On.veg for "PREVIOUSLY ON" title card and solid color
-    QString vegPrev = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/Previously On.veg");
-    if (!QFile::exists(vegPrev)) {
-        vegPrev = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/Previously On.veg");
-    }
-    if (QFile::exists(vegPrev)) {
+    const QString vegPrev = findExtendedVeg(QStringLiteral("Episode 4/Previously On.veg"));
+    if (!vegPrev.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegPrev, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -845,11 +817,8 @@ void TestInterchangeVegas::readsTitlesAndTextGenerators()
 void TestInterchangeVegas::readsVideoEffectsLevelsAndColor()
 {
     // Test e3s3.veg for media-level Video FX (Levels, Color Corrector, Sharpen)
-    QString vegScene3 = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 3/e3s3.veg");
-    if (!QFile::exists(vegScene3)) {
-        vegScene3 = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 3/e3s3.veg");
-    }
-    if (QFile::exists(vegScene3)) {
+    const QString vegScene3 = findExtendedVeg(QStringLiteral("Episode 3/Remaster/Scene 3/e3s3.veg"));
+    if (!vegScene3.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegScene3, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -908,11 +877,8 @@ void TestInterchangeVegas::readsVideoEffectsLevelsAndColor()
 void TestInterchangeVegas::readsVignetteAndSoftlightEffects()
 {
     // 1. Test BEACH PARTY B.veg for Media Pool Sony Vignette
-    QString vegBeach = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/BEACH PARTY B.veg");
-    if (!QFile::exists(vegBeach)) {
-        vegBeach = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/BEACH PARTY B.veg");
-    }
-    if (QFile::exists(vegBeach)) {
+    const QString vegBeach = findExtendedVeg(QStringLiteral("Episode 4/BEACH PARTY B.veg"));
+    if (!vegBeach.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegBeach, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -954,11 +920,8 @@ void TestInterchangeVegas::readsVignetteAndSoftlightEffects()
     }
 
     // 2. Test Credits Episode 3.veg for Event-level Softlight XML and Levels
-    QString vegCredits = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Credits Episode 3.veg");
-    if (!QFile::exists(vegCredits)) {
-        vegCredits = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Credits Episode 3.veg");
-    }
-    if (QFile::exists(vegCredits)) {
+    const QString vegCredits = findExtendedVeg(QStringLiteral("Episode 3/Remaster/Credits Episode 3.veg"));
+    if (!vegCredits.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegCredits, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -1002,11 +965,8 @@ void TestInterchangeVegas::readsVignetteAndSoftlightEffects()
 void TestInterchangeVegas::readsEventPanCropAndKeyframes()
 {
     // 1. Test BEACH PARTY B.veg for both static cropping and 2D pan/zoom keyframes
-    QString vegBeach = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/BEACH PARTY B.veg");
-    if (!QFile::exists(vegBeach)) {
-        vegBeach = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/BEACH PARTY B.veg");
-    }
-    if (QFile::exists(vegBeach)) {
+    const QString vegBeach = findExtendedVeg(QStringLiteral("Episode 4/BEACH PARTY B.veg"));
+    if (!vegBeach.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(vegBeach, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));
@@ -1079,11 +1039,8 @@ void TestInterchangeVegas::readsEventPanCropAndKeyframes()
     }
 
     // 2. Test 3.1b.veg for 4-keyframe camera zoom out
-    QString veg31b = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/3.1b.veg");
-    if (!QFile::exists(veg31b)) {
-        veg31b = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/3.1b.veg");
-    }
-    if (QFile::exists(veg31b)) {
+    const QString veg31b = findExtendedVeg(QStringLiteral("Episode 4/3.1b.veg"));
+    if (!veg31b.isEmpty()) {
         QString err;
         const auto optProj = drift::vegas::readProject(veg31b, &err);
         QVERIFY2(optProj.has_value(), qPrintable(err));

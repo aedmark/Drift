@@ -3833,18 +3833,13 @@ void EditorStateTest::projectJsonExportImportRoundTrip()
 
 void EditorStateTest::convertToProResTranscodesAndRelinks()
 {
-    QString realVeg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 2/E3S2.veg");
-    if (!QFile::exists(realVeg)) {
-        realVeg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 2/E3S2.veg");
+    const QString extendedDir = qEnvironmentVariable("DRIFT_EXTENDED_VEGAS_TESTS_DIR");
+    if (extendedDir.isEmpty()) {
+        QSKIP("Extended tests skipped; set DRIFT_EXTENDED_VEGAS_TESTS_DIR to run");
     }
+    const QString realVeg = QDir(extendedDir).filePath(QStringLiteral("Episode 3/Remaster/Scene 2/E3S2.veg"));
     if (!QFile::exists(realVeg)) {
-        realVeg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 1/e3s1.veg");
-    }
-    if (!QFile::exists(realVeg)) {
-        realVeg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 1/e3s1.veg");
-    }
-    if (!QFile::exists(realVeg)) {
-        QSKIP("Sample .veg file not present on Jellyfish or HAL");
+        QSKIP("Sample .veg file not present in DRIFT_EXTENDED_VEGAS_TESTS_DIR");
     }
 
     AssetLibrary library;
@@ -3876,13 +3871,7 @@ void EditorStateTest::convertToProResTranscodesAndRelinks()
 
 void EditorStateTest::loadVegasProjectViaLoadProject()
 {
-    QString testVeg = QStringLiteral(DRIFT_TEST_DATA_DIR "/sample.veg");
-    if (!QFile::exists(testVeg)) {
-        testVeg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 3/Remaster/Scene 2/E3S2.veg");
-        if (!QFile::exists(testVeg)) {
-            testVeg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 3/Remaster/Scene 2/E3S2.veg");
-        }
-    }
+    const QString testVeg = QStringLiteral(DRIFT_TEST_DATA_DIR "/sample.veg");
     if (!QFile::exists(testVeg)) {
         QSKIP("Sample .veg file not present");
     }
@@ -3902,12 +3891,13 @@ void EditorStateTest::loadVegasProjectViaLoadProject()
 
 void EditorStateTest::loadEpisode4VegasProjectPromptsTranscode()
 {
-    QString ep4Veg = QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/1.1.veg");
-    if (!QFile::exists(ep4Veg)) {
-        ep4Veg = QStringLiteral("/mnt/HAL/Videos/Odds/Episode 4/1.1.veg");
+    const QString extendedDir = qEnvironmentVariable("DRIFT_EXTENDED_VEGAS_TESTS_DIR");
+    if (extendedDir.isEmpty()) {
+        QSKIP("Extended tests skipped; set DRIFT_EXTENDED_VEGAS_TESTS_DIR to run");
     }
+    const QString ep4Veg = QDir(extendedDir).filePath(QStringLiteral("Episode 4/1.1.veg"));
     if (!QFile::exists(ep4Veg)) {
-        QSKIP("Episode 4 1.1.veg not present");
+        QSKIP("Episode 4 1.1.veg not present in DRIFT_EXTENDED_VEGAS_TESTS_DIR");
     }
 
     AssetLibrary library;
@@ -3921,7 +3911,7 @@ void EditorStateTest::loadEpisode4VegasProjectPromptsTranscode()
     QCOMPARE(loadFinished.count(), 1);
     QVERIFY(loadFinished.at(0).at(0).toBool());
 
-    const bool hasTranscodes = QDir(QStringLiteral("/mnt/Jellyfish/Videos/Odds/Episode 4/Transcodes_ProRes")).exists();
+    const bool hasTranscodes = QDir(QDir(extendedDir).filePath(QStringLiteral("Episode 4/Transcodes_ProRes"))).exists();
     if (hasTranscodes) {
         // Co-located ProRes transcodes were automatically relinked, skipping transcode prompt
         QCOMPARE(transcodeSuggested.count(), 0);

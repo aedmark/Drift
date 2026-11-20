@@ -391,8 +391,6 @@ drift::MediaAsset buildProbedAsset(const QString &absolutePath, const QString &n
             asset.codecName = stream.codecName;
             if (MediaProbe::isEditFriendlyCodec(stream.codecName)) {
                 asset.editFriendly = true;
-                asset.frameRateKnown = true;
-                asset.variableFrameRate = false;
             }
         }
     }
