@@ -68,6 +68,8 @@ bool trackAllowsTransitions(drift::TrackType type);
 
 void syncOverlapTransitionsOnTrack(drift::Track &track);
 
+QVariantMap audioEffectToMap(const drift::Effect &effect, int effectIndex, drift::TimeUs timelineStart);
+
 
 // A slot value as the plain QML/MCP value: colours as hex, scalars as numbers, vectors as
 // [x, y]. The typed {type, value} object form is accepted back too.

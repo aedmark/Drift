@@ -700,13 +700,24 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
 
         float peakL = 0.0f;
         float peakR = 0.0f;
+        const bool hasTrackAudioFx = !track.audioEffects.isEmpty();
+
+        float *destBuffer = interleavedStereoOut;
+        if (hasTrackAudioFx) {
+            const int totalFloats = sampleCount * 2;
+            if (m_trackMixBuffer.size() < totalFloats)
+                m_trackMixBuffer.resize(totalFloats);
+            std::memset(m_trackMixBuffer.data(), 0, static_cast<size_t>(totalFloats) * sizeof(float));
+            destBuffer = m_trackMixBuffer.data();
+        }
+
         if (track.type == drift::TrackType::Audio) {
             for (const drift::Clip &clip : track.clips) {
                 if (!clip.enabled)
                     continue;
                 const size_t laneKey = adjustmentsForClip(trackLive, clip.id, live);
                 accumulateClipAudio(*project, clip, track, timelineStartUs, sampleCount, sampleRate,
-                                    interleavedStereoOut, m_clipAudioMutex, m_clipAudio,
+                                    destBuffer, m_clipAudioMutex, m_clipAudio,
                                     live, laneKey, m_streamSalt, m_depth, serial, &peakL, &peakR);
             }
         } else if (track.type == drift::TrackType::Video) {
@@ -715,19 +726,61 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
                     && !clip.suppressEmbeddedAudio) {
                     const size_t laneKey = adjustmentsForClip(trackLive, clip.id, live);
                     accumulateClipAudio(*project, clip, track, timelineStartUs, sampleCount,
-                                        sampleRate, interleavedStereoOut, m_clipAudioMutex,
+                                        sampleRate, destBuffer, m_clipAudioMutex,
                                         m_clipAudio, live, laneKey, m_streamSalt, m_depth, serial,
                                         &peakL, &peakR);
                 }
             }
         }
+
+        if (hasTrackAudioFx) {
+            const QString trackKey = QStringLiteral("__track_%1__").arg(track.id);
+            std::shared_ptr<ClipAudioState> statePtr;
+            {
+                QMutexLocker locker(&m_clipAudioMutex);
+                statePtr = m_clipAudio.value(trackKey);
+                if (!statePtr) {
+                    statePtr = std::make_shared<ClipAudioState>();
+                    m_clipAudio.insert(trackKey, statePtr);
+                }
+            }
+            drift::AudioEffectRack &rack = statePtr->rack;
+            const drift::TimeUs lastEndUs = rack.lastTimelineEndUs();
+            const bool continuous = lastEndUs >= 0
+                                    && qAbs(timelineStartUs - lastEndUs) <= kTimelineGapToleranceUs;
+
+            ClipAudioState &state = *statePtr;
+            if (serial == 0 || state.effectSpecsSerial != serial) {
+                state.effectSpecs = audioEffectSpecsFor(track.audioEffects, 0);
+                state.effectSpecsSerial = serial;
+            }
+            bool rebuilt = false;
+            const bool active = rack.configure(state.effectSpecs, sampleRate, &rebuilt);
+            if (active && (!continuous || rebuilt))
+                rack.reset(timelineStartUs);
+            if (active)
+                rack.process(m_trackMixBuffer.data(), sampleCount, timelineStartUs);
+
+            // Re-measure post-FX peaks for the track meter and sum into main mix
+            peakL = 0.0f;
+            peakR = 0.0f;
+            const int totalFloats = sampleCount * 2;
+            for (int i = 0; i < totalFloats; i += 2) {
+                peakL = qMax(peakL, qAbs(m_trackMixBuffer[i]));
+                peakR = qMax(peakR, qAbs(m_trackMixBuffer[i + 1]));
+                interleavedStereoOut[i] += m_trackMixBuffer[i];
+                interleavedStereoOut[i + 1] += m_trackMixBuffer[i + 1];
+            }
+        }
+
         newTrackLevels.insert(ti, {peakL, peakR});
     }
 
     // The master bus runs on the summed mix, before the limiter — an adjustment that raises level
     // must still be caught by the soft clip rather than sitting outside it.
     const size_t busKey = liveAdjustments(adjustments.masterBus, timelineStartUs, live);
-    if (!live.isEmpty()) {
+    const bool hasMasterTrackFx = !project->masterAudioEffects().isEmpty();
+    if (!live.isEmpty() || hasMasterTrackFx) {
         std::shared_ptr<ClipAudioState> statePtr;
         {
             // Keyed like a clip so resetClipAudioState() tears the bus down on seek along with
@@ -746,12 +799,15 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
                                 && qAbs(timelineStartUs - lastEndUs) <= kTimelineGapToleranceUs;
 
         ClipAudioState &state = *statePtr;
-        if (serial == 0 || state.effectSpecsSerial != serial || state.effectSpecsKey != busKey) {
+        const size_t masterHash = qHashMulti(busKey, project->masterAudioEffects().size());
+        if (serial == 0 || state.effectSpecsSerial != serial || state.effectSpecsKey != masterHash) {
             state.effectSpecs.clear();
+            if (hasMasterTrackFx)
+                state.effectSpecs += audioEffectSpecsFor(project->masterAudioEffects(), 0);
             for (const drift::Clip *adjustment : std::as_const(live))
                 state.effectSpecs += audioEffectSpecsFor(adjustment->audioEffects, adjustment->timelineStart);
             state.effectSpecsSerial = serial;
-            state.effectSpecsKey = busKey;
+            state.effectSpecsKey = masterHash;
         }
         bool rebuilt = false;
         const bool active = rack.configure(state.effectSpecs, sampleRate, &rebuilt);

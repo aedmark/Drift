@@ -23,10 +23,13 @@ Item {
     property real levelR: 0
     property real peakL: 0
     property real peakR: 0
+    property bool hasFx: false
+    property int fxCount: 0
 
     signal muteToggled()
     signal soloToggled()
     signal armToggled()
+    signal fxClicked()
     signal volumePreviewed(real gain)
     signal volumeCommitted()
     signal volumeSet(real gain)
@@ -99,6 +102,19 @@ Item {
         anchors.right: parent.right
     }
 
+    MixerStripToggle {
+        id: fxButton
+        anchors.top: panArea.bottom
+        anchors.topMargin: Theme.spacingXs
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: strip.fxCount > 0 ? "FX " + strip.fxCount : "FX"
+        tone: "active"
+        checked: strip.hasFx
+        tooltip: strip.master ? (strip.hasFx ? qsTr("Master FX (%1 active)").arg(strip.fxCount) : qsTr("Master FX"))
+                              : (strip.hasFx ? qsTr("Track FX on %1 (%2 active)").arg(strip.name).arg(strip.fxCount) : qsTr("Track FX on %1").arg(strip.name))
+        onClicked: strip.fxClicked()
+    }
+
     MixerLevelReadout {
         id: readout
         channel: strip
@@ -107,8 +123,8 @@ Item {
     // --- Meter + fader ------------------------------------------------------------
     Row {
         id: meterRow
-        anchors.top: panArea.bottom
-        anchors.topMargin: Theme.spacingLg
+        anchors.top: fxButton.bottom
+        anchors.topMargin: Theme.spacingSm
         anchors.bottom: readout.top
         anchors.bottomMargin: Theme.spacingLg
         anchors.horizontalCenter: parent.horizontalCenter

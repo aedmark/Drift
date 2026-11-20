@@ -1776,6 +1776,220 @@ bool AppController::setAudioEffectParam(int trackIndex, int clipIndex, int effec
     return true;
 }
 
+// --- Track Audio FX (P10-01) -------------------------------------------------
+
+void AppController::addTrackAudioEffect(int trackIndex, const QString &effectId)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    const AudioEffectEntry *def = audioEffectDefForId(effectId);
+    if (!def)
+        return;
+    const drift::Effect effect = audioEffectFromCatalogEntry(*def, {});
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].audioEffects.append(effect);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Add track audio effect"));
+    finishEdit(tr("Track audio effect added"));
+}
+
+void AppController::removeTrackAudioEffect(int trackIndex, int effectIndex)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (effectIndex < 0 || effectIndex >= track.audioEffects.size())
+        return;
+    const drift::Project before = m_project;
+    track.audioEffects.removeAt(effectIndex);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Remove track audio effect"));
+    finishEdit(tr("Track audio effect removed"));
+}
+
+void AppController::setTrackAudioEffectEnabled(int trackIndex, int effectIndex, bool enabled)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (effectIndex < 0 || effectIndex >= track.audioEffects.size())
+        return;
+    if (track.audioEffects[effectIndex].enabled == enabled)
+        return;
+    const drift::Project before = m_project;
+    track.audioEffects[effectIndex].enabled = enabled;
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, enabled ? tr("Enable track audio effect") : tr("Disable track audio effect"));
+    finishEdit(enabled ? tr("Track audio effect enabled") : tr("Track audio effect disabled"));
+}
+
+void AppController::moveTrackAudioEffect(int trackIndex, int fromIndex, int toIndex)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (fromIndex < 0 || fromIndex >= track.audioEffects.size())
+        return;
+    toIndex = qBound(0, toIndex, track.audioEffects.size() - 1);
+    if (fromIndex == toIndex)
+        return;
+    const drift::Project before = m_project;
+    track.audioEffects.move(fromIndex, toIndex);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Reorder track audio effect"));
+    finishEdit(tr("Track audio effect reordered"));
+}
+
+void AppController::previewSetTrackAudioEffectParam(int trackIndex, int effectIndex,
+                                                     const QString &key, double value)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (effectIndex < 0 || effectIndex >= track.audioEffects.size())
+        return;
+    if (key.isEmpty())
+        return;
+    beginImplicitPreviewDrag(tr("Edit track audio effect"));
+    track.audioEffects[effectIndex].parameters.insert(key, value);
+    m_tracksCacheValid = false;
+    emit tracksChanged();
+}
+
+bool AppController::setTrackAudioEffectParam(int trackIndex, int effectIndex,
+                                             const QString &key, double value)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return false;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (effectIndex < 0 || effectIndex >= track.audioEffects.size())
+        return false;
+    const AudioEffectEntry *def = audioEffectDefForId(track.audioEffects[effectIndex].catalogId);
+    if (!def)
+        return false;
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+    track.audioEffects[effectIndex].parameters.insert(key, value);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Edit track audio effect"));
+    finishEdit(tr("Track audio effect edited"));
+    return true;
+}
+
+QVariantList AppController::trackAudioEffects(int trackIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return {};
+    const drift::Track &track = m_project.tracks().at(trackIndex);
+    QVariantList list;
+    list.reserve(track.audioEffects.size());
+    for (int i = 0; i < track.audioEffects.size(); ++i)
+        list.append(audioEffectToMap(track.audioEffects.at(i), i, 0));
+    return list;
+}
+
+// --- Master Bus Audio FX (P10-01) --------------------------------------------
+
+void AppController::addMasterAudioEffect(const QString &effectId)
+{
+    const AudioEffectEntry *def = audioEffectDefForId(effectId);
+    if (!def)
+        return;
+    const drift::Effect effect = audioEffectFromCatalogEntry(*def, {});
+    const drift::Project before = m_project;
+    m_project.masterAudioEffects().append(effect);
+    pushProjectEdit(before, tr("Add master audio effect"));
+    finishEdit(tr("Master audio effect added"));
+    emit masterAudioEffectsChanged();
+}
+
+void AppController::removeMasterAudioEffect(int effectIndex)
+{
+    if (effectIndex < 0 || effectIndex >= m_project.masterAudioEffects().size())
+        return;
+    const drift::Project before = m_project;
+    m_project.masterAudioEffects().removeAt(effectIndex);
+    pushProjectEdit(before, tr("Remove master audio effect"));
+    finishEdit(tr("Master audio effect removed"));
+    emit masterAudioEffectsChanged();
+}
+
+void AppController::setMasterAudioEffectEnabled(int effectIndex, bool enabled)
+{
+    if (effectIndex < 0 || effectIndex >= m_project.masterAudioEffects().size())
+        return;
+    if (m_project.masterAudioEffects()[effectIndex].enabled == enabled)
+        return;
+    const drift::Project before = m_project;
+    m_project.masterAudioEffects()[effectIndex].enabled = enabled;
+    pushProjectEdit(before, enabled ? tr("Enable master audio effect") : tr("Disable master audio effect"));
+    finishEdit(enabled ? tr("Master audio effect enabled") : tr("Master audio effect disabled"));
+    emit masterAudioEffectsChanged();
+}
+
+void AppController::moveMasterAudioEffect(int fromIndex, int toIndex)
+{
+    if (fromIndex < 0 || fromIndex >= m_project.masterAudioEffects().size())
+        return;
+    toIndex = qBound(0, toIndex, m_project.masterAudioEffects().size() - 1);
+    if (fromIndex == toIndex)
+        return;
+    const drift::Project before = m_project;
+    m_project.masterAudioEffects().move(fromIndex, toIndex);
+    pushProjectEdit(before, tr("Reorder master audio effect"));
+    finishEdit(tr("Master audio effect reordered"));
+    emit masterAudioEffectsChanged();
+}
+
+void AppController::previewSetMasterAudioEffectParam(int effectIndex, const QString &key, double value)
+{
+    if (effectIndex < 0 || effectIndex >= m_project.masterAudioEffects().size())
+        return;
+    if (key.isEmpty())
+        return;
+    beginImplicitPreviewDrag(tr("Edit master audio effect"));
+    m_project.masterAudioEffects()[effectIndex].parameters.insert(key, value);
+    emit masterAudioEffectsChanged();
+}
+
+bool AppController::setMasterAudioEffectParam(int effectIndex, const QString &key, double value)
+{
+    if (effectIndex < 0 || effectIndex >= m_project.masterAudioEffects().size())
+        return false;
+    const AudioEffectEntry *def = audioEffectDefForId(m_project.masterAudioEffects()[effectIndex].catalogId);
+    if (!def)
+        return false;
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+    m_project.masterAudioEffects()[effectIndex].parameters.insert(key, value);
+    pushProjectEdit(before, tr("Edit master audio effect"));
+    finishEdit(tr("Master audio effect edited"));
+    emit masterAudioEffectsChanged();
+    return true;
+}
+
+QVariantList AppController::masterAudioEffects() const
+{
+    QVariantList list;
+    const QList<drift::Effect> &fx = m_project.masterAudioEffects();
+    list.reserve(fx.size());
+    for (int i = 0; i < fx.size(); ++i)
+        list.append(audioEffectToMap(fx.at(i), i, 0));
+    return list;
+}
+
 // --- effect stacks: copy/paste and user presets ------------------------------
 
 drift::EffectStackPreset AppController::effectStackFor(int trackIndex, int clipIndex,

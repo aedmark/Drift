@@ -1096,6 +1096,7 @@ QVariantList AppController::tracks() const
             {QStringLiteral("clips"), clips},
             {QStringLiteral("hasAudio"), hasAudio},
             {QStringLiteral("transitions"), transitions},
+            {QStringLiteral("audioEffects"), trackAudioEffects(ti)},
             {QStringLiteral("muted"), track.muted},
             {QStringLiteral("hidden"), track.hidden},
             {QStringLiteral("excludeFromExport"), track.excludeFromExport},
@@ -1135,6 +1136,7 @@ void AppController::syncAfterProjectSwap()
     m_projectFile->setDirty(true);
     emit bookmarksChanged();
     emit workAreaChanged();
+    emit masterAudioEffectsChanged();
     emit m_projectFile->projectNameChanged();
     emit m_projectFile->backgroundChanged();
     // The timeline and selection refresh is the expensive part. An edit's own push leaves it

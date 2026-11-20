@@ -1023,6 +1023,9 @@ void detachTrack(Track &track)
         for (auto it = transition.parameters.begin(); it != transition.parameters.end(); ++it)
             it.value().detach();
     }
+    track.audioEffects.detach();
+    for (Effect &effect : track.audioEffects)
+        detachEffect(effect);
 }
 
 } // namespace
@@ -1044,6 +1047,9 @@ Project Project::detachedCopy() const
     }
     out.m_openSequenceTabs.detach();
     out.m_bookmarks.detach();
+    out.m_masterAudioEffects.detach();
+    for (Effect &effect : out.m_masterAudioEffects)
+        detachEffect(effect);
     out.m_assetOrder.detach();
     out.m_assetsById.detach();
     out.m_binFolderOrder.detach();
@@ -1587,6 +1593,8 @@ Project Project::fromJson(const QJsonObject &object, QString *errorOut)
             for (const QJsonValue &transitionValue : transitionsArray)
                 track.transitions.append(transitionFromJson(transitionValue.toObject()));
 
+            track.audioEffects = effectsFromJson(trackObject.value(QStringLiteral("audioEffects")).toArray());
+
             tracks.append(track);
         }
         return tracks;
@@ -1737,6 +1745,8 @@ Project Project::fromJson(const QJsonObject &object, QString *errorOut)
         if (!project.hasWorkArea())
             project.clearWorkArea();
     }
+    project.m_masterAudioEffects =
+        effectsFromJson(object.value(QStringLiteral("masterAudioEffects")).toArray());
 
     // After the track block: an empty timeline routes through resetToDefaultTimeline(), which mints
     // a fresh id and timestamps. Read them last so a saved project keeps its own.
@@ -1820,6 +1830,8 @@ QJsonObject Project::toJson(bool includeTranscripts) const
                 trackObject.insert(QStringLiteral("spanEndTrackId"), track.spanEndTrackId);
             if (track.number > 0)
                 trackObject.insert(QStringLiteral("number"), track.number);
+            if (!track.audioEffects.isEmpty())
+                trackObject.insert(QStringLiteral("audioEffects"), effectsToJson(track.audioEffects));
             // Written only when set, so projects without it stay byte-identical.
             if (track.excludeFromExport)
                 trackObject.insert(QStringLiteral("excludeFromExport"), true);
@@ -1868,6 +1880,8 @@ QJsonObject Project::toJson(bool includeTranscripts) const
     };
     if (!sequencesArray.isEmpty())
         root.insert(QStringLiteral("sequences"), sequencesArray);
+    if (!m_masterAudioEffects.isEmpty())
+        root.insert(QStringLiteral("masterAudioEffects"), effectsToJson(m_masterAudioEffects));
     if (!m_teleprompterScript.isEmpty())
         root.insert(QStringLiteral("teleprompterScript"), m_teleprompterScript);
     if (!m_openSequenceTabs.isEmpty())

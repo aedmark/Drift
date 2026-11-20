@@ -212,6 +212,7 @@ class AppController : public QObject
     Q_PROPERTY(QVariantList availableMicrophones READ availableMicrophones NOTIFY availableMicrophonesChanged)
     Q_PROPERTY(QString currentMicrophoneName READ currentMicrophoneName NOTIFY currentMicrophoneChanged)
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY tracksChanged)
+    Q_PROPERTY(QVariantList masterAudioEffects READ masterAudioEffects NOTIFY masterAudioEffectsChanged)
     // A change token for the bindings that read `tracks` only to re-evaluate on an edit. Reading
     // the list for that rebuilt every clip in the project into QVariantMaps, once per binding,
     // per emission — with two dozen such bindings across the desktop and touch shells.
@@ -1605,6 +1606,26 @@ public:
     Q_INVOKABLE void previewSetAudioEffectParam(int trackIndex, int clipIndex, int effectIndex,
                                                 const QString &key, double value);
 
+    // Track Audio FX (P10-01)
+    Q_INVOKABLE void addTrackAudioEffect(int trackIndex, const QString &effectId);
+    Q_INVOKABLE void removeTrackAudioEffect(int trackIndex, int effectIndex);
+    Q_INVOKABLE void setTrackAudioEffectEnabled(int trackIndex, int effectIndex, bool enabled);
+    Q_INVOKABLE void moveTrackAudioEffect(int trackIndex, int fromIndex, int toIndex);
+    Q_INVOKABLE bool setTrackAudioEffectParam(int trackIndex, int effectIndex,
+                                              const QString &key, double value);
+    Q_INVOKABLE void previewSetTrackAudioEffectParam(int trackIndex, int effectIndex,
+                                                     const QString &key, double value);
+    Q_INVOKABLE QVariantList trackAudioEffects(int trackIndex) const;
+
+    // Master Bus Audio FX (P10-01)
+    Q_INVOKABLE void addMasterAudioEffect(const QString &effectId);
+    Q_INVOKABLE void removeMasterAudioEffect(int effectIndex);
+    Q_INVOKABLE void setMasterAudioEffectEnabled(int effectIndex, bool enabled);
+    Q_INVOKABLE void moveMasterAudioEffect(int fromIndex, int toIndex);
+    Q_INVOKABLE bool setMasterAudioEffectParam(int effectIndex, const QString &key, double value);
+    Q_INVOKABLE void previewSetMasterAudioEffectParam(int effectIndex, const QString &key, double value);
+    Q_INVOKABLE QVariantList masterAudioEffects() const;
+
     // Effect stacks travel as JSON on the system clipboard, so a copy also crosses to a second
     // running instance. -1 for both indices means the whole clip.
     Q_INVOKABLE void copyEffectToClipboard(int trackIndex, int clipIndex, int effectIndex);
@@ -1947,6 +1968,7 @@ signals:
     void sizeLinkedChanged();
     void masterVolumeChanged();
     void masterMutedChanged();
+    void masterAudioEffectsChanged();
     // Carries the finished benchmark, merged into whatever the dialog already collected.
     void playbackBenchmarkFinished(const QVariantMap &info);
     void playbackBenchmarkRunningChanged();

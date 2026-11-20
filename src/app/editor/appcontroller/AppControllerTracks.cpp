@@ -2244,6 +2244,7 @@ QByteArray AppController::audioLayoutFingerprint() const
         if (track.type != drift::TrackType::Audio && track.type != drift::TrackType::Video)
             continue;
         hash.addData(track.muted ? "m" : "-");
+        hash.addData(QByteArray::number(track.audioEffects.size()));
         for (const drift::Clip &clip : track.clips) {
             const QString row = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9|%10")
                                     .arg(clip.assetId)
@@ -2273,6 +2274,7 @@ QByteArray AppController::audioLayoutFingerprint() const
                 hash.addData("c");
         }
     }
+    hash.addData(QByteArray::number(m_project.masterAudioEffects().size()));
     return hash.result();
 }
 

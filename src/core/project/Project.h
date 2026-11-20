@@ -106,6 +106,7 @@ struct TrackList : QList<Track>
         for (Track &track : *this) {
             track.clips.detach();
             track.transitions.detach();
+            track.audioEffects.detach();
         }
     }
 };
@@ -243,6 +244,10 @@ public:
     const Background &background() const { return m_background; }
     void setBackground(const Background &background) { m_background = background; }
 
+    const QList<Effect> &masterAudioEffects() const { return m_masterAudioEffects; }
+    QList<Effect> &masterAudioEffects() { return m_masterAudioEffects; }
+    void setMasterAudioEffects(const QList<Effect> &effects) { m_masterAudioEffects = effects; }
+
     void resetToDefaultTimeline();
     TimeUs durationUs() const;
 
@@ -309,6 +314,7 @@ private:
     QString m_activeSequenceId;
     QStringList m_openSequenceTabs;
     QList<Bookmark> m_bookmarks;
+    QList<Effect> m_masterAudioEffects;
     TimeUs m_workAreaInUs = -1;
     TimeUs m_workAreaOutUs = -1;
     Background m_background;

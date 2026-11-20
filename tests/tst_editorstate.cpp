@@ -20,6 +20,8 @@
 #include "app/editor/sessions/SpeedCurveController.h"
 #include "ui/preview/PreviewController.h"
 #include "ui/preview/Outliner3dModel.h"
+#include "engine/audio/AudioMixer.h"
+#include "engine/packages/audio/AudioEffectCatalog.h"
 #include <QtTest>
 
 #include <QAccessible>
@@ -352,6 +354,7 @@ private slots:
     void elasticTimeStretchCtrlDrag();
     void cursorlessSplitAtPlayhead();
     void slipEditingToolAltDrag();
+    void trackAndMasterAudioFxRacks();
     void customFadeCurveSessionApplyAndCancel();
     void animationCurveSessionIsSeparateFromFade();
     void clipAnimationKindsListsBuiltins();
@@ -7843,6 +7846,136 @@ void EditorStateTest::slipEditingToolAltDrag()
     // Slip by +1.0s with loop=true -> shifts loopOffsetUs by 1.0s % 4.0s = 1.0s, srcIn/srcOut intact
     QVERIFY(state.commitSlipClip(0, 0, 1.0));
     QCOMPARE(state.project()->tracks().at(0).clips.at(0).loopOffsetUs, drift::secondsToUs(1.0));
+}
+
+void EditorStateTest::trackAndMasterAudioFxRacks()
+{
+    AssetLibrary library;
+    AppController state(&library);
+
+    // Setup project with 1 video track and 1 audio track
+    state.project()->tracks().clear();
+    state.project()->tracks().append(drift::Track{.type = drift::TrackType::Video});
+    state.project()->tracks().append(drift::Track{.type = drift::TrackType::Audio});
+
+    // Verify initial state
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.size(), 0);
+    QCOMPARE(state.project()->masterAudioEffects().size(), 0);
+    QCOMPARE(state.trackAudioEffects(1).size(), 0);
+    QCOMPARE(state.masterAudioEffects().size(), 0);
+
+    // 1. Track Audio FX operations
+    // Add "utility.eq" to track 1
+    state.addTrackAudioEffect(1, QStringLiteral("utility.eq"));
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.size(), 1);
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(0).catalogId, QStringLiteral("utility.eq"));
+    QVERIFY(state.project()->tracks().at(1).audioEffects.at(0).enabled);
+
+    QVariantList trackFx = state.trackAudioEffects(1);
+    QCOMPARE(trackFx.size(), 1);
+    QCOMPARE(trackFx.at(0).toMap().value(QStringLiteral("catalogId")).toString(), QStringLiteral("utility.eq"));
+
+    // Modify parameter
+    QVERIFY(state.setTrackAudioEffectParam(1, 0, QStringLiteral("low"), 4.5));
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(0).parameters.value(QStringLiteral("low")).toDouble(), 4.5);
+
+    // Toggle enabled
+    state.setTrackAudioEffectEnabled(1, 0, false);
+    QVERIFY(!state.project()->tracks().at(1).audioEffects.at(0).enabled);
+
+    // Add second effect: "utility.compressor"
+    state.addTrackAudioEffect(1, QStringLiteral("utility.compressor"));
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.size(), 2);
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(1).catalogId, QStringLiteral("utility.compressor"));
+
+    // Reorder effects
+    state.moveTrackAudioEffect(1, 0, 1);
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(0).catalogId, QStringLiteral("utility.compressor"));
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(1).catalogId, QStringLiteral("utility.eq"));
+
+    // Remove first effect
+    state.removeTrackAudioEffect(1, 0);
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.size(), 1);
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(0).catalogId, QStringLiteral("utility.eq"));
+
+    // Undo restores removed effect
+    state.undo();
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.size(), 2);
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(0).catalogId, QStringLiteral("utility.compressor"));
+
+    // Redo re-applies removal
+    state.redo();
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.size(), 1);
+    QCOMPARE(state.project()->tracks().at(1).audioEffects.at(0).catalogId, QStringLiteral("utility.eq"));
+
+    // 2. Master Audio FX operations
+    // Add "utility.limiter" to master bus
+    state.addMasterAudioEffect(QStringLiteral("utility.limiter"));
+    QCOMPARE(state.project()->masterAudioEffects().size(), 1);
+    QCOMPARE(state.project()->masterAudioEffects().at(0).catalogId, QStringLiteral("utility.limiter"));
+    QCOMPARE(state.masterAudioEffects().size(), 1);
+
+    // Modify parameter
+    QVERIFY(state.setMasterAudioEffectParam(0, QStringLiteral("ceiling"), 0.8));
+    QCOMPARE(state.project()->masterAudioEffects().at(0).parameters.value(QStringLiteral("ceiling")).toDouble(), 0.8);
+
+    // Toggle enabled
+    state.setMasterAudioEffectEnabled(0, false);
+    QVERIFY(!state.project()->masterAudioEffects().at(0).enabled);
+
+    // Add second master effect
+    state.addMasterAudioEffect(QStringLiteral("utility.eq"));
+    QCOMPARE(state.project()->masterAudioEffects().size(), 2);
+    QCOMPARE(state.project()->masterAudioEffects().at(1).catalogId, QStringLiteral("utility.eq"));
+
+    // Reorder master effects
+    state.moveMasterAudioEffect(0, 1);
+    QCOMPARE(state.project()->masterAudioEffects().at(0).catalogId, QStringLiteral("utility.eq"));
+    QCOMPARE(state.project()->masterAudioEffects().at(1).catalogId, QStringLiteral("utility.limiter"));
+
+    // Remove first master effect
+    state.removeMasterAudioEffect(0);
+    QCOMPARE(state.project()->masterAudioEffects().size(), 1);
+    QCOMPARE(state.project()->masterAudioEffects().at(0).catalogId, QStringLiteral("utility.limiter"));
+
+    // Undo restores master effects
+    state.undo();
+    QCOMPARE(state.project()->masterAudioEffects().size(), 2);
+    QCOMPARE(state.project()->masterAudioEffects().at(0).catalogId, QStringLiteral("utility.eq"));
+
+    // Redo re-applies removal
+    state.redo();
+    QCOMPARE(state.project()->masterAudioEffects().size(), 1);
+    QCOMPARE(state.project()->masterAudioEffects().at(0).catalogId, QStringLiteral("utility.limiter"));
+
+    // 3. Project JSON serialization round-trip
+    // Re-enable track effect and set master effect enabled
+    state.setTrackAudioEffectEnabled(1, 0, true);
+    state.setMasterAudioEffectEnabled(0, true);
+
+    const QJsonObject json = state.project()->toJson();
+    QString parseErr;
+    const drift::Project loaded = drift::Project::fromJson(json, &parseErr);
+    QVERIFY2(parseErr.isEmpty(), qPrintable(parseErr));
+    QCOMPARE(loaded.tracks().at(1).audioEffects.size(), 1);
+    QCOMPARE(loaded.tracks().at(1).audioEffects.at(0).catalogId, QStringLiteral("utility.eq"));
+    QCOMPARE(loaded.tracks().at(1).audioEffects.at(0).parameters.value(QStringLiteral("low")).toDouble(), 4.5);
+    QCOMPARE(loaded.masterAudioEffects().size(), 1);
+    QCOMPARE(loaded.masterAudioEffects().at(0).catalogId, QStringLiteral("utility.limiter"));
+    QCOMPARE(loaded.masterAudioEffects().at(0).parameters.value(QStringLiteral("ceiling")).toDouble(), 0.8);
+
+    // 4. AudioMixer execution with Track and Master FX
+    // Test AudioMixer::mix with populated track FX and master FX
+    AudioMixer mixer;
+    mixer.setProject(state.project());
+    constexpr int kFrames = 256;
+    QVector<float> buffer(kFrames * 2, 0.0f);
+    mixer.mix(0, kFrames, 48000, buffer.data());
+    // Buffer should render without crash and remain valid float numbers
+    for (float sample : buffer) {
+        QVERIFY(!std::isnan(sample));
+        QVERIFY(!std::isinf(sample));
+    }
 }
 
 void EditorStateTest::customFadeCurveSessionApplyAndCancel()

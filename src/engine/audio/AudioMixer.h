@@ -138,6 +138,7 @@ private:
     double m_masterVolume = 1.0;
     bool m_masterMuted = false;
     mutable QMutex m_levelsMutex;
+    mutable QVector<float> m_trackMixBuffer;
     mutable QHash<int, QPair<float, float>> m_trackLevels;
     mutable QPair<float, float> m_masterLevels{0.0f, 0.0f};
     mutable QHash<int, QPair<float, float>> m_trackMeterPeaks;

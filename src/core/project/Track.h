@@ -36,6 +36,7 @@ struct Track
     TrackType type = TrackType::Video;
     QList<Clip> clips;
     QList<Transition> transitions;
+    QList<Effect> audioEffects; // Persistent Track FX rack (processes summed audio of the track)
     // User-given label, shown instead of the default one ("Video 1") once set.
     // Empty by default — most tracks never get a custom name.
     QString name;

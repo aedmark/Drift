@@ -611,6 +611,10 @@ QVariantMap audioEffectBadgeToMap(const drift::Effect &effect)
     };
 }
 
+} // namespace
+
+namespace drift::appcontroller_detail {
+
 // Audio effects use the same per-instance shape as video effects, but read from the audio catalog.
 // Params are addressed as "afx.<index>.<key>" for the keyframe API, key times on the timeline.
 QVariantMap audioEffectToMap(const drift::Effect &effect, int effectIndex, drift::TimeUs timelineStart)
@@ -647,6 +651,10 @@ QVariantMap audioEffectToMap(const drift::Effect &effect, int effectIndex, drift
         {QStringLiteral("enabled"), effect.enabled},
     };
 }
+
+} // namespace drift::appcontroller_detail
+
+namespace {
 
 QVariantMap keyframesToMap(const drift::Clip &clip)
 {

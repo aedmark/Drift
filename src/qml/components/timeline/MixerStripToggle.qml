@@ -7,6 +7,7 @@ AbstractButton {
     id: toggle
 
     property string glyph: ""
+    property string text: ""
     property string tooltip: ""
     property string tone: "destructive"
     property bool blinking: false
@@ -46,6 +47,7 @@ AbstractButton {
     contentItem: Item {
         IconGlyph {
             id: toggleGlyph
+            visible: toggle.glyph.length > 0
             anchors.centerIn: parent
             glyph: toggle.glyph
             iconSize: Theme.iconSizeBase
@@ -59,6 +61,18 @@ AbstractButton {
                 NumberAnimation { to: 0.3; duration: 450 }
                 NumberAnimation { to: 1.0; duration: 450 }
             }
+        }
+
+        Text {
+            id: toggleText
+            visible: toggle.text.length > 0 && toggle.glyph.length === 0
+            anchors.centerIn: parent
+            text: toggle.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeXs
+            font.weight: Font.Bold
+            color: toggle.checked ? toggle._checkedFg
+                 : (toggle.hovered ? Theme.c.mixerStripToggle.foreground : Theme.c.mixerStripToggle.foregroundMuted)
         }
     }
 

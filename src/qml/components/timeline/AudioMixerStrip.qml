@@ -139,7 +139,8 @@ Rectangle {
                         muted: t.muted === true,
                         solo: t.solo === true,
                         volume: t.volume !== undefined ? t.volume : 1.0,
-                        pan: t.pan !== undefined ? t.pan : 0.0
+                        pan: t.pan !== undefined ? t.pan : 0.0,
+                        audioEffects: t.audioEffects || []
                     })
                 }
                 return result
@@ -596,7 +597,10 @@ Rectangle {
                                     armPaused: EditorState.isAudioRecordingPaused
                                     volume: armed ? EditorState.audioRecordGain : modelData.volume
                                     pan: modelData.pan
+                                    hasFx: (modelData.audioEffects || []).length > 0
+                                    fxCount: (modelData.audioEffects || []).length
 
+                                    onFxClicked: fxContextMenu.openForTrack(trackIndex, modelData.name, modelData.audioEffects || [])
                                     onMuteToggled: EditorState.setTrackMuted(trackIndex, !muted)
                                     onSoloToggled: EditorState.setTrackSolo(trackIndex, !solo)
                                     onArmToggled: {
@@ -643,7 +647,10 @@ Rectangle {
                         levelR: content.masterLevelR
                         peakL: content.masterPeakL
                         peakR: content.masterPeakR
+                        hasFx: (EditorState.masterAudioEffects || []).length > 0
+                        fxCount: (EditorState.masterAudioEffects || []).length
 
+                        onFxClicked: fxContextMenu.openForMaster(EditorState.masterAudioEffects || [])
                         onMuteToggled: EditorState.masterMuted = !EditorState.masterMuted
                         onVolumePreviewed: (gain) => EditorState.masterVolume = gain
                         onVolumeSet: (gain) => EditorState.masterVolume = gain
@@ -709,6 +716,89 @@ Rectangle {
                 ThemedToolTip {
                     visible: resizeHandle.containsMouse && !resizeHandle.pressed
                     text: qsTr("Drag to resize — double-click to fit")
+                }
+            }
+        }
+    }
+
+    ThemedContextMenu {
+        id: fxContextMenu
+        property bool isMaster: false
+        property int targetTrackIndex: -1
+        property string targetTrackName: ""
+        property var targetEffects: []
+
+        function openForTrack(trackIdx, trackName, effects) {
+            isMaster = false
+            targetTrackIndex = trackIdx
+            targetTrackName = trackName
+            targetEffects = effects
+            open()
+        }
+
+        function openForMaster(effects) {
+            isMaster = true
+            targetTrackIndex = -1
+            targetTrackName = qsTr("Master")
+            targetEffects = effects
+            open()
+        }
+
+        ThemedMenuItem {
+            enabled: false
+            text: fxContextMenu.isMaster ? qsTr("Master Bus FX") : qsTr("Track FX — %1").arg(fxContextMenu.targetTrackName)
+            icon.name: Theme.icons.audioLines
+        }
+
+        ThemedMenuSeparator {}
+
+        Repeater {
+            model: fxContextMenu.targetEffects.length
+            delegate: ThemedMenuItem {
+                required property int index
+                readonly property var effectItem: fxContextMenu.targetEffects[index] || ({})
+                text: (effectItem.label || effectItem.catalogId || qsTr("Effect")) + (effectItem.enabled === false ? qsTr(" [Bypassed]") : "")
+                icon.name: effectItem.enabled !== false ? Theme.icons.check : Theme.icons.slash
+                onTriggered: {
+                    if (fxContextMenu.isMaster)
+                        EditorState.setMasterAudioEffectEnabled(index, effectItem.enabled === false)
+                    else
+                        EditorState.setTrackAudioEffectEnabled(fxContextMenu.targetTrackIndex, index, effectItem.enabled === false)
+                }
+            }
+        }
+
+        ThemedMenuSeparator { visible: fxContextMenu.targetEffects.length > 0 }
+
+        ThemedContextMenu {
+            title: qsTr("Add audio effect…")
+
+            Repeater {
+                model: EditorState.audioEffectCatalog()
+                delegate: ThemedMenuItem {
+                    required property var modelData
+                    text: modelData.displayName || modelData.id
+                    onTriggered: {
+                        if (fxContextMenu.isMaster)
+                            EditorState.addMasterAudioEffect(modelData.id)
+                        else
+                            EditorState.addTrackAudioEffect(fxContextMenu.targetTrackIndex, modelData.id)
+                    }
+                }
+            }
+        }
+
+        ThemedMenuItem {
+            visible: fxContextMenu.targetEffects.length > 0
+            text: qsTr("Remove all effects")
+            icon.name: Theme.icons.trash
+            onTriggered: {
+                if (fxContextMenu.isMaster) {
+                    for (var i = fxContextMenu.targetEffects.length - 1; i >= 0; i--)
+                        EditorState.removeMasterAudioEffect(i)
+                } else {
+                    for (var j = fxContextMenu.targetEffects.length - 1; j >= 0; j--)
+                        EditorState.removeTrackAudioEffect(fxContextMenu.targetTrackIndex, j)
                 }
             }
         }
