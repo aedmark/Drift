@@ -1801,6 +1801,7 @@ bool splitClipAtOffsetMin(Clip &head, Clip &tail, TimeUs offset, TimeUs minEdgeU
     const bool looped = head.loops();
     const TimeUs sourceOffset =
         looped ? 1
+        : head.hasVelocityEnvelope() ? qBound(TimeUs{1}, head.timelineToSourceUs(head.timelineStart + offset) - head.srcIn, sourceSpan - 1)
         : head.hasSpeedCurve() ? head.speedCurve.sourceOffsetForTimelineOffset(offset, sourceSpan)
                              : head.sourceDeltaForTimelineDelta(offset);
     if (sourceOffset <= 0 || sourceOffset >= sourceSpan)
@@ -1809,6 +1810,13 @@ bool splitClipAtOffsetMin(Clip &head, Clip &tail, TimeUs offset, TimeUs minEdgeU
     tail = head;
     tail.timelineStart = head.timelineStart + offset;
     tail.timelineDuration = head.timelineDuration - offset;
+
+    if (head.hasVelocityEnvelope()) {
+        const double cut = static_cast<double>(offset) / static_cast<double>(head.timelineDuration);
+        const VelocityEnvelope parent = head.velocityEnvelope;
+        head.velocityEnvelope = parent.subRange(0.0, cut);
+        tail.velocityEnvelope = parent.subRange(cut, 1.0);
+    }
 
     // Curve positions are normalised over the clip's own source range, so each half needs the
     // parent's ramp resampled onto its shorter range — copying it verbatim would stretch both

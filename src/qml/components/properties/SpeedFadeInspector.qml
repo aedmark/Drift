@@ -188,5 +188,61 @@ Item {
                                                           EditorState.selectedClip)
             }
         }
+
+        ThemedMenuSeparator {
+            visible: root.clipKind === "video" && !root.nestedSource
+            width: parent.width
+        }
+
+        Column {
+            id: velocityColumn
+            width: parent.width
+            spacing: Theme.spacingMd
+            visible: root.clipKind === "video" && !root.nestedSource
+
+            readonly property bool hasVelocityEnv: {
+                void root.clipDataRevision
+                return !!root.clipData.hasVelocityEnvelope && !!root.clipData.velocityEnvelopeEnabled
+            }
+
+            ThemedInspectorHeading {
+                title: qsTr("Velocity Envelope (VEGAS)")
+            }
+
+            Row {
+                width: parent.width
+                spacing: 6
+
+                ThemedChip {
+                    text: velocityColumn.hasVelocityEnv
+                          ? qsTr("Velocity envelope active — remove")
+                          : qsTr("Insert velocity envelope")
+                    selected: velocityColumn.hasVelocityEnv
+                    onClicked: EditorState.toggleClipVelocityEnvelope(
+                                   EditorState.selectedTrack, EditorState.selectedClip)
+                }
+
+                ThemedButton {
+                    visible: velocityColumn.hasVelocityEnv
+                    text: qsTr("Reset (100%)")
+                    variant: "secondary"
+                    onClicked: {
+                        EditorState.setClipVelocityPoints(
+                            EditorState.selectedTrack, EditorState.selectedClip,
+                            [{ pos: 0.0, velocity: 1.0, curveType: "smooth" },
+                             { pos: 1.0, velocity: 1.0, curveType: "smooth" }])
+                    }
+                }
+            }
+
+            Text {
+                visible: velocityColumn.hasVelocityEnv
+                text: qsTr("Double-click clip line on timeline to add points. Right-click points for curve types.")
+                color: Theme.c.speedFadeInspector.foregroundMuted
+                font.pixelSize: Theme.fontSizeSm
+                wrapMode: Text.Wrap
+                width: parent.width
+            }
+        }
     }
 }

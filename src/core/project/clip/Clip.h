@@ -9,6 +9,7 @@
 #include "core/project/media/MediaAsset.h"
 #include "core/shapes/ShapeStyle.h"
 #include "core/animation/SpeedCurve.h"
+#include "core/animation/VelocityEnvelope.h"
 #include "core/project/SubtitleCue.h"
 #include "core/text/TextStyle.h"
 #include "core/base/Time.h"
@@ -128,6 +129,7 @@ struct Clip
     // multiplying with it, so there is only ever one number describing the rate at a given
     // moment. The source range stays fixed and the timeline duration is what the ramp derives.
     SpeedCurve speedCurve;
+    VelocityEnvelope velocityEnvelope;
     bool reverse = false; // play source range backward; speed still applies as magnitude
     // Repeat srcIn..srcOut for as long as the clip runs, so timelineDuration is free of the source
     // range rather than derived from it. loopOffsetUs is how far into the range (in playback
@@ -272,10 +274,11 @@ struct Clip
     }
 
     bool hasSpeedCurve() const { return !speedCurve.isEmpty(); }
+    bool hasVelocityEnvelope() const { return velocityEnvelope.enabled(); }
 
     bool loops() const
     {
-        return loop && (type == ClipType::Video || type == ClipType::Audio) && !hasSpeedCurve() && srcOut > srcIn;
+        return loop && (type == ClipType::Video || type == ClipType::Audio) && !hasSpeedCurve() && !hasVelocityEnvelope() && srcOut > srcIn;
     }
 
     // Timeline length of one pass through srcIn..srcOut.
@@ -299,6 +302,9 @@ struct Clip
             return reverse ? srcOut - offset : srcIn + offset;
         }
         const TimeUs rel = qBound(TimeUs{0}, timelineUs - timelineStart, timelineDuration);
+        if (hasVelocityEnvelope()) {
+            return velocityEnvelope.sourceTimeForTimelineOffset(rel, timelineDuration, srcIn, srcOut, reverse);
+        }
         const TimeUs offset =
             hasSpeedCurve() ? speedCurve.sourceOffsetForTimelineOffset(rel, srcOut - srcIn)
                             : sourceDeltaForTimelineDelta(rel);
@@ -321,6 +327,9 @@ struct Clip
             return reverse ? srcOut - offset : srcIn + offset;
         }
         const TimeUs rel = timelineUs - timelineStart;
+        if (hasVelocityEnvelope()) {
+            return velocityEnvelope.sourceTimeForTimelineOffset(rel, timelineDuration, srcIn, srcOut, reverse);
+        }
         const TimeUs offset = static_cast<TimeUs>(llround(static_cast<double>(rel) * effectiveSpeed()));
         return reverse ? srcOut - offset : srcIn + offset;
     }
@@ -339,6 +348,8 @@ struct Clip
             if (offset < 0)
                 offset += range;
         }
+        if (hasVelocityEnvelope())
+            return velocityEnvelope.timelineOffsetForSourceTime(sourceUs, timelineDuration, srcIn, srcOut, reverse);
         if (hasSpeedCurve())
             return speedCurve.timelineOffsetForSourceOffset(offset, range);
         return static_cast<TimeUs>(llround(static_cast<double>(offset) / effectiveSpeed()));

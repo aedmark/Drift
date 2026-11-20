@@ -1395,6 +1395,50 @@ void TimelineTrackItem::appendClip(int index, const QRectF &baseRect, bool selec
     appendFade(rect.left(), fadeInW, false);
     appendFade(rect.right() - fadeOutW, fadeOutW, true);
 
+    // --- velocity envelope -------------------------------------------------------------------
+    if (row.hasVelocityEnvelope && row.velocityEnvelopeEnabled && rect.width() > 1.0 && rect.height() > 8.0) {
+        const double topMargin = 4.0;
+        const double bottomMargin = 4.0;
+        const double availHeight = rect.height() - topMargin - bottomMargin;
+        const auto velocityToY = [&](double v) {
+            double norm = 0.0;
+            if (v <= 0.0) {
+                const double u = std::clamp((v + 1.0) / 1.0, 0.0, 1.0);
+                norm = 0.25 * u;
+            } else if (v <= 1.0) {
+                norm = 0.25 + 0.25 * std::clamp(v, 0.0, 1.0);
+            } else {
+                norm = 0.50 + 0.50 * std::clamp((v - 1.0) / 2.0, 0.0, 1.0);
+            }
+            return rect.bottom() - bottomMargin - norm * availHeight;
+        };
+
+        const double y100 = velocityToY(1.0);
+        const double y0 = velocityToY(0.0);
+        appendStroke(m_over, {{rect.left(), y100}, {rect.right(), y100}}, 1.0, QColor(255, 255, 255, 45), ox);
+        appendStroke(m_over, {{rect.left(), y0}, {rect.right(), y0}}, 1.0, QColor(80, 190, 255, 65), ox);
+
+        const int steps = std::clamp(int(std::ceil(rect.width() / 4.0)), 16, 256);
+        QVector<QPointF> curve;
+        curve.reserve(steps + 1);
+        for (int i = 0; i <= steps; ++i) {
+            const double pos = double(i) / steps;
+            const double v = row.velocityEnvelope.velocityAt(pos);
+            const double x = rect.left() + pos * rect.width();
+            const double y = velocityToY(v);
+            curve.append({x, y});
+        }
+        appendStroke(m_over, curve, 2.0, QColor(60, 230, 90, 235), ox);
+
+        for (const drift::VelocityPoint &pt : row.velocityEnvelope.points()) {
+            const double kx = rect.left() + pt.pos * rect.width();
+            const double ky = velocityToY(pt.velocity);
+            const QRectF knobRect(kx - 3.0, ky - 3.0, 6.0, 6.0);
+            appendRoundedRect(m_over, knobRect, 1.0, QColor(255, 255, 255, 255), ox, AllCorners);
+            appendOutline(m_over, knobRect, 1.0, 1.0, QColor(20, 160, 50, 255), ox, AllCorners);
+        }
+    }
+
     // A clip that is off — disabled itself, or on a hidden or muted track — stays visible but
     // reads as inert.
     if (!row.enabled || m_trackDimmed) {

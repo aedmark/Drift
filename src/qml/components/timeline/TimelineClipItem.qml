@@ -326,6 +326,11 @@ Item {
     // Fade dots sit above trim handles so they stay
     // grabable at the corners (zero fade). Trim the
     // edge below the dots; grab the dots to fade.
+    TimelineVelocityEnvelope {
+        id: velocityEnvelopeOverlay
+        owner: clipItem
+    }
+
     TimelineFadeHandle {
         id: fadeInHandle
         owner: clipItem

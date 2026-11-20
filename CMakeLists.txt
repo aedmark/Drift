@@ -568,6 +568,8 @@ add_library(driftcore STATIC
     src/core/base/CameraEuler.h
     src/core/animation/SpeedCurve.h
     src/core/animation/SpeedCurve.cpp
+    src/core/animation/VelocityEnvelope.h
+    src/core/animation/VelocityEnvelope.cpp
     src/core/animation/FadeShape.h
     src/core/animation/FadeShape.cpp
     src/core/animation/Easing.h
@@ -2196,6 +2198,7 @@ qt_add_qml_module(drift
         src/qml/components/timeline/TimelineGapHover.qml
         src/qml/components/timeline/TimelineFadeHandle.qml
         src/qml/components/timeline/TimelineFadeCurveContextMenu.qml
+        src/qml/components/timeline/TimelineVelocityEnvelope.qml
         src/qml/components/timeline/TimelineEmptyState.qml
         src/qml/components/timeline/TimelineCutOverlay.qml
         src/qml/components/timeline/TimelineCursorRequest.qml

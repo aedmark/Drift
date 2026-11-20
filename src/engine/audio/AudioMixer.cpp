@@ -269,7 +269,15 @@ void AudioMixer::readClipAudio(QVector<float> &out, const drift::Clip &clip, qui
     // clamps at the clip's end, so differencing there would under-report the rate.
     const drift::TimeUs blockEndUs = playStartUs + framesToUs(wantFrames, sampleRate);
     double tempo = clip.effectiveSpeed();
-    if (clip.hasSpeedCurve()) {
+    if (clip.hasVelocityEnvelope()) {
+        const double v = clip.velocityEnvelope.velocityAtTimelineOffset(
+            playStartUs - clip.timelineStart, clip.timelineDuration);
+        if (v <= 0.001) {
+            silencePastEnd(out, winStartUs, winEndUs, sampleRate);
+            return;
+        }
+        tempo = v;
+    } else if (clip.hasSpeedCurve()) {
         tempo = blockEndUs <= clip.timelineEnd()
                     ? static_cast<double>(clip.timelineToSourceUs(blockEndUs)
                                           - clip.timelineToSourceUs(playStartUs))

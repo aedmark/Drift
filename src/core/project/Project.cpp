@@ -286,6 +286,7 @@ QJsonObject clipToJson(const Clip &clip)
         {QStringLiteral("blendMode"), blendModeToString(clip.blendMode)},
         {QStringLiteral("speed"), clip.speed},
         {QStringLiteral("speedCurve"), clip.speedCurve.toJson()},
+        {QStringLiteral("velocityEnvelope"), clip.velocityEnvelope.toJson()},
         {QStringLiteral("reverse"), clip.reverse},
         {QStringLiteral("loop"), clip.loop},
         {QStringLiteral("loopOffsetUs"), qint64(clip.loopOffsetUs)},
@@ -486,6 +487,7 @@ Clip clipFromJsonV2(const QJsonObject &object, int version, int canvasW = 1920, 
     clip.blendMode = blendModeFromString(object.value(QStringLiteral("blendMode")).toString());
     clip.speed = object.value(QStringLiteral("speed")).toDouble(1.0);
     clip.speedCurve = SpeedCurve::fromJson(object.value(QStringLiteral("speedCurve")).toArray());
+    clip.velocityEnvelope = VelocityEnvelope::fromJson(object.value(QStringLiteral("velocityEnvelope")).toObject());
     clip.reverse = object.value(QStringLiteral("reverse")).toBool(false);
     clip.loop = object.value(QStringLiteral("loop")).toBool(false);
     clip.loopOffsetUs = object.value(QStringLiteral("loopOffsetUs")).toInteger(0);

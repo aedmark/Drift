@@ -186,6 +186,10 @@ private slots:
     void speedCurveMappingIsMonotonic();
     void speedCurveSubRangePreservesShape();
     void speedCurveSerialization();
+    void velocityEnvelopeTimeMapping();
+    void velocityEnvelopeCurveTypesAndHandles();
+    void velocityEnvelopeProjectJsonRoundTrip();
+    void velocityEnvelopeSplitSubRange();
     void clipReverseAndFlipSerialization();
     void loopedClipMapsSplitsAndMerges();
     void clipSplitMergeRoundTrip();
@@ -3909,6 +3913,195 @@ void CoreTest::speedCurveSerialization()
     QCOMPARE(loadedMid.outDx, 0.3);
     QCOMPARE(loadedMid.corner, true);
     QCOMPARE(out.speedCurve.retimedDurationUs(out.srcOut - out.srcIn), clip.timelineDuration);
+}
+
+void CoreTest::velocityEnvelopeTimeMapping()
+{
+    drift::Clip clip;
+    clip.timelineStart = drift::secondsToUs(1.0);
+    clip.timelineDuration = drift::secondsToUs(10.0);
+    clip.srcIn = drift::secondsToUs(5.0);
+    clip.srcOut = drift::secondsToUs(15.0);
+
+    // 1. Default envelope (100% velocity = 1.0)
+    clip.velocityEnvelope = drift::VelocityEnvelope::createDefault();
+    QVERIFY(clip.hasVelocityEnvelope());
+
+    // Timeline offset 0 -> srcIn (5.0s)
+    QCOMPARE(clip.timelineToSourceUs(clip.timelineStart), drift::secondsToUs(5.0));
+    // Timeline offset 5s -> srcIn + 5s = 10.0s
+    QCOMPARE(clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(5.0)), drift::secondsToUs(10.0));
+    // Timeline offset 10s -> srcIn + 10s = 15.0s (srcOut)
+    QCOMPARE(clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(10.0)), drift::secondsToUs(15.0));
+
+    // 2. Freeze-frame (0% velocity)
+    // 0..2s: 100% velocity (advance from 5s to 7s)
+    // 2..6s: 0% velocity (freeze at 7s)
+    // 6..10s: 100% velocity (advance from 7s to 11s)
+    drift::VelocityPoint p0{0.0, 1.0, drift::VelocityCurveType::Hold};
+    drift::VelocityPoint p1{0.2, 0.0, drift::VelocityCurveType::Hold};
+    drift::VelocityPoint p2{0.6, 1.0, drift::VelocityCurveType::Hold};
+    drift::VelocityPoint p3{1.0, 1.0, drift::VelocityCurveType::Hold};
+
+    drift::VelocityEnvelope freezeEnv;
+    freezeEnv.setPoints({p0, p1, p2, p3});
+    clip.velocityEnvelope = freezeEnv;
+
+    // At 1.0s into clip: velocity was 1.0, source reaches 5.0 + 1.0 = 6.0s
+    const drift::TimeUs s1 = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(1.0));
+    QVERIFY(qAbs(s1 - drift::secondsToUs(6.0)) < drift::secondsToUs(0.05));
+
+    // During freeze (2.0s .. 6.0s into clip, i.e. timeline 3.0s .. 7.0s):
+    const drift::TimeUs sFreezeA = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(2.5));
+    const drift::TimeUs sFreezeB = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(5.5));
+    QVERIFY(qAbs(sFreezeA - drift::secondsToUs(7.0)) < drift::secondsToUs(0.05));
+    QVERIFY(qAbs(sFreezeB - drift::secondsToUs(7.0)) < drift::secondsToUs(0.05));
+    QVERIFY(qAbs(sFreezeA - sFreezeB) < drift::secondsToUs(0.01)); // Frozen!
+
+    // After freeze (8.0s into clip): reaches 7.0 + 2.0 = 9.0s
+    const drift::TimeUs s3 = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(8.0));
+    QVERIFY(qAbs(s3 - drift::secondsToUs(9.0)) < drift::secondsToUs(0.05));
+
+    // 3. Reverse playback (-100% velocity)
+    // Envelope is constant -1.0
+    drift::VelocityPoint r0{0.0, -1.0, drift::VelocityCurveType::Linear};
+    drift::VelocityPoint r1{1.0, -1.0, drift::VelocityCurveType::Linear};
+    drift::VelocityEnvelope revEnv;
+    revEnv.setPoints({r0, r1});
+    clip.velocityEnvelope = revEnv;
+
+    // Starts at srcOut (15.0s) and ends at srcIn (5.0s)
+    const drift::TimeUs rStart = clip.timelineToSourceUs(clip.timelineStart);
+    const drift::TimeUs rMid = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(5.0));
+    const drift::TimeUs rEnd = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(10.0));
+    QVERIFY(qAbs(rStart - drift::secondsToUs(15.0)) < drift::secondsToUs(0.05));
+    QVERIFY(qAbs(rMid - drift::secondsToUs(10.0)) < drift::secondsToUs(0.05));
+    QVERIFY(qAbs(rEnd - drift::secondsToUs(5.0)) < drift::secondsToUs(0.05));
+
+    // 4. Fast forward (1000% velocity = 10.0)
+    drift::VelocityPoint f0{0.0, 10.0, drift::VelocityCurveType::Linear};
+    drift::VelocityPoint f1{1.0, 10.0, drift::VelocityCurveType::Linear};
+    drift::VelocityEnvelope fastEnv;
+    fastEnv.setPoints({f0, f1});
+    clip.velocityEnvelope = fastEnv;
+
+    // At 0.5s into clip, 10x advancement = +5.0s: reaches 5.0 + 5.0 = 10.0s
+    const drift::TimeUs fMid = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(0.5));
+    QVERIFY(qAbs(fMid - drift::secondsToUs(10.0)) < drift::secondsToUs(0.05));
+    // At 1.0s into clip, reaches 5.0 + 10.0 = 15.0s (clamped at srcOut)
+    const drift::TimeUs fEnd = clip.timelineToSourceUs(clip.timelineStart + drift::secondsToUs(1.0));
+    QVERIFY(qAbs(fEnd - drift::secondsToUs(15.0)) < drift::secondsToUs(0.05));
+}
+
+void CoreTest::velocityEnvelopeCurveTypesAndHandles()
+{
+    drift::VelocityPoint p0{0.0, 0.0, drift::VelocityCurveType::Linear};
+    drift::VelocityPoint p1{1.0, 2.0, drift::VelocityCurveType::Linear};
+
+    // Test Linear interpolation
+    drift::VelocityEnvelope envLinear;
+    envLinear.setPoints({p0, p1});
+    QVERIFY(qAbs(envLinear.velocityAt(0.5) - 1.0) < 0.01);
+
+    // Test Hold interpolation
+    drift::VelocityEnvelope envHold;
+    p0.curveType = drift::VelocityCurveType::Hold;
+    envHold.setPoints({p0, p1});
+    QVERIFY(qAbs(envHold.velocityAt(0.25) - 0.0) < 0.01);
+    QVERIFY(qAbs(envHold.velocityAt(0.75) - 0.0) < 0.01);
+
+    // Test Fast vs Slow
+    drift::VelocityEnvelope envFast, envSlow;
+    p0.curveType = drift::VelocityCurveType::Fast;
+    envFast.setPoints({p0, p1});
+    p0.curveType = drift::VelocityCurveType::Slow;
+    envSlow.setPoints({p0, p1});
+    // Fast fade rises quicker than slow fade
+    QVERIFY(envFast.velocityAt(0.5) > envSlow.velocityAt(0.5));
+
+    // Test Sharp fade
+    drift::VelocityEnvelope envSharp;
+    p0.curveType = drift::VelocityCurveType::Sharp;
+    envSharp.setPoints({p0, p1});
+    QVERIFY(envSharp.velocityAt(0.1) < envLinear.velocityAt(0.1));
+    QVERIFY(envSharp.velocityAt(0.9) > envLinear.velocityAt(0.9));
+
+    // Test Spline Handles
+    drift::VelocityEnvelope envHandles;
+    drift::VelocityPoint h0{0.0, 1.0, drift::VelocityCurveType::Smooth, 0.0, 0.0, 0.3, 2.0};
+    drift::VelocityPoint h1{1.0, 1.0, drift::VelocityCurveType::Smooth, -0.3, 2.0, 0.0, 0.0};
+    envHandles.setPoints({h0, h1});
+    // Overshoot peak near mid
+    QVERIFY(envHandles.velocityAt(0.5) > 1.5);
+}
+
+void CoreTest::velocityEnvelopeProjectJsonRoundTrip()
+{
+    drift::Project project;
+    drift::Clip clip;
+    clip.id = QStringLiteral("clip-vel");
+    clip.type = drift::ClipType::Video;
+    clip.timelineStart = 0;
+    clip.timelineDuration = drift::secondsToUs(5.0);
+    clip.srcIn = 0;
+    clip.srcOut = drift::secondsToUs(5.0);
+
+    drift::VelocityEnvelope env;
+    drift::VelocityPoint p0{0.0, 1.0, drift::VelocityCurveType::Smooth, 0.0, 0.0, 0.2, 0.5};
+    drift::VelocityPoint p1{0.4, 0.0, drift::VelocityCurveType::Hold, 0.0, 0.0, 0.0, 0.0};
+    drift::VelocityPoint p2{0.7, -1.0, drift::VelocityCurveType::Linear, 0.0, 0.0, 0.0, 0.0};
+    drift::VelocityPoint p3{1.0, 3.0, drift::VelocityCurveType::Fast, -0.1, -0.5, 0.0, 0.0};
+    env.setPoints({p0, p1, p2, p3});
+    clip.velocityEnvelope = env;
+
+    project.tracks()[0].clips.append(clip);
+
+    const QJsonObject json = project.toJson();
+    QString err;
+    const drift::Project loaded = drift::Project::fromJson(json, &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+
+    const drift::Clip &loadedClip = loaded.tracks()[0].clips[0];
+    QVERIFY(loadedClip.hasVelocityEnvelope());
+    QCOMPARE(loadedClip.velocityEnvelope.points().size(), 4);
+
+    const drift::VelocityPoint &lp1 = loadedClip.velocityEnvelope.points().at(1);
+    QCOMPARE(lp1.pos, 0.4);
+    QCOMPARE(lp1.velocity, 0.0);
+    QCOMPARE(lp1.curveType, drift::VelocityCurveType::Hold);
+
+    const drift::VelocityPoint &lp2 = loadedClip.velocityEnvelope.points().at(2);
+    QCOMPARE(lp2.pos, 0.7);
+    QCOMPARE(lp2.velocity, -1.0);
+    QCOMPARE(lp2.curveType, drift::VelocityCurveType::Linear);
+
+    const drift::VelocityPoint &lp3 = loadedClip.velocityEnvelope.points().at(3);
+    QCOMPARE(lp3.pos, 1.0);
+    QCOMPARE(lp3.velocity, 3.0);
+    QCOMPARE(lp3.curveType, drift::VelocityCurveType::Fast);
+}
+
+void CoreTest::velocityEnvelopeSplitSubRange()
+{
+    drift::VelocityEnvelope env;
+    drift::VelocityPoint p0{0.0, 1.0, drift::VelocityCurveType::Linear};
+    drift::VelocityPoint p1{0.5, 3.0, drift::VelocityCurveType::Linear};
+    drift::VelocityPoint p2{1.0, 0.0, drift::VelocityCurveType::Linear};
+    env.setPoints({p0, p1, p2});
+
+    drift::VelocityEnvelope head = env.subRange(0.0, 0.5);
+    drift::VelocityEnvelope tail = env.subRange(0.5, 1.0);
+
+    QVERIFY(head.enabled());
+    QVERIFY(tail.enabled());
+
+    // Head starts at 1.0, ends at 3.0
+    QVERIFY(qAbs(head.velocityAt(0.0) - 1.0) < 0.05);
+    QVERIFY(qAbs(head.velocityAt(1.0) - 3.0) < 0.05);
+
+    // Tail starts at 3.0, ends at 0.0
+    QVERIFY(qAbs(tail.velocityAt(0.0) - 3.0) < 0.05);
+    QVERIFY(qAbs(tail.velocityAt(1.0) - 0.0) < 0.05);
 }
 
 void CoreTest::clipReverseAndFlipSerialization()

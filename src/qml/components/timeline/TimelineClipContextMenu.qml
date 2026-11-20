@@ -391,6 +391,14 @@ ThemedContextMenu {
         }
     }
     ThemedMenuItem {
+        text: owner.clipData.hasVelocityEnvelope && owner.clipData.velocityEnvelopeEnabled
+              ? qsTr("Remove velocity envelope")
+              : qsTr("Insert velocity envelope")
+        icon.name: Theme.icons.trendingUp
+        visible: owner.trackType === "video" && owner.clipData.kind === "video"
+        onTriggered: EditorState.toggleClipVelocityEnvelope(owner.trackIndex, owner.clipIndex)
+    }
+    ThemedMenuItem {
         text: qsTr("Mask & track…")
         icon.name: Theme.icons.mask
         visible: owner.trackType === "video"

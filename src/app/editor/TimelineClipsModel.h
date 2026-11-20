@@ -7,6 +7,7 @@
 
 #include "core/animation/FadeShape.h"
 #include "core/animation/Keyframe.h"
+#include "core/animation/VelocityEnvelope.h"
 
 // One track's clips, exposed as roles.
 //
@@ -64,6 +65,9 @@ public:
         LoopPeriodRole,
         LoopPhaseRole,
         EnabledRole,
+        HasVelocityEnvelopeRole,
+        VelocityEnvelopeEnabledRole,
+        VelocityPointsRole,
     };
     Q_ENUM(Role)
 
@@ -104,6 +108,9 @@ public:
         double loopPeriod = 0.0;
         double loopPhase = 0.0;
         bool enabled = true;
+        bool hasVelocityEnvelope = false;
+        bool velocityEnvelopeEnabled = false;
+        QVariantList velocityPoints;
 
         // Not roles: typed copies for the scene-graph renderer, derived from the fields above so
         // any change to them already arrives as a changed row.
@@ -112,6 +119,7 @@ public:
         drift::FadeCurve fadeOutCurveTyped = drift::FadeCurve::Smooth;
         drift::FadeShape fadeOutShapeTyped;
         drift::KeyframeTrack<double> volumeTyped;
+        drift::VelocityEnvelope velocityEnvelope;
         // The effect stack as one line, "(off)" marks included; empty when there are none.
         QString effectsLabel;
         // "-6.0 dB" for a constant gain off unity; empty when keyframed or at unity.

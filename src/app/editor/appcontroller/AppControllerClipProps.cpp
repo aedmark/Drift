@@ -1,5 +1,6 @@
 #include "engine/platform/AndroidUri.h"
 #include "app/editor/appcontroller/AppControllerInternal.h"
+#include "core/animation/VelocityEnvelope.h"
 #include "engine/packages/effects/EffectCatalog.h"
 #include "app/mcp/McpController.h"
 
@@ -2083,4 +2084,231 @@ void AppController::setClipOrientation(int trackIndex, int clipIndex, int degree
     setClipOrientationTo(clip, normalized);
     pushProjectEdit(before, tr("Orientation changed"));
     finishEdit(tr("Clip orientation set to %1°").arg(normalized));
+}
+
+bool AppController::clipHasVelocityEnvelope(int trackIndex, int clipIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return false;
+    const drift::Track &track = m_project.tracks().at(trackIndex);
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return false;
+    return track.clips.at(clipIndex).hasVelocityEnvelope();
+}
+
+bool AppController::clipVelocityEnvelopeEnabled(int trackIndex, int clipIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return false;
+    const drift::Track &track = m_project.tracks().at(trackIndex);
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return false;
+    return track.clips.at(clipIndex).velocityEnvelope.enabled();
+}
+
+QVariantList AppController::clipVelocityPoints(int trackIndex, int clipIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return {};
+    const drift::Track &track = m_project.tracks().at(trackIndex);
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return {};
+    QVariantList list;
+    for (const drift::VelocityPoint &pt : track.clips.at(clipIndex).velocityEnvelope.points()) {
+        list.append(QVariantMap{
+            {QStringLiteral("pos"), pt.pos},
+            {QStringLiteral("velocity"), pt.velocity},
+            {QStringLiteral("curveType"), drift::velocityCurveTypeToString(pt.curveType)},
+            {QStringLiteral("inDx"), pt.inDx},
+            {QStringLiteral("inDy"), pt.inDy},
+            {QStringLiteral("outDx"), pt.outDx},
+            {QStringLiteral("outDy"), pt.outDy},
+        });
+    }
+    return list;
+}
+
+void AppController::setClipVelocityEnvelopeEnabled(int trackIndex, int clipIndex, bool enabled)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return;
+    drift::Clip &clip = track.clips[clipIndex];
+    if (clip.type != drift::ClipType::Video)
+        return;
+
+    const drift::Project before = m_project;
+    if (enabled && clip.velocityEnvelope.isEmpty()) {
+        clip.velocityEnvelope = drift::VelocityEnvelope::createDefault();
+    } else {
+        clip.velocityEnvelope.setEnabled(enabled);
+    }
+
+    pushProjectEdit(before, enabled ? tr("Insert velocity envelope") : tr("Remove velocity envelope"));
+    finishEdit(enabled ? tr("Velocity envelope enabled") : tr("Velocity envelope disabled"));
+}
+
+void AppController::toggleClipVelocityEnvelope(int trackIndex, int clipIndex)
+{
+    const bool current = clipVelocityEnvelopeEnabled(trackIndex, clipIndex);
+    setClipVelocityEnvelopeEnabled(trackIndex, clipIndex, !current);
+}
+
+void AppController::setClipVelocityPoints(int trackIndex, int clipIndex, const QVariantList &points)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return;
+    drift::Clip &clip = track.clips[clipIndex];
+    if (clip.type != drift::ClipType::Video)
+        return;
+
+    const drift::Project before = m_project;
+    QList<drift::VelocityPoint> pts;
+    pts.reserve(points.size());
+    for (const QVariant &v : points) {
+        const QVariantMap map = v.toMap();
+        drift::VelocityPoint pt;
+        pt.pos = map.value(QStringLiteral("pos")).toDouble();
+        pt.velocity = map.value(QStringLiteral("velocity"), 1.0).toDouble();
+        pt.curveType = drift::velocityCurveTypeFromString(map.value(QStringLiteral("curveType")).toString());
+        pt.inDx = map.value(QStringLiteral("inDx")).toDouble();
+        pt.inDy = map.value(QStringLiteral("inDy")).toDouble();
+        pt.outDx = map.value(QStringLiteral("outDx")).toDouble();
+        pt.outDy = map.value(QStringLiteral("outDy")).toDouble();
+        pts.append(pt);
+    }
+    clip.velocityEnvelope.setPoints(pts);
+
+    pushProjectEdit(before, tr("Velocity envelope modified"));
+    finishEdit(tr("Velocity envelope updated"));
+}
+
+void AppController::previewSetClipVelocityPoints(int trackIndex, int clipIndex, const QVariantList &points)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return;
+    drift::Clip &clip = track.clips[clipIndex];
+    if (clip.type != drift::ClipType::Video)
+        return;
+
+    QList<drift::VelocityPoint> pts;
+    pts.reserve(points.size());
+    for (const QVariant &v : points) {
+        const QVariantMap map = v.toMap();
+        drift::VelocityPoint pt;
+        pt.pos = map.value(QStringLiteral("pos")).toDouble();
+        pt.velocity = map.value(QStringLiteral("velocity"), 1.0).toDouble();
+        pt.curveType = drift::velocityCurveTypeFromString(map.value(QStringLiteral("curveType")).toString());
+        pt.inDx = map.value(QStringLiteral("inDx")).toDouble();
+        pt.inDy = map.value(QStringLiteral("inDy")).toDouble();
+        pt.outDx = map.value(QStringLiteral("outDx")).toDouble();
+        pt.outDy = map.value(QStringLiteral("outDy")).toDouble();
+        pts.append(pt);
+    }
+    clip.velocityEnvelope.setPoints(pts);
+    syncClipModels();
+    emitPreviewFrame();
+}
+
+void AppController::addClipVelocityPoint(int trackIndex, int clipIndex, double pos, double velocity, const QString &curveType)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return;
+    drift::Clip &clip = track.clips[clipIndex];
+    if (clip.type != drift::ClipType::Video)
+        return;
+
+    const drift::Project before = m_project;
+    if (clip.velocityEnvelope.isEmpty())
+        clip.velocityEnvelope = drift::VelocityEnvelope::createDefault();
+
+    QList<drift::VelocityPoint> pts = clip.velocityEnvelope.points();
+    drift::VelocityPoint newPt;
+    newPt.pos = qBound(0.0, pos, 1.0);
+    newPt.velocity = qBound(drift::kMinVelocity, velocity, drift::kMaxVelocity);
+    newPt.curveType = drift::velocityCurveTypeFromString(curveType);
+    pts.append(newPt);
+    clip.velocityEnvelope.setPoints(pts);
+
+    pushProjectEdit(before, tr("Add velocity envelope point"));
+    finishEdit(tr("Velocity point added"));
+}
+
+void AppController::removeClipVelocityPoint(int trackIndex, int clipIndex, int pointIndex)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return;
+    drift::Clip &clip = track.clips[clipIndex];
+    if (clip.type != drift::ClipType::Video || clip.velocityEnvelope.isEmpty())
+        return;
+
+    QList<drift::VelocityPoint> pts = clip.velocityEnvelope.points();
+    if (pointIndex < 0 || pointIndex >= pts.size())
+        return;
+
+    const drift::Project before = m_project;
+    pts.removeAt(pointIndex);
+    if (pts.size() < 2) {
+        clip.velocityEnvelope = drift::VelocityEnvelope::createDefault();
+    } else {
+        clip.velocityEnvelope.setPoints(pts);
+    }
+
+    pushProjectEdit(before, tr("Remove velocity envelope point"));
+    finishEdit(tr("Velocity point removed"));
+}
+
+void AppController::setClipVelocityPointCurveType(int trackIndex, int clipIndex, int pointIndex, const QString &curveType)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return;
+    drift::Clip &clip = track.clips[clipIndex];
+    if (clip.type != drift::ClipType::Video || clip.velocityEnvelope.isEmpty())
+        return;
+
+    QList<drift::VelocityPoint> pts = clip.velocityEnvelope.points();
+    if (pointIndex < 0 || pointIndex >= pts.size())
+        return;
+
+    const drift::Project before = m_project;
+    pts[pointIndex].curveType = drift::velocityCurveTypeFromString(curveType);
+    clip.velocityEnvelope.setPoints(pts);
+
+    pushProjectEdit(before, tr("Change velocity curve type"));
+    finishEdit(tr("Velocity curve set to %1").arg(curveType));
+}
+
+void AppController::clearClipVelocityEnvelope(int trackIndex, int clipIndex)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (clipIndex < 0 || clipIndex >= track.clips.size())
+        return;
+    drift::Clip &clip = track.clips[clipIndex];
+    if (!clip.hasVelocityEnvelope())
+        return;
+
+    const drift::Project before = m_project;
+    clip.velocityEnvelope.clear();
+
+    pushProjectEdit(before, tr("Clear velocity envelope"));
+    finishEdit(tr("Velocity envelope removed"));
 }

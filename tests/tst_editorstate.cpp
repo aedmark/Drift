@@ -356,6 +356,7 @@ private slots:
     void slipEditingToolAltDrag();
     void trackAndMasterAudioFxRacks();
     void projectNotesAndMetadataRoundTrip();
+    void velocityEnvelopeEditorStateActionsAndUndo();
     void customFadeCurveSessionApplyAndCancel();
     void animationCurveSessionIsSeparateFromFade();
     void clipAnimationKindsListsBuiltins();
@@ -8020,6 +8021,64 @@ void EditorStateTest::projectNotesAndMetadataRoundTrip()
     QCOMPARE(loaded.author(), QStringLiteral("Gordon K"));
     QCOMPARE(loaded.notes(), QStringLiteral("Remaster notes for audio and video"));
     QCOMPARE(loaded.description(), QStringLiteral("Remaster notes for audio and video"));
+}
+
+void EditorStateTest::velocityEnvelopeEditorStateActionsAndUndo()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    appendLinkedVideoAudioPair(*state.project());
+
+    // Initially no velocity envelope
+    QVERIFY(!state.clipHasVelocityEnvelope(0, 0));
+    QVERIFY(!state.clipVelocityEnvelopeEnabled(0, 0));
+
+    // 1. Toggle velocity envelope on
+    state.toggleClipVelocityEnvelope(0, 0);
+    QVERIFY(state.clipHasVelocityEnvelope(0, 0));
+    QVERIFY(state.clipVelocityEnvelopeEnabled(0, 0));
+    QCOMPARE(state.clipVelocityPoints(0, 0).size(), 2);
+
+    // 2. Add velocity point at midpoint (pos 0.5, velocity 0.0 -> freeze frame)
+    state.addClipVelocityPoint(0, 0, 0.5, 0.0, QStringLiteral("hold"));
+    QCOMPARE(state.clipVelocityPoints(0, 0).size(), 3);
+    const QVariantList pts = state.clipVelocityPoints(0, 0);
+    QCOMPARE(pts.at(1).toMap().value(QStringLiteral("pos")).toDouble(), 0.5);
+    QCOMPARE(pts.at(1).toMap().value(QStringLiteral("velocity")).toDouble(), 0.0);
+    QCOMPARE(pts.at(1).toMap().value(QStringLiteral("curveType")).toString(), QStringLiteral("hold"));
+
+    // 3. Change curve type of point 1 to "fast"
+    state.setClipVelocityPointCurveType(0, 0, 1, QStringLiteral("fast"));
+    QCOMPARE(state.clipVelocityPoints(0, 0).at(1).toMap().value(QStringLiteral("curveType")).toString(), QStringLiteral("fast"));
+
+    // 4. Update velocity points directly (simulate drag)
+    QVariantList newPts = state.clipVelocityPoints(0, 0);
+    QVariantMap p1 = newPts.at(1).toMap();
+    p1[QStringLiteral("velocity")] = -1.0; // Reverse!
+    newPts[1] = p1;
+    state.setClipVelocityPoints(0, 0, newPts);
+    QCOMPARE(state.clipVelocityPoints(0, 0).at(1).toMap().value(QStringLiteral("velocity")).toDouble(), -1.0);
+
+    // 5. Test undo stack
+    state.undo(); // Undo setClipVelocityPoints
+    QCOMPARE(state.clipVelocityPoints(0, 0).at(1).toMap().value(QStringLiteral("velocity")).toDouble(), 0.0);
+
+    state.undo(); // Undo setClipVelocityPointCurveType
+    QCOMPARE(state.clipVelocityPoints(0, 0).at(1).toMap().value(QStringLiteral("curveType")).toString(), QStringLiteral("hold"));
+
+    state.undo(); // Undo addClipVelocityPoint
+    QCOMPARE(state.clipVelocityPoints(0, 0).size(), 2);
+
+    state.undo(); // Undo toggleClipVelocityEnvelope
+    QVERIFY(!state.clipVelocityEnvelopeEnabled(0, 0));
+
+    state.redo(); // Redo toggle
+    QVERIFY(state.clipVelocityEnvelopeEnabled(0, 0));
+
+    // 6. Test clear velocity envelope
+    state.clearClipVelocityEnvelope(0, 0);
+    QVERIFY(!state.clipHasVelocityEnvelope(0, 0));
+    QVERIFY(!state.clipVelocityEnvelopeEnabled(0, 0));
 }
 
 void EditorStateTest::customFadeCurveSessionApplyAndCancel()

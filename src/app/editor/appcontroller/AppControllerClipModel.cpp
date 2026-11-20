@@ -1,4 +1,5 @@
 #include "app/editor/appcontroller/AppControllerInternal.h"
+#include "core/animation/VelocityEnvelope.h"
 #include "engine/packages/effects/EffectCatalog.h"
 #include "engine/packages/procedurals/ProceduralCatalog.h"
 #include "engine/render3d/models/ModelAsset.h"
@@ -675,6 +676,23 @@ QVariantMap keyframesToMap(const drift::Clip &clip)
         {QStringLiteral("volume"), keyframeTrackToMap(clip.volume, clip.timelineStart)},
     };
 }
+
+QVariantList velocityPointsToVariant(const drift::VelocityEnvelope &env)
+{
+    QVariantList list;
+    for (const drift::VelocityPoint &pt : env.points()) {
+        list.append(QVariantMap{
+            {QStringLiteral("pos"), pt.pos},
+            {QStringLiteral("velocity"), pt.velocity},
+            {QStringLiteral("curveType"), drift::velocityCurveTypeToString(pt.curveType)},
+            {QStringLiteral("inDx"), pt.inDx},
+            {QStringLiteral("inDy"), pt.inDy},
+            {QStringLiteral("outDx"), pt.outDx},
+            {QStringLiteral("outDy"), pt.outDy},
+        });
+    }
+    return list;
+}
 } // namespace
 namespace drift::appdetail {
 
@@ -969,6 +987,9 @@ QVariantMap AppController::clipToMap(const drift::Clip &clip, const drift::Clip 
         {QStringLiteral("blendMode"), drift::blendModeToString(clip.blendMode)},
         {QStringLiteral("speed"), clip.speed},
         {QStringLiteral("hasSpeedCurve"), clip.hasSpeedCurve()},
+        {QStringLiteral("hasVelocityEnvelope"), clip.hasVelocityEnvelope()},
+        {QStringLiteral("velocityEnvelopeEnabled"), clip.velocityEnvelope.enabled()},
+        {QStringLiteral("velocityPoints"), velocityPointsToVariant(clip.velocityEnvelope)},
         {QStringLiteral("reverse"), clip.reverse},
         {QStringLiteral("loop"), clip.loop},
         {QStringLiteral("enabled"), clip.enabled},
@@ -1141,6 +1162,10 @@ TimelineClipsModel::Row AppController::clipRow(const drift::Clip &clip,
     row.fadeInShapeTyped = clip.fadeInShape;
     row.fadeOutCurveTyped = clip.fadeOutCurve;
     row.fadeOutShapeTyped = clip.fadeOutShape;
+    row.hasVelocityEnvelope = clip.hasVelocityEnvelope();
+    row.velocityEnvelopeEnabled = clip.velocityEnvelope.enabled();
+    row.velocityEnvelope = clip.velocityEnvelope;
+    row.velocityPoints = velocityPointsToVariant(clip.velocityEnvelope);
     QStringList effectNames;
     for (const QVariantList *list : {&row.effects, &row.audioEffects}) {
         for (const QVariant &value : *list) {

@@ -741,6 +741,19 @@ public:
 
     Q_INVOKABLE void clearClipSpeedCurve(int trackIndex, int clipIndex);
 
+    // Velocity envelope methods (VEGAS Pro parity)
+    Q_INVOKABLE bool clipHasVelocityEnvelope(int trackIndex, int clipIndex) const;
+    Q_INVOKABLE bool clipVelocityEnvelopeEnabled(int trackIndex, int clipIndex) const;
+    Q_INVOKABLE QVariantList clipVelocityPoints(int trackIndex, int clipIndex) const;
+    Q_INVOKABLE void setClipVelocityEnvelopeEnabled(int trackIndex, int clipIndex, bool enabled);
+    Q_INVOKABLE void toggleClipVelocityEnvelope(int trackIndex, int clipIndex);
+    Q_INVOKABLE void setClipVelocityPoints(int trackIndex, int clipIndex, const QVariantList &points);
+    Q_INVOKABLE void previewSetClipVelocityPoints(int trackIndex, int clipIndex, const QVariantList &points);
+    Q_INVOKABLE void addClipVelocityPoint(int trackIndex, int clipIndex, double pos, double velocity, const QString &curveType = QStringLiteral("smooth"));
+    Q_INVOKABLE void removeClipVelocityPoint(int trackIndex, int clipIndex, int pointIndex);
+    Q_INVOKABLE void setClipVelocityPointCurveType(int trackIndex, int clipIndex, int pointIndex, const QString &curveType);
+    Q_INVOKABLE void clearClipVelocityEnvelope(int trackIndex, int clipIndex);
+
     Q_INVOKABLE void setTransitionEasing(int trackIndex, const QString &transitionId,
                                          const QString &curve, const QVariantList &handles = {});
 
