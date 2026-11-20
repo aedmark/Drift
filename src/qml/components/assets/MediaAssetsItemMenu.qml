@@ -30,6 +30,12 @@ ThemedContextMenu {
         onTriggered: root.host.previewRequested(root.assetIndex)
     }
     ThemedMenuItem {
+        text: qsTr("Media FX…")
+        icon.name: Theme.icons.sparkles
+        visible: root.kind !== "composite" && root.host.selectedAssetIds.length <= 1
+        onTriggered: root.host.mediaFxRequested(root.assetId)
+    }
+    ThemedMenuItem {
         text: qsTr("Rename…")
         icon.name: Theme.icons.pencil
         visible: root.host.selectedAssetIds.length <= 1

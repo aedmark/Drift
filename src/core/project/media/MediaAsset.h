@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/base/Time.h"
+#include "core/effects/Effect.h"
 #include "core/project/media/SourceLab.h"
 
 #include <QDateTime>
@@ -134,6 +135,12 @@ struct MediaAsset
     // Audio Drift generated rather than imported (voiceover, sound effect): what made it —
     // {provider, kind, voice, model, text/prompt} — so it can be regenerated. Empty otherwise.
     QJsonObject generator;
+
+    // Media Pool FX (VEGAS parity): pre-timeline source processing applied to this asset
+    // before any event-level pan/crop or event FX. All timeline clips referencing this asset
+    // automatically inherit these effects upstream.
+    QList<Effect> effects;
+    QList<Effect> audioEffects;
 
     // Size and modification time of `path` when it was last probed. Every cache that keys on the
     // path alone would otherwise go on serving a file replaced in place, so this is what tells

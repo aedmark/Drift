@@ -991,6 +991,10 @@ QVariant AssetLibrary::data(const QModelIndex &index, int role) const
                                               [](const drift::SourceRange &r) { return r.rating > 0; }));
     case MaskRoleRole:
         return asset->maskRole;
+    case HasEffectsRole:
+        return !asset->effects.isEmpty() || !asset->audioEffects.isEmpty();
+    case EffectsCountRole:
+        return asset->effects.size() + asset->audioEffects.size();
     default:
         return {};
     }
@@ -1012,6 +1016,8 @@ QHash<int, QByteArray> AssetLibrary::roleNames() const
         {RangeCountRole, "rangeCount"},
         {FavoriteRangeCountRole, "favoriteRangeCount"},
         {MaskRoleRole, "maskRole"},
+        {HasEffectsRole, "hasEffects"},
+        {EffectsCountRole, "effectsCount"},
     };
 }
 
@@ -1046,6 +1052,14 @@ QString AssetLibrary::assetIdAt(int index) const
     if (!m_project)
         return {};
     return m_project->assetIdAt(index);
+}
+
+bool AssetLibrary::hasEffects(const QString &assetId) const
+{
+    if (!m_project)
+        return false;
+    const drift::MediaAsset *a = m_project->asset(assetId);
+    return a && (!a->effects.isEmpty() || !a->audioEffects.isEmpty());
 }
 
 void AssetLibrary::emitAssetRowChanged(int index, const QList<int> &roles)

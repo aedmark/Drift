@@ -509,6 +509,16 @@ ThemedContextMenu {
         }
     }
     ThemedMenuItem {
+        text: qsTr("Media FX…")
+        icon.name: Theme.icons.sparkles
+        visible: !owner.isTransformClip && !!owner.clipData && !!owner.clipData.assetId && owner.clipData.assetId.length > 0
+        onTriggered: {
+            if (typeof owner.panel.requestMediaFx === "function") {
+                owner.panel.requestMediaFx(owner.clipData.assetId)
+            }
+        }
+    }
+    ThemedMenuItem {
         text: qsTr("Blur area…")
         icon.name: Theme.icons.eyeOff
         visible: owner.trackType === "video" && !owner.isTransformClip

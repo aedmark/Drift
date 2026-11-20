@@ -726,6 +726,10 @@ QJsonObject assetToJson(const MediaAsset &asset)
             markers.append(drift::toJson(marker));
         object.insert(QStringLiteral("markers"), markers);
     }
+    if (!asset.effects.isEmpty())
+        object.insert(QStringLiteral("effects"), effectsToJson(asset.effects));
+    if (!asset.audioEffects.isEmpty())
+        object.insert(QStringLiteral("audioEffects"), effectsToJson(asset.audioEffects));
     return object;
 }
 
@@ -764,6 +768,10 @@ MediaAsset assetFromJsonV2(const QJsonObject &object)
         asset.ranges.append(drift::sourceRangeFromJson(value.toObject()));
     for (const QJsonValue &value : object.value(QStringLiteral("markers")).toArray())
         asset.markers.append(drift::sourceMarkerFromJson(value.toObject()));
+    if (object.contains(QStringLiteral("effects")))
+        asset.effects = effectsFromJson(object.value(QStringLiteral("effects")).toArray());
+    if (object.contains(QStringLiteral("audioEffects")))
+        asset.audioEffects = effectsFromJson(object.value(QStringLiteral("audioEffects")).toArray());
     if (object.contains(QStringLiteral("variableFrameRate"))) {
         asset.frameRateKnown = true;
         asset.variableFrameRate = object.value(QStringLiteral("variableFrameRate")).toBool();

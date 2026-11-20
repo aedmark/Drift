@@ -2523,6 +2523,7 @@ qt_add_qml_module(drift
         src/qml/components/dialogs/ExportDialog.qml
         src/qml/components/dialogs/ExportProgressDialog.qml
         src/qml/components/dialogs/CollectMediaDialog.qml
+        src/qml/components/dialogs/MediaFxDialog.qml
         src/qml/components/dialogs/ImageSequenceDialog.qml
         src/qml/components/dialogs/ReverseProgressDialog.qml
         src/qml/components/dialogs/SubtitleProgressDialog.qml

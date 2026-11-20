@@ -1162,6 +1162,10 @@ PanelFrame {
         replaceClipDialog.openForAddTake(trackIndex, clipIndex)
     }
 
+    function requestMediaFx(assetId) {
+        mediaFxDialog.openForAsset(assetId)
+    }
+
     function requestRenameClip(trackIndex, clipIndex) {
         if (trackIndex < 0 || clipIndex < 0)
             return
@@ -2515,6 +2519,10 @@ PanelFrame {
 
     TimelineReplaceClipDialog {
         id: replaceClipDialog
+    }
+
+    MediaFxDialog {
+        id: mediaFxDialog
     }
 
     ThemedDialog {

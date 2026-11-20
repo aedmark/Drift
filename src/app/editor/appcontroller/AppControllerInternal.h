@@ -68,6 +68,7 @@ bool trackAllowsTransitions(drift::TrackType type);
 
 void syncOverlapTransitionsOnTrack(drift::Track &track);
 
+QVariantMap effectToMap(const drift::Effect &effect, int effectIndex, drift::TimeUs timelineStart);
 QVariantMap audioEffectToMap(const drift::Effect &effect, int effectIndex, drift::TimeUs timelineStart);
 
 

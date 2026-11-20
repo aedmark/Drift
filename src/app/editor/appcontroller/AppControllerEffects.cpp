@@ -1990,6 +1990,356 @@ QVariantList AppController::masterAudioEffects() const
     return list;
 }
 
+// --- Media Pool Video & Audio FX (P11-04) -----------------------------------
+
+QVariantList AppController::assetEffects(const QString &assetId) const
+{
+    const drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return {};
+    QVariantList list;
+    list.reserve(asset->effects.size());
+    for (int i = 0; i < asset->effects.size(); ++i)
+        list.append(effectToMap(asset->effects.at(i), i, 0));
+    return list;
+}
+
+void AppController::addAssetEffect(const QString &assetId, const QString &effectId)
+{
+    const drift::MediaAsset *check = m_project.asset(assetId);
+    if (!check)
+        return;
+    const EffectPresetEntry *def = effectDefForId(effectId);
+    if (!def)
+        return;
+
+    drift::Effect effect;
+    effect.name = def->filterName;
+    effect.catalogId = def->meta.id;
+    for (auto it = def->fixedParams.constBegin(); it != def->fixedParams.constEnd(); ++it)
+        effect.parameters.insert(it.key(), it.value());
+    for (const drift::EffectParamSpec &p : def->meta.parameters)
+        p.insertDefault(effect.parameters);
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->effects.append(effect);
+    m_tracksCacheValid = false;
+    if (m_assetLibrary) {
+        const int idx = m_assetLibrary->indexOfId(assetId);
+        if (idx >= 0) {
+            const QModelIndex mIdx = m_assetLibrary->index(idx);
+            emit m_assetLibrary->dataChanged(mIdx, mIdx, {AssetLibrary::HasEffectsRole, AssetLibrary::EffectsCountRole});
+            emit m_assetLibrary->badgeRevisionChanged();
+        }
+    }
+    pushProjectEdit(before, tr("Add media effect"));
+    finishEdit(tr("Media effect added"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::removeAssetEffect(const QString &assetId, int effectIndex)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || effectIndex < 0 || effectIndex >= existing->effects.size())
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset || effectIndex < 0 || effectIndex >= asset->effects.size())
+        return;
+    asset->effects.removeAt(effectIndex);
+    m_tracksCacheValid = false;
+    if (m_assetLibrary) {
+        const int idx = m_assetLibrary->indexOfId(assetId);
+        if (idx >= 0) {
+            const QModelIndex mIdx = m_assetLibrary->index(idx);
+            emit m_assetLibrary->dataChanged(mIdx, mIdx, {AssetLibrary::HasEffectsRole, AssetLibrary::EffectsCountRole});
+            emit m_assetLibrary->badgeRevisionChanged();
+        }
+    }
+    pushProjectEdit(before, tr("Remove media effect"));
+    finishEdit(tr("Media effect removed"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::setAssetEffectEnabled(const QString &assetId, int effectIndex, bool enabled)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || effectIndex < 0 || effectIndex >= existing->effects.size())
+        return;
+    if (existing->effects[effectIndex].enabled == enabled)
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->effects[effectIndex].enabled = enabled;
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, enabled ? tr("Enable media effect") : tr("Disable media effect"));
+    finishEdit(enabled ? tr("Media effect enabled") : tr("Media effect disabled"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::moveAssetEffect(const QString &assetId, int fromIndex, int toIndex)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || fromIndex < 0 || fromIndex >= existing->effects.size())
+        return;
+    toIndex = qBound(0, toIndex, existing->effects.size() - 1);
+    if (fromIndex == toIndex)
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->effects.move(fromIndex, toIndex);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Reorder media effect"));
+    finishEdit(tr("Media effect reordered"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::previewSetAssetEffectParam(const QString &assetId, int effectIndex,
+                                               const QString &key, const QVariant &value)
+{
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset || effectIndex < 0 || effectIndex >= asset->effects.size() || key.isEmpty())
+        return;
+
+    beginImplicitPreviewDrag(tr("Edit media effect"));
+    asset->effects[effectIndex].parameters.insert(key, value);
+    m_tracksCacheValid = false;
+    emit assetEffectsChanged(assetId);
+}
+
+bool AppController::setAssetEffectParam(const QString &assetId, int effectIndex,
+                                        const QString &key, const QVariant &value)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || effectIndex < 0 || effectIndex >= existing->effects.size() || key.isEmpty())
+        return false;
+
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return false;
+    asset->effects[effectIndex].parameters.insert(key, value);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Edit media effect"));
+    finishEdit(tr("Media effect edited"));
+    emit assetEffectsChanged(assetId);
+    return true;
+}
+
+void AppController::clearAssetEffects(const QString &assetId)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || existing->effects.isEmpty())
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->effects.clear();
+    m_tracksCacheValid = false;
+    if (m_assetLibrary) {
+        const int idx = m_assetLibrary->indexOfId(assetId);
+        if (idx >= 0) {
+            const QModelIndex mIdx = m_assetLibrary->index(idx);
+            emit m_assetLibrary->dataChanged(mIdx, mIdx, {AssetLibrary::HasEffectsRole, AssetLibrary::EffectsCountRole});
+            emit m_assetLibrary->badgeRevisionChanged();
+        }
+    }
+    pushProjectEdit(before, tr("Clear media effects"));
+    finishEdit(tr("Media effects cleared"));
+    emit assetEffectsChanged(assetId);
+}
+
+QVariantList AppController::assetAudioEffects(const QString &assetId) const
+{
+    const drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return {};
+    QVariantList list;
+    list.reserve(asset->audioEffects.size());
+    for (int i = 0; i < asset->audioEffects.size(); ++i)
+        list.append(audioEffectToMap(asset->audioEffects.at(i), i, 0));
+    return list;
+}
+
+void AppController::addAssetAudioEffect(const QString &assetId, const QString &effectId)
+{
+    const drift::MediaAsset *check = m_project.asset(assetId);
+    if (!check)
+        return;
+    const AudioEffectEntry *def = audioEffectDefForId(effectId);
+    if (!def)
+        return;
+
+    const drift::Effect effect = audioEffectFromCatalogEntry(*def, {});
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->audioEffects.append(effect);
+    m_tracksCacheValid = false;
+    if (m_assetLibrary) {
+        const int idx = m_assetLibrary->indexOfId(assetId);
+        if (idx >= 0) {
+            const QModelIndex mIdx = m_assetLibrary->index(idx);
+            emit m_assetLibrary->dataChanged(mIdx, mIdx, {AssetLibrary::HasEffectsRole, AssetLibrary::EffectsCountRole});
+            emit m_assetLibrary->badgeRevisionChanged();
+        }
+    }
+    pushProjectEdit(before, tr("Add media audio effect"));
+    finishEdit(tr("Media audio effect added"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::removeAssetAudioEffect(const QString &assetId, int effectIndex)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || effectIndex < 0 || effectIndex >= existing->audioEffects.size())
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset || effectIndex < 0 || effectIndex >= asset->audioEffects.size())
+        return;
+    asset->audioEffects.removeAt(effectIndex);
+    m_tracksCacheValid = false;
+    if (m_assetLibrary) {
+        const int idx = m_assetLibrary->indexOfId(assetId);
+        if (idx >= 0) {
+            const QModelIndex mIdx = m_assetLibrary->index(idx);
+            emit m_assetLibrary->dataChanged(mIdx, mIdx, {AssetLibrary::HasEffectsRole, AssetLibrary::EffectsCountRole});
+            emit m_assetLibrary->badgeRevisionChanged();
+        }
+    }
+    pushProjectEdit(before, tr("Remove media audio effect"));
+    finishEdit(tr("Media audio effect removed"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::setAssetAudioEffectEnabled(const QString &assetId, int effectIndex, bool enabled)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || effectIndex < 0 || effectIndex >= existing->audioEffects.size())
+        return;
+    if (existing->audioEffects[effectIndex].enabled == enabled)
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->audioEffects[effectIndex].enabled = enabled;
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, enabled ? tr("Enable media audio effect") : tr("Disable media audio effect"));
+    finishEdit(enabled ? tr("Media audio effect enabled") : tr("Media audio effect disabled"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::moveAssetAudioEffect(const QString &assetId, int fromIndex, int toIndex)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || fromIndex < 0 || fromIndex >= existing->audioEffects.size())
+        return;
+    toIndex = qBound(0, toIndex, existing->audioEffects.size() - 1);
+    if (fromIndex == toIndex)
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->audioEffects.move(fromIndex, toIndex);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Reorder media audio effect"));
+    finishEdit(tr("Media audio effect reordered"));
+    emit assetEffectsChanged(assetId);
+}
+
+void AppController::previewSetAssetAudioEffectParam(const QString &assetId, int effectIndex,
+                                                    const QString &key, double value)
+{
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset || effectIndex < 0 || effectIndex >= asset->audioEffects.size() || key.isEmpty())
+        return;
+
+    beginImplicitPreviewDrag(tr("Edit media audio effect"));
+    asset->audioEffects[effectIndex].parameters.insert(key, value);
+    m_tracksCacheValid = false;
+    emit assetEffectsChanged(assetId);
+}
+
+bool AppController::setAssetAudioEffectParam(const QString &assetId, int effectIndex,
+                                             const QString &key, double value)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || effectIndex < 0 || effectIndex >= existing->audioEffects.size())
+        return false;
+    const AudioEffectEntry *def = audioEffectDefForId(existing->audioEffects[effectIndex].catalogId);
+    if (!def)
+        return false;
+
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return false;
+    asset->audioEffects[effectIndex].parameters.insert(key, value);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Edit media audio effect"));
+    finishEdit(tr("Media audio effect edited"));
+    emit assetEffectsChanged(assetId);
+    return true;
+}
+
+void AppController::clearAssetAudioEffects(const QString &assetId)
+{
+    const drift::MediaAsset *existing = m_project.asset(assetId);
+    if (!existing || existing->audioEffects.isEmpty())
+        return;
+
+    const drift::Project before = m_project;
+    drift::MediaAsset *asset = m_project.asset(assetId);
+    if (!asset)
+        return;
+    asset->audioEffects.clear();
+    m_tracksCacheValid = false;
+    if (m_assetLibrary) {
+        const int idx = m_assetLibrary->indexOfId(assetId);
+        if (idx >= 0) {
+            const QModelIndex mIdx = m_assetLibrary->index(idx);
+            emit m_assetLibrary->dataChanged(mIdx, mIdx, {AssetLibrary::HasEffectsRole, AssetLibrary::EffectsCountRole});
+            emit m_assetLibrary->badgeRevisionChanged();
+        }
+    }
+    pushProjectEdit(before, tr("Clear media audio effects"));
+    finishEdit(tr("Media audio effects cleared"));
+    emit assetEffectsChanged(assetId);
+}
+
 // --- effect stacks: copy/paste and user presets ------------------------------
 
 drift::EffectStackPreset AppController::effectStackFor(int trackIndex, int clipIndex,

@@ -7,12 +7,21 @@ Row {
 
     property string proxyState: ""
     property bool editFriendly: false
+    property bool hasEffects: false
     property string assetName: ""
     property string maskRole: ""
 
     width: parent ? parent.width : 0
     spacing: Theme.spacingSm
 
+    MediaPill {
+        id: cardFxPill
+        anchors.verticalCenter: parent.verticalCenter
+        text: qsTr("FX")
+        tooltip: qsTr("Media Pool FX (pre-timeline source processing)")
+        visible: root.hasEffects
+        fontSize: Theme.fontSizeTiny
+    }
     MediaPill {
         id: cardProxyPill
         anchors.verticalCenter: parent.verticalCenter
@@ -44,6 +53,7 @@ Row {
     }
     Text {
         width: Math.max(0, parent.width
+                           - (cardFxPill.visible ? cardFxPill.width + parent.spacing : 0)
                            - (cardProxyPill.visible ? cardProxyPill.width + parent.spacing : 0)
                            - (cardEditFriendlyPill.visible
                               ? cardEditFriendlyPill.width + parent.spacing : 0)

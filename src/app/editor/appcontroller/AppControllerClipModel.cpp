@@ -560,6 +560,33 @@ QVariantMap paramSpecToMap(const drift::EffectParamSpec &paramDef, const QMap<QS
     return param;
 }
 
+// What the timeline strip shows of an effect stack: a badge, and a tooltip listing the names.
+// It reads `label` and `enabled` and nothing else, so it has no use for the full map above —
+// which walks the catalog's parameter spec, stats every file-path value and builds a keyframe
+// track per parameter, once per effect, once per clip, on every edit.
+QVariantMap effectBadgeToMap(const drift::Effect &effect)
+{
+    const EffectPresetEntry *def = effectDefForId(effect.catalogId);
+    return {
+        {QStringLiteral("label"),
+         def ? def->meta.displayName : (effect.name.isEmpty() ? effect.catalogId : effect.name)},
+        {QStringLiteral("enabled"), effect.enabled},
+    };
+}
+
+QVariantMap audioEffectBadgeToMap(const drift::Effect &effect)
+{
+    const AudioEffectEntry *def = audioEffectDefForId(effect.catalogId);
+    return {
+        {QStringLiteral("label"), def ? def->displayName : effect.name},
+        {QStringLiteral("enabled"), effect.enabled},
+    };
+}
+
+} // namespace
+
+namespace drift::appcontroller_detail {
+
 // `effectIndex` and `timelineStart` are only needed to describe the params' keyframe tracks: the
 // inspector addresses them as "fx.<index>.<key>", and key times are reported on the timeline.
 QVariantMap effectToMap(const drift::Effect &effect, int effectIndex, drift::TimeUs timelineStart)
@@ -588,33 +615,6 @@ QVariantMap effectToMap(const drift::Effect &effect, int effectIndex, drift::Tim
         {QStringLiteral("enabled"), effect.enabled},
     };
 }
-
-// What the timeline strip shows of an effect stack: a badge, and a tooltip listing the names.
-// It reads `label` and `enabled` and nothing else, so it has no use for the full map above —
-// which walks the catalog's parameter spec, stats every file-path value and builds a keyframe
-// track per parameter, once per effect, once per clip, on every edit.
-QVariantMap effectBadgeToMap(const drift::Effect &effect)
-{
-    const EffectPresetEntry *def = effectDefForId(effect.catalogId);
-    return {
-        {QStringLiteral("label"),
-         def ? def->meta.displayName : (effect.name.isEmpty() ? effect.catalogId : effect.name)},
-        {QStringLiteral("enabled"), effect.enabled},
-    };
-}
-
-QVariantMap audioEffectBadgeToMap(const drift::Effect &effect)
-{
-    const AudioEffectEntry *def = audioEffectDefForId(effect.catalogId);
-    return {
-        {QStringLiteral("label"), def ? def->displayName : effect.name},
-        {QStringLiteral("enabled"), effect.enabled},
-    };
-}
-
-} // namespace
-
-namespace drift::appcontroller_detail {
 
 // Audio effects use the same per-instance shape as video effects, but read from the audio catalog.
 // Params are addressed as "afx.<index>.<key>" for the keyframe API, key times on the timeline.

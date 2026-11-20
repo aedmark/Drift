@@ -2634,6 +2634,22 @@
         <translation>ක්ලිප් සම්බන්ධ කරන්න</translation>
     </message>
     <message>
+        <source>Group selected clips</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ungroup selected clips</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle ignore event grouping</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Enable or disable selected clips</source>
         <translation>තෝරාගත් ක්ලිප් සක්‍රීය හෝ අක්‍රීය කරන්න</translation>
     </message>
@@ -3879,18 +3895,6 @@
         <translation>ශ්‍රව්‍ය ට්‍රැකය වෙනස් කරන්න</translation>
     </message>
     <message>
-        <source>Clips unlinked</source>
-        <translation>ක්ලිප් විසන්ධි කරන ලදී</translation>
-    </message>
-    <message>
-        <source>Audio unlinked</source>
-        <translation>ශ්‍රව්‍ය විසන්ධි කරන ලදී</translation>
-    </message>
-    <message>
-        <source>Clips linked</source>
-        <translation>ක්ලිප් සම්බන්ධ කරන ලදී</translation>
-    </message>
-    <message>
         <source>Fade updated</source>
         <translation>Fade යාවත්කාලීන විය</translation>
     </message>
@@ -4751,6 +4755,118 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Add media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear media effects</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effects cleared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear media audio effects</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effects cleared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>This stack uses “%1”, which isn’t installed — it won’t show. Open Extras to install it.</source>
         <translation>මෙම ස්ටැක් එක ස්ථාපනය කර නැති “%1” භාවිත කරයි — එය නොපෙනේ. එය ස්ථාපනය කිරීමට අමතර අංග විවෘත කරන්න.</translation>
     </message>
@@ -5252,6 +5368,18 @@
     </message>
     <message>
         <source>Delete Active Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Group Events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ungroup Events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear Group</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -14025,6 +14153,14 @@
 <context>
     <name>MediaAssetsGridNameRow</name>
     <message>
+        <source>FX</source>
+        <translation type="unfinished">FX</translation>
+    </message>
+    <message>
+        <source>Media Pool FX (pre-timeline source processing)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Linked proxy</source>
         <translation>සම්බන්ධිත ප්‍රොක්සිය</translation>
     </message>
@@ -14077,6 +14213,10 @@
     <message>
         <source>Preview and edit…</source>
         <translation>පෙරදසුන සහ සංස්කරණය…</translation>
+    </message>
+    <message>
+        <source>Media FX…</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Rename…</source>
@@ -14510,6 +14650,49 @@
     <message>
         <source>Media refreshed</source>
         <translation>මාධ්‍ය නැවුම් කරන ලදී</translation>
+    </message>
+</context>
+<context>
+    <name>MediaFxDialog</name>
+    <message>
+        <source>Media FX — %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Asset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Video FX (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio FX (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add Effect…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear All</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No Media Pool video effects applied</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No Media Pool audio effects applied</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media FX process the source media before it hits the timeline.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -24832,6 +25015,30 @@ If playback stutters, try another.</source>
         <translation>වීඩියෝව වැඩිදියුණු කරන්න…</translation>
     </message>
     <message>
+        <source>Group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Create New (G)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove from Group (U)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear Group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select All in Group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore Event Grouping (Ctrl+Shift+U)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Unlink</source>
         <translation>විසන්ධි කරන්න</translation>
     </message>
@@ -24894,6 +25101,10 @@ If playback stutters, try another.</source>
     <message>
         <source>Color grade…</source>
         <translation>වර්ණ සංශෝධනය කරන්න…</translation>
+    </message>
+    <message>
+        <source>Media FX…</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Blur area…</source>
@@ -25337,6 +25548,14 @@ If playback stutters, try another.</source>
     </message>
     <message>
         <source>Ripple Delete (Shift+Del)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore Event Grouping: ON (Clips move independently)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore Event Grouping: OFF (Grouped clips move together)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

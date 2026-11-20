@@ -396,20 +396,31 @@ void accumulateClipAudio(const drift::Project &project, const drift::Clip &clip,
     }
 
     QVector<float> &chunk = state.chunk;
-    // The clip's own stack plus whatever the nested audio lanes on its track contribute right
-    // now. A lane can begin and end part-way through a clip, so this list changes shape mid-clip
+    // The asset's Media Pool FX stack (upstream, pre-timeline VEGAS parity) plus the clip's
+    // own stack plus whatever the nested audio lanes on its track contribute right now.
+    // A lane can begin and end part-way through a clip, so this list changes shape mid-clip
     // — which is exactly the case the rebuild check below exists to cover.
-    if (!clip.audioEffects.isEmpty() || !laneClips.isEmpty()) {
+    const drift::MediaAsset *asset = project.asset(clip.assetId);
+    const bool hasAssetAudioFx = asset && !asset->audioEffects.isEmpty();
+    if (!clip.audioEffects.isEmpty() || !laneClips.isEmpty() || hasAssetAudioFx) {
         drift::AudioEffectRack &rack = state.rack;
+        const size_t combinedKey = qHashMulti(laneKey, hasAssetAudioFx ? asset->audioEffects.size() : 0);
         if (snapshotSerial == 0 || state.effectSpecsSerial != snapshotSerial
-            || state.effectSpecsKey != laneKey) {
+            || state.effectSpecsKey != combinedKey) {
             // Specs are built per owner: keyframe times count from the start of the clip that
             // carries the effect, which for a lane's effects is the adjustment, not this clip.
-            state.effectSpecs = audioEffectSpecsFor(clip.audioEffects, clip.timelineStart);
+            state.effectSpecs.clear();
+            if (hasAssetAudioFx) {
+                // Media pool audio FX run upstream of clip audio FX.
+                // Keyframe times for asset-level effects are relative to source time 0,
+                // which aligns to timeline time (clip.timelineStart - clip.srcIn).
+                state.effectSpecs += audioEffectSpecsFor(asset->audioEffects, clip.timelineStart - clip.srcIn);
+            }
+            state.effectSpecs += audioEffectSpecsFor(clip.audioEffects, clip.timelineStart);
             for (const drift::Clip *adjustment : laneClips)
                 state.effectSpecs += audioEffectSpecsFor(adjustment->audioEffects, adjustment->timelineStart);
             state.effectSpecsSerial = snapshotSerial;
-            state.effectSpecsKey = laneKey;
+            state.effectSpecsKey = combinedKey;
         }
 
         const drift::TimeUs lastEndUs = rack.lastTimelineEndUs();

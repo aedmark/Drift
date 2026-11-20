@@ -731,6 +731,14 @@ PanelFrame {
         id: collectMediaDialog
     }
 
+    MediaFxDialog {
+        id: mediaFxDialog
+    }
+
+    function openMediaFx(assetId) {
+        mediaFxDialog.openForAsset(assetId)
+    }
+
     // Selects a tab by id. Used by cross-panel jumps such as the properties
     // panel's "Browse effects" / "Browse audio effects" empty-state actions.
     function showTab(tabId) {
@@ -1179,6 +1187,7 @@ PanelFrame {
                             if (ShellBridge.main && ShellBridge.main.openMediaPreview)
                                 ShellBridge.main.openMediaPreview(assetIndex)
                         }
+                        onMediaFxRequested: (assetId) => mediaFxDialog.openForAsset(assetId)
                         onAddToTimelineRequested: (assetIds) => root.requestAddToTimeline(assetIds)
                         onRemoveRequested: (assetIds) => root.requestRemoveAsset(assetIds)
                         onReplaceRequested: (assetIndex) => root.requestReplaceAsset(assetIndex)

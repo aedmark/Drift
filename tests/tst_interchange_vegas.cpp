@@ -855,40 +855,50 @@ void TestInterchangeVegas::readsVideoEffectsLevelsAndColor()
         QVERIFY2(optProj.has_value(), qPrintable(err));
         const drift::Project &proj = *optProj;
 
-        int totalClipsWithEffects = 0;
+        int totalAssetsWithEffects = 0;
         bool foundLevels = false;
         bool foundColorGrade = false;
         bool foundSharpen = false;
 
+        const auto inspectFx = [&](const QList<drift::Effect> &effects) {
+            for (const auto &fx : effects) {
+                if (fx.catalogId == QStringLiteral("adjust.levels")) {
+                    foundLevels = true;
+                    QVERIFY(fx.parameters.contains(QStringLiteral("gamma")));
+                    QVERIFY(fx.parameters.value(QStringLiteral("gamma")).toDouble() > 1.0);
+                } else if (fx.catalogId == QStringLiteral("color.grade")) {
+                    foundColorGrade = true;
+                    QVERIFY(fx.parameters.contains(QStringLiteral("saturation")));
+                    QVERIFY(fx.parameters.value(QStringLiteral("saturation")).toDouble() > 1.0);
+                } else if (fx.catalogId == QStringLiteral("stylize.sharpen")) {
+                    foundSharpen = true;
+                    QVERIFY(fx.parameters.contains(QStringLiteral("luma_amount")));
+                    QVERIFY(fx.parameters.value(QStringLiteral("luma_amount")).toDouble() > 0.0);
+                }
+            }
+        };
+
+        for (const auto &asset : proj.assets()) {
+            if (!asset.effects.isEmpty()) {
+                ++totalAssetsWithEffects;
+                inspectFx(asset.effects);
+            }
+        }
+
         for (const auto &track : proj.tracks()) {
             for (const auto &clip : track.clips) {
                 if (!clip.effects.isEmpty()) {
-                    ++totalClipsWithEffects;
-                    for (const auto &fx : clip.effects) {
-                        if (fx.catalogId == QStringLiteral("adjust.levels")) {
-                            foundLevels = true;
-                            QVERIFY(fx.parameters.contains(QStringLiteral("gamma")));
-                            QVERIFY(fx.parameters.value(QStringLiteral("gamma")).toDouble() > 1.0);
-                        } else if (fx.catalogId == QStringLiteral("color.grade")) {
-                            foundColorGrade = true;
-                            QVERIFY(fx.parameters.contains(QStringLiteral("saturation")));
-                            QVERIFY(fx.parameters.value(QStringLiteral("saturation")).toDouble() > 1.0);
-                        } else if (fx.catalogId == QStringLiteral("stylize.sharpen")) {
-                            foundSharpen = true;
-                            QVERIFY(fx.parameters.contains(QStringLiteral("luma_amount")));
-                            QVERIFY(fx.parameters.value(QStringLiteral("luma_amount")).toDouble() > 0.0);
-                        }
-                    }
+                    inspectFx(clip.effects);
                 }
             }
         }
 
-        qDebug() << "e3s3.veg clips with effects:" << totalClipsWithEffects
+        qDebug() << "e3s3.veg assets with effects:" << totalAssetsWithEffects
                  << "foundLevels:" << foundLevels
                  << "foundColorGrade:" << foundColorGrade
                  << "foundSharpen:" << foundSharpen;
 
-        QVERIFY(totalClipsWithEffects >= 5);
+        QVERIFY(totalAssetsWithEffects >= 5);
         QVERIFY(foundLevels);
         QVERIFY(foundColorGrade);
         QVERIFY(foundSharpen);
@@ -909,6 +919,20 @@ void TestInterchangeVegas::readsVignetteAndSoftlightEffects()
         const drift::Project &proj = *optProj;
 
         bool foundVignette = false;
+        // P11-04: Media Pool FX are preserved directly on MediaAsset::effects
+        for (const auto &asset : proj.assets()) {
+            for (const auto &fx : asset.effects) {
+                if (fx.catalogId == QStringLiteral("stylize.vignette")) {
+                    foundVignette = true;
+                    QVERIFY(fx.parameters.contains(QStringLiteral("amount")));
+                    QVERIFY(fx.parameters.value(QStringLiteral("amount")).toDouble() > 0.0);
+                    QVERIFY(fx.parameters.contains(QStringLiteral("feather")));
+                    QVERIFY(fx.parameters.value(QStringLiteral("feather")).toDouble() > 0.0);
+                    QCOMPARE(fx.parameters.value(QStringLiteral("center.x")).toDouble(), 0.5);
+                    QCOMPARE(fx.parameters.value(QStringLiteral("center.y")).toDouble(), 0.5);
+                }
+            }
+        }
         for (const auto &track : proj.tracks()) {
             for (const auto &clip : track.clips) {
                 for (const auto &fx : clip.effects) {

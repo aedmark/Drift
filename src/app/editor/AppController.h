@@ -1673,6 +1673,30 @@ public:
     Q_INVOKABLE void previewSetMasterAudioEffectParam(int effectIndex, const QString &key, double value);
     Q_INVOKABLE QVariantList masterAudioEffects() const;
 
+    // Media Pool Video FX (P11-04)
+    Q_INVOKABLE QVariantList assetEffects(const QString &assetId) const;
+    Q_INVOKABLE void addAssetEffect(const QString &assetId, const QString &effectId);
+    Q_INVOKABLE void removeAssetEffect(const QString &assetId, int effectIndex);
+    Q_INVOKABLE void setAssetEffectEnabled(const QString &assetId, int effectIndex, bool enabled);
+    Q_INVOKABLE void moveAssetEffect(const QString &assetId, int fromIndex, int toIndex);
+    Q_INVOKABLE bool setAssetEffectParam(const QString &assetId, int effectIndex,
+                                         const QString &key, const QVariant &value);
+    Q_INVOKABLE void previewSetAssetEffectParam(const QString &assetId, int effectIndex,
+                                                const QString &key, const QVariant &value);
+    Q_INVOKABLE void clearAssetEffects(const QString &assetId);
+
+    // Media Pool Audio FX (P11-04)
+    Q_INVOKABLE QVariantList assetAudioEffects(const QString &assetId) const;
+    Q_INVOKABLE void addAssetAudioEffect(const QString &assetId, const QString &effectId);
+    Q_INVOKABLE void removeAssetAudioEffect(const QString &assetId, int effectIndex);
+    Q_INVOKABLE void setAssetAudioEffectEnabled(const QString &assetId, int effectIndex, bool enabled);
+    Q_INVOKABLE void moveAssetAudioEffect(const QString &assetId, int fromIndex, int toIndex);
+    Q_INVOKABLE bool setAssetAudioEffectParam(const QString &assetId, int effectIndex,
+                                             const QString &key, double value);
+    Q_INVOKABLE void previewSetAssetAudioEffectParam(const QString &assetId, int effectIndex,
+                                                     const QString &key, double value);
+    Q_INVOKABLE void clearAssetAudioEffects(const QString &assetId);
+
     // Effect stacks travel as JSON on the system clipboard, so a copy also crosses to a second
     // running instance. -1 for both indices means the whole clip.
     Q_INVOKABLE void copyEffectToClipboard(int trackIndex, int clipIndex, int effectIndex);
@@ -2018,6 +2042,7 @@ signals:
     void masterVolumeChanged();
     void masterMutedChanged();
     void masterAudioEffectsChanged();
+    void assetEffectsChanged(const QString &assetId);
     // Carries the finished benchmark, merged into whatever the dialog already collected.
     void playbackBenchmarkFinished(const QVariantMap &info);
     void playbackBenchmarkRunningChanged();

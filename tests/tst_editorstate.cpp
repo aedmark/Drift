@@ -545,6 +545,7 @@ private slots:
     void provisionalKindReadsTheExtensionAlone();
     void importFileNameStaysStorable();
     void splatInputsAreModelPaths();
+    void vegasMediaPoolFxPreTimelineProcessing();
 };
 
 // A file dragged in from the file manager has no bin row yet, so the timeline's drop preview
@@ -18691,6 +18692,194 @@ void EditorStateTest::bakeFingerprintTracksRangeEdits()
     QVERIFY(drift::bakeFingerprint(project, 0, 60) != drift::bakeFingerprint(project, 300, 360));
     project.setResolution(1920, 1080);
     QVERIFY(drift::bakeFingerprint(project, 0, 60) != original);
+}
+
+void EditorStateTest::vegasMediaPoolFxPreTimelineProcessing()
+{
+    AssetLibrary library;
+    AppController state(&library);
+
+    // 1. Add video and audio media assets
+    drift::MediaAsset videoAsset;
+    videoAsset.id = QStringLiteral("asset_v1");
+    videoAsset.name = QStringLiteral("source.mp4");
+    videoAsset.kind = drift::MediaKind::Video;
+    videoAsset.path = QStringLiteral("/media/source.mp4");
+    videoAsset.durationUs = drift::secondsToUs(10.0);
+    state.project()->addAsset(videoAsset);
+
+    drift::MediaAsset audioAsset;
+    audioAsset.id = QStringLiteral("asset_a1");
+    audioAsset.name = QStringLiteral("source.wav");
+    audioAsset.kind = drift::MediaKind::Audio;
+    audioAsset.path = QStringLiteral("/media/source.wav");
+    audioAsset.durationUs = drift::secondsToUs(10.0);
+    state.project()->addAsset(audioAsset);
+
+    library.syncToProject();
+
+    // Verify initial state: no effects
+    QVERIFY(!library.hasEffects(QStringLiteral("asset_v1")));
+    QVERIFY(!library.hasEffects(QStringLiteral("asset_a1")));
+    QCOMPARE(state.assetEffects(QStringLiteral("asset_v1")).size(), 0);
+    QCOMPARE(state.assetAudioEffects(QStringLiteral("asset_a1")).size(), 0);
+
+    // 2. Add video Media Pool FX ("adjust.contrast") and audio Media Pool FX
+    state.addAssetEffect(QStringLiteral("asset_v1"), QStringLiteral("adjust.contrast"));
+    const QVariantList audioCatalog = state.audioEffectCatalog();
+    QVERIFY(!audioCatalog.isEmpty());
+    const QString audioFxId = audioCatalog.first().toMap().value(QStringLiteral("id")).toString();
+    QVERIFY(!audioFxId.isEmpty());
+    state.addAssetAudioEffect(QStringLiteral("asset_a1"), audioFxId);
+
+    // Verify AssetLibrary badges and counts
+    QVERIFY(library.hasEffects(QStringLiteral("asset_v1")));
+    QVERIFY(library.hasEffects(QStringLiteral("asset_a1")));
+    QCOMPARE(state.assetEffects(QStringLiteral("asset_v1")).size(), 1);
+    QCOMPARE(state.assetAudioEffects(QStringLiteral("asset_a1")).size(), 1);
+
+    const drift::MediaAsset *vAsset = state.project()->asset(QStringLiteral("asset_v1"));
+    QVERIFY(vAsset != nullptr);
+    QCOMPARE(vAsset->effects.size(), 1);
+    QCOMPARE(vAsset->effects.at(0).catalogId, QStringLiteral("adjust.contrast"));
+
+    const drift::MediaAsset *aAsset = state.project()->asset(QStringLiteral("asset_a1"));
+    QVERIFY(aAsset != nullptr);
+    QCOMPARE(aAsset->audioEffects.size(), 1);
+    QCOMPARE(aAsset->audioEffects.at(0).catalogId, audioFxId);
+
+    // 3. Set parameters on asset effects
+    QVERIFY(state.setAssetEffectParam(QStringLiteral("asset_v1"), 0, QStringLiteral("contrast"), 1.85));
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(0).parameters.value(QStringLiteral("contrast")).toDouble(), 1.85);
+
+    const AudioEffectEntry *audioDef = audioEffectDefForId(audioFxId);
+    QVERIFY(audioDef != nullptr);
+    if (!audioDef->parameters.isEmpty()) {
+        const QString paramKey = audioDef->parameters.first().key;
+        const double targetVal = (audioDef->parameters.first().min + audioDef->parameters.first().max) * 0.5;
+        QVERIFY(state.setAssetAudioEffectParam(QStringLiteral("asset_a1"), 0, paramKey, targetVal));
+        QCOMPARE(state.project()->asset(QStringLiteral("asset_a1"))->audioEffects.at(0).parameters.value(paramKey).toDouble(), targetVal);
+    }
+
+    // 4. Create timeline clips referencing asset_v1
+    drift::Track videoTrack{.type = drift::TrackType::Video};
+    videoTrack.id = QStringLiteral("t_video_0");
+    state.project()->tracks().append(videoTrack);
+
+    drift::Clip clip1;
+    clip1.id = QStringLiteral("clip_1");
+    clip1.type = drift::ClipType::Video;
+    clip1.assetId = QStringLiteral("asset_v1");
+    clip1.timelineStart = 0;
+    clip1.timelineDuration = drift::secondsToUs(4.0);
+    clip1.srcIn = 0;
+    clip1.srcOut = drift::secondsToUs(4.0);
+    // Event FX on clip 1
+    drift::Effect clip1Fx;
+    clip1Fx.catalogId = QStringLiteral("adjust.brightness");
+    clip1Fx.enabled = true;
+    clip1.effects.append(clip1Fx);
+
+    drift::Clip clip2;
+    clip2.id = QStringLiteral("clip_2");
+    clip2.type = drift::ClipType::Video;
+    clip2.assetId = QStringLiteral("asset_v1");
+    clip2.timelineStart = drift::secondsToUs(5.0);
+    clip2.timelineDuration = drift::secondsToUs(4.0);
+    clip2.srcIn = drift::secondsToUs(2.0);
+    clip2.srcOut = drift::secondsToUs(6.0);
+
+    state.project()->tracks()[0].clips.append(clip1);
+    state.project()->tracks()[0].clips.append(clip2);
+
+    // 5. Verify upstream processing in resolvedClipEffects:
+    // Clip 1 should resolve Media Pool FX (adjust.contrast) FIRST, then Clip FX (adjust.brightness) SECOND
+    const QList<drift::Effect> resolved1 = FrameCompositor::resolvedClipEffects(clip1, 0, state.project());
+    QCOMPARE(resolved1.size(), 2);
+    QCOMPARE(resolved1.at(0).catalogId, QStringLiteral("adjust.contrast")); // Upstream Media Pool FX
+    QCOMPARE(resolved1.at(0).parameters.value(QStringLiteral("contrast")).toDouble(), 1.85);
+    QCOMPARE(resolved1.at(1).catalogId, QStringLiteral("adjust.brightness")); // Downstream Event FX
+
+    // Clip 2 has no event FX, but automatically inherits Media Pool FX
+    const QList<drift::Effect> resolved2 = FrameCompositor::resolvedClipEffects(clip2, 0, state.project());
+    QCOMPARE(resolved2.size(), 1);
+    QCOMPARE(resolved2.at(0).catalogId, QStringLiteral("adjust.contrast"));
+    QCOMPARE(resolved2.at(0).parameters.value(QStringLiteral("contrast")).toDouble(), 1.85);
+
+    // 6. Test Keyframing on Media Pool FX evaluated in Media Source Time
+    // Add keyframes to asset_v1 contrast: at source 0s = 1.0, at source 2s = 2.0
+    drift::MediaAsset *mutAsset = state.project()->asset(QStringLiteral("asset_v1"));
+    QVERIFY(mutAsset != nullptr);
+    drift::KeyframeTrack<double> contrastTrack;
+    contrastTrack.setKeyframe(0, 1.0);
+    contrastTrack.setKeyframe(drift::secondsToUs(2.0), 2.0);
+    mutAsset->effects[0].paramKeyframes.insert(QStringLiteral("contrast"), contrastTrack);
+
+    // Clip 1 srcIn is 0. At clipTime 0s (source 0s), contrast is 1.0. At clipTime 2s (source 2s), contrast is 2.0.
+    const QList<drift::Effect> resClip1T0 = FrameCompositor::resolvedClipEffects(clip1, 0, state.project());
+    QCOMPARE(resClip1T0.at(0).parameters.value(QStringLiteral("contrast")).toDouble(), 1.0);
+    const QList<drift::Effect> resClip1T2 = FrameCompositor::resolvedClipEffects(clip1, drift::secondsToUs(2.0), state.project());
+    QCOMPARE(resClip1T2.at(0).parameters.value(QStringLiteral("contrast")).toDouble(), 2.0);
+
+    // Clip 2 srcIn is 2.0s. At clipTime 0s (source time 2.0s), contrast should resolve to 2.0!
+    const QList<drift::Effect> resClip2T0 = FrameCompositor::resolvedClipEffects(clip2, 0, state.project());
+    QCOMPARE(resClip2T0.at(0).parameters.value(QStringLiteral("contrast")).toDouble(), 2.0);
+
+    // 7. Toggle enabled state
+    state.setAssetEffectEnabled(QStringLiteral("asset_v1"), 0, false);
+    QVERIFY(!state.project()->asset(QStringLiteral("asset_v1"))->effects.at(0).enabled);
+    const QList<drift::Effect> resDisabled = FrameCompositor::resolvedClipEffects(clip1, 0, state.project());
+    QCOMPARE(resDisabled.size(), 1);
+    QCOMPARE(resDisabled.at(0).catalogId, QStringLiteral("adjust.brightness"));
+
+    state.setAssetEffectEnabled(QStringLiteral("asset_v1"), 0, true);
+    QVERIFY(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(0).enabled);
+    const QList<drift::Effect> resReEnabled = FrameCompositor::resolvedClipEffects(clip1, 0, state.project());
+    QCOMPARE(resReEnabled.size(), 2);
+    QCOMPARE(resReEnabled.at(0).catalogId, QStringLiteral("adjust.contrast"));
+    QCOMPARE(resReEnabled.at(1).catalogId, QStringLiteral("adjust.brightness"));
+
+    // 8. Reorder effects
+    state.addAssetEffect(QStringLiteral("asset_v1"), QStringLiteral("adjust.levels"));
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.size(), 2);
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(0).catalogId, QStringLiteral("adjust.contrast"));
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(1).catalogId, QStringLiteral("adjust.levels"));
+
+    state.moveAssetEffect(QStringLiteral("asset_v1"), 0, 1);
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(0).catalogId, QStringLiteral("adjust.levels"));
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(1).catalogId, QStringLiteral("adjust.contrast"));
+
+    // 9. Test Undo / Redo
+    QVERIFY(state.undoAvailable());
+    state.undo();
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(0).catalogId, QStringLiteral("adjust.contrast"));
+    state.redo();
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.at(0).catalogId, QStringLiteral("adjust.levels"));
+
+    // 10. Test JSON persistence roundtrip
+    const QJsonObject json = state.project()->toJson();
+    QString err;
+    const drift::Project roundtripped = drift::Project::fromJson(json, &err);
+    QVERIFY(err.isEmpty());
+    const drift::MediaAsset *rtV = roundtripped.asset(QStringLiteral("asset_v1"));
+    QVERIFY(rtV != nullptr);
+    QCOMPARE(rtV->effects.size(), 2);
+    QCOMPARE(rtV->effects.at(0).catalogId, QStringLiteral("adjust.levels"));
+    QCOMPARE(rtV->effects.at(1).catalogId, QStringLiteral("adjust.contrast"));
+
+    const drift::MediaAsset *rtA = roundtripped.asset(QStringLiteral("asset_a1"));
+    QVERIFY(rtA != nullptr);
+    QCOMPARE(rtA->audioEffects.size(), 1);
+    QCOMPARE(rtA->audioEffects.at(0).catalogId, audioFxId);
+
+    // 11. Test Clear operations
+    state.clearAssetEffects(QStringLiteral("asset_v1"));
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_v1"))->effects.size(), 0);
+    QVERIFY(!library.hasEffects(QStringLiteral("asset_v1")));
+
+    state.clearAssetAudioEffects(QStringLiteral("asset_a1"));
+    QCOMPARE(state.project()->asset(QStringLiteral("asset_a1"))->audioEffects.size(), 0);
+    QVERIFY(!library.hasEffects(QStringLiteral("asset_a1")));
 }
 
 QTEST_MAIN(EditorStateTest)

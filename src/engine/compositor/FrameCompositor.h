@@ -122,6 +122,12 @@ public:
                                                drift::TimeUs adjustmentStartUs, drift::TimeUs adjustmentSrcInUs,
                                                drift::TimeUs timelineUs);
 
+    // The clip's chain as it should render at this instant: Media Pool FX on the underlying media asset
+    // (evaluated at source time, pre-timeline VEGAS parity) prepended upstream of clip effects,
+    // with every keyframed parameter baked down to its value at this instant.
+    static QList<drift::Effect> resolvedClipEffects(const drift::Clip &clip, drift::TimeUs clipTimeUs,
+                                                    const drift::Project *project = nullptr);
+
     // How a text clip is laid out at `timelineUs`, as the compositor will draw it: the layout rect
     // (the clip's scaled box in canvas px at renderScale, before any rotation about its centre, which
     // is the clip's position unless an anchor is set) and the shaped block for

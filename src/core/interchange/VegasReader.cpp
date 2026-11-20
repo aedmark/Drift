@@ -1696,6 +1696,7 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                     asset.id = assetId;
                     asset.path = resolved;
                     asset.name = QFileInfo(resolved).fileName();
+                    asset.effects = entry.mediaEffects;
 
                     const QFileInfo resolvedInfo(resolved);
                     if (resolvedInfo.exists() && resolvedInfo.isFile()) {
@@ -2019,8 +2020,10 @@ std::optional<Project> readProjectData(const QByteArray &data, const QString &so
                                                 nestedSeqId = m.sequenceId;
                                                 clip.name = QFileInfo(m.resolvedPath).completeBaseName();
                                             }
-                                            for (const Effect &fx : m.mediaEffects) {
-                                                clip.effects.append(fx);
+                                            if (clip.assetId.isEmpty()) {
+                                                for (const Effect &fx : m.mediaEffects) {
+                                                    clip.effects.append(fx);
+                                                }
                                             }
                                         } else {
                                             clip.name = QStringLiteral("clip_%1").arg(track.clips.size());

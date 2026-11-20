@@ -54,6 +54,8 @@ public:
         RangeCountRole,
         FavoriteRangeCountRole,
         MaskRoleRole,
+        HasEffectsRole,
+        EffectsCountRole,
     };
     Q_ENUM(Role)
 
@@ -130,6 +132,7 @@ public:
     Q_INVOKABLE QVariantMap assetAt(int index) const;
     Q_INVOKABLE QString assetIdAt(int index) const;
     Q_INVOKABLE int indexOfId(const QString &id) const;
+    Q_INVOKABLE bool hasEffects(const QString &assetId) const;
     Q_INVOKABLE QString thumbnailAt(int index) const;
     Q_INVOKABLE QString filmstripAt(int index) const;
     Q_INVOKABLE void ensureMedia(int index);

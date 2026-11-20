@@ -129,6 +129,7 @@ Column {
         assetName: root.name
         proxyState: root.isFolder ? "" : root.host.proxyStateOf(root.assetId)
         editFriendly: !root.isFolder && root.host.editFriendlyOf(root.assetId)
+        hasEffects: !root.isFolder && AssetLibrary.hasEffects(root.assetId)
         maskRole: root.maskRole
     }
 }

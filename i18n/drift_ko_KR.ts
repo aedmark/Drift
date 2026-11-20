@@ -2631,6 +2631,22 @@
         <translation>클립 연결</translation>
     </message>
     <message>
+        <source>Group selected clips</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ungroup selected clips</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle ignore event grouping</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Enable or disable selected clips</source>
         <translation>선택한 클립 활성화 또는 비활성화</translation>
     </message>
@@ -3873,18 +3889,6 @@
         <translation>오디오 트랙 변경</translation>
     </message>
     <message>
-        <source>Clips unlinked</source>
-        <translation>클립 연결이 해제됨</translation>
-    </message>
-    <message>
-        <source>Audio unlinked</source>
-        <translation>오디오 연결이 해제됨</translation>
-    </message>
-    <message>
-        <source>Clips linked</source>
-        <translation>클립 연결됨</translation>
-    </message>
-    <message>
         <source>Fade updated</source>
         <translation>페이드가 업데이트됨</translation>
     </message>
@@ -4741,6 +4745,118 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Add media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit media effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear media effects</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media effects cleared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reorder media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect reordered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit media audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear media audio effects</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media audio effects cleared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>This stack uses “%1”, which isn’t installed — it won’t show. Open Extras to install it.</source>
         <translation>이 스택은 “%1”을 사용하지만 설치되어 있지 않아 표시되지 않습니다. 추가 기능을 열어 설치하세요.</translation>
     </message>
@@ -5238,6 +5354,18 @@
     </message>
     <message>
         <source>Delete Active Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Group Events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ungroup Events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear Group</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -13973,6 +14101,14 @@
 <context>
     <name>MediaAssetsGridNameRow</name>
     <message>
+        <source>FX</source>
+        <translation type="unfinished">FX</translation>
+    </message>
+    <message>
+        <source>Media Pool FX (pre-timeline source processing)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Linked proxy</source>
         <translation>연결된 프록시</translation>
     </message>
@@ -14024,6 +14160,10 @@
     <message>
         <source>Preview and edit…</source>
         <translation>미리보기 및 편집…</translation>
+    </message>
+    <message>
+        <source>Media FX…</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Rename…</source>
@@ -14448,6 +14588,49 @@
     <message>
         <source>Media refreshed</source>
         <translation>미디어 새로 고침 완료</translation>
+    </message>
+</context>
+<context>
+    <name>MediaFxDialog</name>
+    <message>
+        <source>Media FX — %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Asset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation type="unfinished">완료</translation>
+    </message>
+    <message>
+        <source>Video FX (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio FX (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add Effect…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear All</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No Media Pool video effects applied</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No Media Pool audio effects applied</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Media FX process the source media before it hits the timeline.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -24739,6 +24922,30 @@ If playback stutters, try another.</source>
         <translation>비디오 화질 개선…</translation>
     </message>
     <message>
+        <source>Group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Create New (G)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove from Group (U)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear Group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select All in Group</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore Event Grouping (Ctrl+Shift+U)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Unlink</source>
         <translation>연결 해제</translation>
     </message>
@@ -24801,6 +25008,10 @@ If playback stutters, try another.</source>
     <message>
         <source>Color grade…</source>
         <translation>색보정…</translation>
+    </message>
+    <message>
+        <source>Media FX…</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Blur area…</source>
@@ -25243,6 +25454,14 @@ If playback stutters, try another.</source>
     </message>
     <message>
         <source>Ripple Delete (Shift+Del)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore Event Grouping: ON (Clips move independently)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ignore Event Grouping: OFF (Grouped clips move together)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

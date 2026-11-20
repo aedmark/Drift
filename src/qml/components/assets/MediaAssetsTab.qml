@@ -67,6 +67,8 @@ Item {
     signal addToTimelineRequested(var assetIds)
     // Emitted from the card/row context menu. Opens the preview/edit window.
     signal previewRequested(int assetIndex)
+    // Emitted from the card/row context menu. Opens the Media Pool FX dialog (P11-04).
+    signal mediaFxRequested(string assetId)
     // Emitted from the card/row context menu. Carries every selected asset's id, not just the
     // one clicked — see selectedAssetIds below. The parent owns the in-use check and the
     // confirmation.
