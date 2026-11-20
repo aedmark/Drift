@@ -2,6 +2,10 @@
 # drift's staged effects/ — core-only in packaged builds — and the tests need the full set.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
+if(MSVC)
+    add_compile_options(/bigobj)
+endif()
+
 qt_add_executable(tst_mediaprobe tst_mediaprobe.cpp)
 target_link_libraries(tst_mediaprobe PRIVATE Qt6::Test driftengine)
 add_test(NAME MediaProbe COMMAND tst_mediaprobe)
