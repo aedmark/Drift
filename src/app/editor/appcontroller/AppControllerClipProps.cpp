@@ -1,6 +1,9 @@
 #include "engine/platform/AndroidUri.h"
 #include "app/editor/appcontroller/AppControllerInternal.h"
 #include "core/animation/VelocityEnvelope.h"
+#include "engine/audio/AudioMixer.h"
+#include "engine/audio/dsp/ClipAudioRetimer.h"
+#include "engine/decode/readers/ClipReaderPool.h"
 #include "engine/packages/effects/EffectCatalog.h"
 #include "app/mcp/McpController.h"
 
@@ -2007,6 +2010,359 @@ void AppController::setClipPan(int trackIndex, int clipIndex, double pan)
     m_project.tracks()[trackIndex].clips[clipIndex].pan = clamped;
     pushProjectEdit(before, tr("Pan changed"));
     finishEdit(tr("Clip pan updated"));
+}
+
+namespace {
+
+bool clipCarriesAudio(const drift::Clip &clip)
+{
+    return (clip.type == drift::ClipType::Audio || clip.type == drift::ClipType::Video
+            || clip.type == drift::ClipType::Composite)
+           && (!clip.path.isEmpty() || !clip.sequenceId.isEmpty());
+}
+
+void writeConstantKeyTrack(drift::KeyframeTrack<double> &track, double value, double defaultValue)
+{
+    if (track.keyframes().size() > 1)
+        return;
+    if (qFuzzyCompare(value + 1.0, defaultValue + 1.0))
+        track.clearKeyframes();
+    else
+        track.setKeyframe(0, value);
+}
+
+double scanClipPeakAmplitude(const drift::Clip &clip)
+{
+    if (clip.path.isEmpty() || clip.timelineDuration <= 0)
+        return 0.0;
+    constexpr int kRate = 48000;
+    constexpr int kBlockFrames = 4096;
+    const drift::TimeUs blockUs = static_cast<drift::TimeUs>(
+        (static_cast<int64_t>(kBlockFrames) * drift::kUsPerSecond) / kRate);
+    // Stride if a clip exceeds 180 s so normalize stays responsive synchronously on huge files.
+    const drift::TimeUs maxDirectUs = drift::secondsToUs(180.0);
+    const drift::TimeUs strideUs = clip.timelineDuration > maxDirectUs
+                                       ? qMax(blockUs, clip.timelineDuration / 2000)
+                                       : blockUs;
+
+    drift::ClipAudioRetimer retimer;
+    QVector<float> buf;
+    const quint64 streamId = ClipReaderPool::streamIdForClip(clip.id) ^ 0x4E4F524DULL;
+    float peak = 0.0f;
+    for (drift::TimeUs t = clip.timelineStart; t < clip.timelineEnd(); t += strideUs) {
+        const int remain = static_cast<int>(
+            ((clip.timelineEnd() - t) * kRate + drift::kUsPerSecond - 1) / drift::kUsPerSecond);
+        const int frames = qBound(1, remain, kBlockFrames);
+        AudioMixer::readClipAudio(buf, clip, streamId, t, frames, kRate, &retimer);
+        for (const float s : std::as_const(buf))
+            peak = qMax(peak, std::abs(s));
+    }
+    return static_cast<double>(peak);
+}
+
+} // namespace
+
+void AppController::previewClipBaseOpacity(int trackIndex, int clipIndex, double opacity)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex))
+        return;
+    if (m_project.tracks().at(trackIndex).locked)
+        return;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (clip.type == drift::ClipType::Audio || clip.opacity.keyframes().size() > 1)
+        return;
+
+    beginImplicitPreviewDrag(tr("Adjust clip opacity"));
+    writeConstantKeyTrack(clip.opacity, std::clamp(opacity, 0.0, 1.0), 1.0);
+    m_previewDragDirty = true;
+    emitPreviewFrame();
+}
+
+void AppController::commitClipBaseOpacity(int trackIndex, int clipIndex, double opacity)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return;
+    }
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (clip.type == drift::ClipType::Audio || clip.opacity.keyframes().size() > 1) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return;
+    }
+
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+
+    const double clamped = std::clamp(opacity, 0.0, 1.0);
+    const double beforeVal =
+        before.tracks().at(trackIndex).clips.at(clipIndex).opacity.isEmpty()
+            ? 1.0
+            : before.tracks().at(trackIndex).clips.at(clipIndex).opacity.keyframes().constBegin()->value;
+    writeConstantKeyTrack(clip.opacity, clamped, 1.0);
+    if (qFuzzyCompare(beforeVal + 1.0, clamped + 1.0)) {
+        syncClipModels();
+        return;
+    }
+    pushProjectEdit(before, tr("Adjust clip opacity"));
+    finishEdit(tr("Clip opacity %1%").arg(qRound(clamped * 100.0)));
+}
+
+void AppController::previewClipBaseVolume(int trackIndex, int clipIndex, double gain)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex))
+        return;
+    if (m_project.tracks().at(trackIndex).locked)
+        return;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if ((clip.type != drift::ClipType::Audio && clip.type != drift::ClipType::Video
+         && clip.type != drift::ClipType::Composite)
+        || clip.volume.keyframes().size() > 1) {
+        return;
+    }
+
+    beginImplicitPreviewDrag(tr("Adjust clip gain"));
+    writeConstantKeyTrack(clip.volume, std::clamp(gain, 0.0, 2.0), 1.0);
+    m_previewDragDirty = true;
+    emitPreviewFrame();
+}
+
+void AppController::commitClipBaseVolume(int trackIndex, int clipIndex, double gain)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return;
+    }
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if ((clip.type != drift::ClipType::Audio && clip.type != drift::ClipType::Video
+         && clip.type != drift::ClipType::Composite)
+        || clip.volume.keyframes().size() > 1) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return;
+    }
+
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+
+    const double clamped = std::clamp(gain, 0.0, 2.0);
+    const double beforeVal =
+        before.tracks().at(trackIndex).clips.at(clipIndex).volume.isEmpty()
+            ? 1.0
+            : before.tracks().at(trackIndex).clips.at(clipIndex).volume.keyframes().constBegin()->value;
+    writeConstantKeyTrack(clip.volume, clamped, 1.0);
+    if (qFuzzyCompare(beforeVal + 1.0, clamped + 1.0)) {
+        syncClipModels();
+        return;
+    }
+    pushProjectEdit(before, tr("Adjust clip gain"));
+    finishEdit(clamped <= 0.0 ? tr("Clip gain -inf dB")
+                              : tr("Clip gain %1 dB")
+                                    .arg(20.0 * std::log10(clamped), 0, 'f', 1));
+}
+
+void AppController::setClipPitchSemitones(int trackIndex, int clipIndex, double semitones)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked)
+        return;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (clip.type != drift::ClipType::Audio && clip.type != drift::ClipType::Video)
+        return;
+
+    const double clamped = qBound(-24.0, semitones, 24.0);
+    if (qFuzzyCompare(clip.pitchSemitones + 25.0, clamped + 25.0))
+        return;
+
+    const drift::Project before = m_project;
+    clip.pitchSemitones = clamped;
+    pushProjectEdit(before, tr("Pitch shift clip"));
+    finishEdit(tr("Pitch %1%2 st")
+                   .arg(clamped > 0.0 ? QStringLiteral("+") : QString())
+                   .arg(clamped, 0, 'f', 1));
+}
+
+void AppController::nudgeSelectedClipPitch(double deltaSemitones)
+{
+    QList<QPair<int, int>> pairs = m_selection;
+    if (pairs.isEmpty() && isValidClipIndex(m_selectedTrack, m_selectedClip))
+        pairs.append({m_selectedTrack, m_selectedClip});
+    pairs = withPartners(m_project, pairs);
+    if (pairs.isEmpty())
+        return;
+
+    const drift::Project before = m_project;
+    bool changed = false;
+    double lastPitch = 0.0;
+    for (const auto &pair : std::as_const(pairs)) {
+        if (!isValidClipIndex(pair.first, pair.second) || m_project.tracks().at(pair.first).locked)
+            continue;
+        drift::Clip &clip = m_project.tracks()[pair.first].clips[pair.second];
+        if (clip.type != drift::ClipType::Audio && clip.type != drift::ClipType::Video)
+            continue;
+        const double next = qBound(-24.0, clip.pitchSemitones + deltaSemitones, 24.0);
+        if (!qFuzzyCompare(clip.pitchSemitones + 25.0, next + 25.0)) {
+            clip.pitchSemitones = next;
+            lastPitch = next;
+            changed = true;
+        }
+    }
+    if (!changed)
+        return;
+    pushProjectEdit(before, tr("Pitch shift clip"));
+    finishEdit(tr("Pitch %1%2 st")
+                   .arg(lastPitch > 0.0 ? QStringLiteral("+") : QString())
+                   .arg(lastPitch, 0, 'f', 1));
+}
+
+void AppController::setClipLockPitchToStretch(int trackIndex, int clipIndex, bool lock)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked)
+        return;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (clip.type != drift::ClipType::Audio && clip.type != drift::ClipType::Video)
+        return;
+    if (clip.lockPitchToStretch == lock)
+        return;
+
+    const drift::Project before = m_project;
+    clip.lockPitchToStretch = lock;
+    pushProjectEdit(before, lock ? tr("Lock pitch to stretch") : tr("Unlock pitch from stretch"));
+    finishEdit(lock ? tr("Pitch locked to stretch") : tr("Pitch preserved during stretch"));
+}
+
+void AppController::setClipInvertPhase(int trackIndex, int clipIndex, bool invert)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked)
+        return;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (clip.type != drift::ClipType::Audio && clip.type != drift::ClipType::Video)
+        return;
+    if (clip.invertPhase == invert)
+        return;
+
+    const drift::Project before = m_project;
+    clip.invertPhase = invert;
+    pushProjectEdit(before, invert ? tr("Invert clip phase") : tr("Restore clip phase"));
+    finishEdit(invert ? tr("Phase inverted") : tr("Phase normal"));
+}
+
+void AppController::setClipAudioChannelMode(int trackIndex, int clipIndex, const QString &mode)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked)
+        return;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (clip.type != drift::ClipType::Audio && clip.type != drift::ClipType::Video)
+        return;
+    const drift::AudioChannelMode parsed = drift::audioChannelModeFromString(mode);
+    if (clip.audioChannelMode == parsed)
+        return;
+
+    const drift::Project before = m_project;
+    clip.audioChannelMode = parsed;
+    pushProjectEdit(before, tr("Change audio channel mode"));
+    finishEdit(tr("Audio channels updated"));
+}
+
+bool AppController::normalizeClipAudio(int trackIndex, int clipIndex, double targetPeakDb)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked)
+        return false;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (!clipCarriesAudio(clip) || clip.path.isEmpty())
+        return false;
+
+    const double peak = scanClipPeakAmplitude(clip);
+    if (peak <= 1e-6) {
+        setLastMessage(tr("Selected clip contains silence; cannot normalize"), QStringLiteral("warning"));
+        return false;
+    }
+
+    const double clampedTargetDb = qBound(-24.0, targetPeakDb, 0.0);
+    const double targetLinear = std::pow(10.0, clampedTargetDb / 20.0);
+    const double gain = qBound(0.01, targetLinear / peak, 16.0);
+    if (qFuzzyCompare(clip.normalizeGain + 1.0, gain + 1.0))
+        return true;
+
+    const drift::Project before = m_project;
+    clip.normalizeGain = gain;
+    pushProjectEdit(before, tr("Normalize audio"));
+    const double boostDb = 20.0 * std::log10(gain);
+    finishEdit(tr("Normalized (%1%2 dB)")
+                   .arg(boostDb > 0.0 ? QStringLiteral("+") : QString())
+                   .arg(boostDb, 0, 'f', 1));
+    return true;
+}
+
+bool AppController::normalizeSelectedClipAudio(double targetPeakDb)
+{
+    QList<QPair<int, int>> pairs = m_selection;
+    if (pairs.isEmpty() && isValidClipIndex(m_selectedTrack, m_selectedClip))
+        pairs.append({m_selectedTrack, m_selectedClip});
+    pairs = withPartners(m_project, pairs);
+    if (pairs.isEmpty())
+        return false;
+
+    const double clampedTargetDb = qBound(-24.0, targetPeakDb, 0.0);
+    const double targetLinear = std::pow(10.0, clampedTargetDb / 20.0);
+
+    const drift::Project before = m_project;
+    bool changed = false;
+    bool sawSilent = false;
+    for (const auto &pair : std::as_const(pairs)) {
+        if (!isValidClipIndex(pair.first, pair.second) || m_project.tracks().at(pair.first).locked)
+            continue;
+        drift::Clip &clip = m_project.tracks()[pair.first].clips[pair.second];
+        if (!clipCarriesAudio(clip) || clip.path.isEmpty())
+            continue;
+        if (clip.type == drift::ClipType::Video && clip.suppressEmbeddedAudio)
+            continue;
+        const double peak = scanClipPeakAmplitude(clip);
+        if (peak <= 1e-6) {
+            sawSilent = true;
+            continue;
+        }
+        const double gain = qBound(0.01, targetLinear / peak, 16.0);
+        if (!qFuzzyCompare(clip.normalizeGain + 1.0, gain + 1.0)) {
+            clip.normalizeGain = gain;
+            changed = true;
+        }
+    }
+    if (!changed) {
+        if (sawSilent)
+            setLastMessage(tr("Selected clip contains silence; cannot normalize"), QStringLiteral("warning"));
+        return false;
+    }
+    pushProjectEdit(before, tr("Normalize audio"));
+    finishEdit(tr("Normalized selected audio to %1 dB").arg(clampedTargetDb, 0, 'f', 1));
+    return true;
+}
+
+void AppController::resetClipNormalize(int trackIndex, int clipIndex)
+{
+    if (!isValidClipIndex(trackIndex, clipIndex) || m_project.tracks().at(trackIndex).locked)
+        return;
+    drift::Clip &clip = m_project.tracks()[trackIndex].clips[clipIndex];
+    if (qFuzzyCompare(clip.normalizeGain + 1.0, 2.0))
+        return;
+
+    const drift::Project before = m_project;
+    clip.normalizeGain = 1.0;
+    pushProjectEdit(before, tr("Reset audio normalization"));
+    finishEdit(tr("Normalization reset"));
 }
 
 void AppController::setClipRotationSnap(int trackIndex, int clipIndex, double degrees)

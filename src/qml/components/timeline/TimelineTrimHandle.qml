@@ -11,6 +11,9 @@ Rectangle {
     property int edge: -1
     property bool isStretch: false
     property real stretchSpeed: 1.0
+    property bool isRoll: false
+    property int rollLeftClip: -1
+    property string rollPartnerId: ""
     readonly property bool trimming: trimMouse.trimming
 
     readonly property bool areaContainsMouse: trimMouse.containsMouse
@@ -194,6 +197,29 @@ Rectangle {
             lastTrimPx = px
             lastTrimSeconds = target
 
+            if (handle.isRoll) {
+                const p = EditorState.previewRollEdit(owner.trackIndex, handle.rollLeftClip, target)
+                if (p.ok) {
+                    const isLeftSide = (p.leftId === owner.clipData.id)
+                    owner.trimPreviewStart = isLeftSide ? p.leftStart : p.rightStart
+                    owner.trimPreviewDuration = isLeftSide ? p.leftDuration : p.rightDuration
+                    owner.trimPreviewIn = isLeftSide ? p.leftIn : p.rightIn
+                    owner.trimPreviewOut = isLeftSide ? p.leftOut : p.rightOut
+                    owner.trimPreviewActive = true
+                    const partnerId = isLeftSide ? p.rightId : p.leftId
+                    handle.rollPartnerId = partnerId
+                    if (owner.trackClips && partnerId) {
+                        owner.trackClips.setLivePreview(partnerId, true,
+                                                        isLeftSide ? p.rightStart : p.leftStart,
+                                                        isLeftSide ? p.rightDuration : p.leftDuration,
+                                                        isLeftSide ? p.rightIn : p.leftIn,
+                                                        isLeftSide ? p.rightOut : p.leftOut)
+                    }
+                    Haptics.trimStep(p.changed ? 1 : 0)
+                }
+                return
+            }
+
             if (handle.isStretch) {
                 const p = EditorState.previewStretchClip(owner.trackIndex, owner.clipIndex, handle.edge, target)
                 if (p.ok) {
@@ -281,11 +307,19 @@ Rectangle {
                 Haptics.select()
             handle.isStretch = (mouse.modifiers & Qt.ControlModifier) !== 0
             handle.stretchSpeed = 1.0
+            handle.rollPartnerId = ""
+            const rollLeft = (!handle.isStretch && owner.panel.timelineTool === "roll")
+                             ? EditorState.rollLeftClipForEdge(owner.trackIndex, owner.clipIndex, handle.edge)
+                             : -1
+            handle.isRoll = rollLeft >= 0
+            handle.rollLeftClip = rollLeft
             // One undo entry and one dirty mark for the whole drag. Without this a trim was
             // invisible to both: it never moved the undo stack index, and the dirty flag is
             // only ever set from that index changing — so trimming, closing, and being asked
             // nothing about saving lost the work outright.
-            if (handle.isStretch)
+            if (handle.isRoll)
+                EditorState.beginPreviewDrag(qsTr("Roll edit"))
+            else if (handle.isStretch)
                 EditorState.beginPreviewDrag(qsTr("Time stretch clip"))
             else
                 EditorState.beginPreviewDrag(qsTr("Trim clip"))
@@ -328,7 +362,15 @@ Rectangle {
                 // geometry bindings are reading the project again by the time it lands.
                 owner.trimPreviewActive = false
                 owner.panel.clearTrimFollow()
-                if (handle.isStretch) {
+                if (handle.rollPartnerId && owner.trackClips)
+                    owner.trackClips.setLivePreview(handle.rollPartnerId, false, 0, 0, 0, 0)
+                if (handle.isRoll) {
+                    EditorState.commitRollEdit(owner.trackIndex, handle.rollLeftClip, lastTrimSeconds)
+                    EditorState.endTrimGesture()
+                    handle.isRoll = false
+                    handle.rollLeftClip = -1
+                    handle.rollPartnerId = ""
+                } else if (handle.isStretch) {
                     EditorState.commitStretchClip(owner.trackIndex, owner.clipIndex,
                                                   handle.edge, lastTrimSeconds)
                     EditorState.endTrimGesture()
@@ -349,9 +391,14 @@ Rectangle {
                 trimming = false
                 owner.trimPreviewActive = false
                 owner.panel.clearTrimFollow()
+                if (handle.rollPartnerId && owner.trackClips)
+                    owner.trackClips.setLivePreview(handle.rollPartnerId, false, 0, 0, 0, 0)
                 EditorState.endTrimGesture()
                 EditorState.cancelPreviewDrag()
                 handle.isStretch = false
+                handle.isRoll = false
+                handle.rollLeftClip = -1
+                handle.rollPartnerId = ""
             }
         }
     }

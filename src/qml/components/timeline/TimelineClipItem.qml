@@ -358,6 +358,11 @@ Item {
         owner: clipItem
     }
 
+    TimelineTopEdgeHandle {
+        id: topEdgeHandle
+        owner: clipItem
+    }
+
     TimelineFadeHandle {
         id: fadeInHandle
         owner: clipItem

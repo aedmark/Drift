@@ -3281,6 +3281,514 @@ bool AppController::nudgeSlipClip(int trackIndex, int clipIndex, int frames)
     return commitSlipClip(trackIndex, clipIndex, deltaSeconds);
 }
 
+namespace {
+
+constexpr drift::TimeUs kEditTouchToleranceUs = 2000;
+
+int findRightTouchingClip(const drift::Track &track, int leftIndex)
+{
+    if (leftIndex < 0 || leftIndex >= track.clips.size())
+        return -1;
+    const drift::TimeUs leftEnd = track.clips.at(leftIndex).timelineEnd();
+    if (leftIndex + 1 < track.clips.size()
+        && qAbs(track.clips.at(leftIndex + 1).timelineStart - leftEnd) <= kEditTouchToleranceUs) {
+        return leftIndex + 1;
+    }
+    for (int i = 0; i < track.clips.size(); ++i) {
+        if (i == leftIndex)
+            continue;
+        if (qAbs(track.clips.at(i).timelineStart - leftEnd) <= kEditTouchToleranceUs)
+            return i;
+    }
+    return -1;
+}
+
+int findLeftTouchingClip(const drift::Track &track, int rightIndex)
+{
+    if (rightIndex < 0 || rightIndex >= track.clips.size())
+        return -1;
+    const drift::TimeUs rightStart = track.clips.at(rightIndex).timelineStart;
+    if (rightIndex - 1 >= 0
+        && qAbs(track.clips.at(rightIndex - 1).timelineEnd() - rightStart) <= kEditTouchToleranceUs) {
+        return rightIndex - 1;
+    }
+    for (int i = 0; i < track.clips.size(); ++i) {
+        if (i == rightIndex)
+            continue;
+        if (qAbs(track.clips.at(i).timelineEnd() - rightStart) <= kEditTouchToleranceUs)
+            return i;
+    }
+    return -1;
+}
+
+void findAdjacentNeighbors(const drift::Track &track, int clipIndex, int *prevOut, int *nextOut)
+{
+    *prevOut = -1;
+    *nextOut = -1;
+    const drift::Clip &clip = track.clips.at(clipIndex);
+    const drift::TimeUs start = clip.timelineStart;
+    const drift::TimeUs end = clip.timelineEnd();
+    drift::TimeUs bestPrevEnd = -1;
+    drift::TimeUs bestNextStart = std::numeric_limits<drift::TimeUs>::max();
+
+    for (int i = 0; i < track.clips.size(); ++i) {
+        if (i == clipIndex)
+            continue;
+        const drift::Clip &other = track.clips.at(i);
+        const drift::TimeUs oEnd = other.timelineEnd();
+        if (oEnd <= start + kEditTouchToleranceUs && oEnd > bestPrevEnd) {
+            bestPrevEnd = oEnd;
+            *prevOut = i;
+        }
+        if (other.timelineStart >= end - kEditTouchToleranceUs && other.timelineStart < bestNextStart) {
+            bestNextStart = other.timelineStart;
+            *nextOut = i;
+        }
+    }
+}
+
+drift::TimeUs timelineExtendBudget(const drift::Project &project, const drift::Clip &clip, bool extendLeft)
+{
+    if (clip.loops())
+        return 0;
+    if (clip.type == drift::ClipType::Image || clip.type == drift::ClipType::Text
+        || clip.type == drift::ClipType::Subtitle || clip.type == drift::ClipType::Shape
+        || clip.type == drift::ClipType::Adjustment || clip.type == drift::ClipType::Vector
+        || clip.type == drift::ClipType::Model3d || clip.type == drift::ClipType::Pdf
+        || clip.type == drift::ClipType::Procedural) {
+        return drift::secondsToUs(36000.0);
+    }
+    const double speed = clip.effectiveSpeed();
+    drift::TimeUs availSrc = 0;
+    if (extendLeft) {
+        if (clip.reverse) {
+            const drift::TimeUs maxSrc = drift::sourceDurationForClip(project, clip);
+            availSrc = maxSrc > 0 ? qMax<drift::TimeUs>(0, maxSrc - clip.srcOut) : 0;
+        } else {
+            availSrc = qMax<drift::TimeUs>(0, clip.srcIn);
+        }
+    } else {
+        if (clip.reverse) {
+            availSrc = qMax<drift::TimeUs>(0, clip.srcIn);
+        } else {
+            const drift::TimeUs maxSrc = drift::sourceDurationForClip(project, clip);
+            availSrc = maxSrc > 0 ? qMax<drift::TimeUs>(0, maxSrc - clip.srcOut) : 0;
+        }
+    }
+    return static_cast<drift::TimeUs>(llround(static_cast<double>(availSrc) / speed));
+}
+
+void applyRightEdgeDelta(drift::Clip &clip, drift::TimeUs delta)
+{
+    const bool synthetic = clip.type == drift::ClipType::Image || clip.type == drift::ClipType::Text
+                           || clip.type == drift::ClipType::Subtitle || clip.type == drift::ClipType::Shape
+                           || clip.type == drift::ClipType::Adjustment || clip.type == drift::ClipType::Vector
+                           || clip.type == drift::ClipType::Model3d || clip.type == drift::ClipType::Pdf
+                           || clip.type == drift::ClipType::Procedural;
+    clip.timelineDuration += delta;
+    if (synthetic) {
+        clip.srcOut = clip.srcIn + clip.timelineDuration;
+    } else {
+        const drift::TimeUs srcDelta = clip.sourceDeltaForTimelineDelta(delta);
+        if (clip.reverse)
+            clip.srcIn = qMax<drift::TimeUs>(0, clip.srcIn - srcDelta);
+        else
+            clip.srcOut = qMax(clip.srcIn + 1, clip.srcOut + srcDelta);
+    }
+    clip.syncDurationFromSpeedCurve();
+}
+
+void applyLeftEdgeDelta(drift::Clip &clip, drift::TimeUs delta)
+{
+    const bool synthetic = clip.type == drift::ClipType::Image || clip.type == drift::ClipType::Text
+                           || clip.type == drift::ClipType::Subtitle || clip.type == drift::ClipType::Shape
+                           || clip.type == drift::ClipType::Adjustment || clip.type == drift::ClipType::Vector
+                           || clip.type == drift::ClipType::Model3d || clip.type == drift::ClipType::Pdf
+                           || clip.type == drift::ClipType::Procedural;
+    clip.timelineStart += delta;
+    clip.timelineDuration -= delta;
+    for (drift::SubtitleCue &cue : clip.subtitleCues) {
+        cue.startUs -= delta;
+        cue.endUs -= delta;
+    }
+    if (synthetic) {
+        if (clip.type == drift::ClipType::Adjustment && clip.adjustmentKind == drift::AdjustmentKind::Mask)
+            clip.srcIn += delta;
+        clip.srcOut = clip.srcIn + clip.timelineDuration;
+    } else {
+        const drift::TimeUs srcDelta = clip.sourceDeltaForTimelineDelta(delta);
+        if (clip.reverse)
+            clip.srcOut = qMax(clip.srcIn + 1, clip.srcOut - srcDelta);
+        else
+            clip.srcIn = qMax<drift::TimeUs>(0, clip.srcIn + srcDelta);
+    }
+    clip.syncDurationFromSpeedCurve();
+}
+
+} // namespace
+
+int AppController::rollLeftClipForEdge(int trackIndex, int clipIndex, int side) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return -1;
+    const drift::Track &track = m_project.tracks().at(trackIndex);
+    if (track.locked || clipIndex < 0 || clipIndex >= track.clips.size())
+        return -1;
+    if (side > 0)
+        return findRightTouchingClip(track, clipIndex) >= 0 ? clipIndex : -1;
+    if (side < 0)
+        return findLeftTouchingClip(track, clipIndex);
+    return -1;
+}
+
+AppController::RollComputation AppController::computeRollEdit(int trackIndex, int leftClipIndex,
+                                                              double targetCutSeconds, bool snap) const
+{
+    RollComputation out;
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return out;
+    const drift::Track &track = m_project.tracks().at(trackIndex);
+    if (track.locked || leftClipIndex < 0 || leftClipIndex >= track.clips.size())
+        return out;
+
+    const int rightClipIndex = findRightTouchingClip(track, leftClipIndex);
+    if (rightClipIndex < 0)
+        return out;
+
+    const drift::Clip &left = track.clips.at(leftClipIndex);
+    const drift::Clip &right = track.clips.at(rightClipIndex);
+    if (left.loops() || right.loops())
+        return out;
+
+    const drift::TimeUs minDur = drift::minClipDurationUs(m_project.fps());
+    const drift::TimeUs oldCutUs = left.timelineEnd();
+    const drift::TimeUs rawTargetUs = qMax<drift::TimeUs>(0, drift::secondsToUs(targetCutSeconds));
+    const drift::TimeUs targetUs = snap ? snapTimeForGesture(rawTargetUs) : rawTargetUs;
+    drift::TimeUs delta = targetUs - oldCutUs;
+
+    drift::TimeUs minDelta = minDur - left.timelineDuration;
+    drift::TimeUs maxDelta = right.timelineDuration - minDur;
+    minDelta = qMax(minDelta, -timelineExtendBudget(m_project, right, true));
+    maxDelta = qMin(maxDelta, timelineExtendBudget(m_project, left, false));
+
+    // Also include touching linked partner pairs if event grouping is active.
+    QList<QPair<int, QPair<int, int>>> partnerIndices;
+    if (!m_ignoreGrouping && !left.linkId.isEmpty() && !right.linkId.isEmpty()) {
+        const QList<drift::ClipRef> leftPartners = drift::linkedPartners(m_project, left);
+        const QList<drift::ClipRef> rightPartners = drift::linkedPartners(m_project, right);
+        for (const drift::ClipRef &lp : leftPartners) {
+            if (lp.trackIndex == trackIndex || m_project.tracks().at(lp.trackIndex).locked)
+                continue;
+            const drift::Track &pTrack = m_project.tracks().at(lp.trackIndex);
+            const drift::Clip &pLeft = pTrack.clips.at(lp.clipIndex);
+            if (qAbs(pLeft.timelineEnd() - oldCutUs) > kEditTouchToleranceUs)
+                continue;
+            for (const drift::ClipRef &rp : rightPartners) {
+                if (rp.trackIndex != lp.trackIndex || rp.clipIndex == lp.clipIndex)
+                    continue;
+                const drift::Clip &pRight = pTrack.clips.at(rp.clipIndex);
+                if (qAbs(pRight.timelineStart - pLeft.timelineEnd()) <= kEditTouchToleranceUs
+                    && !pLeft.loops() && !pRight.loops()) {
+                    minDelta = qMax(minDelta, minDur - pLeft.timelineDuration);
+                    minDelta = qMax(minDelta, -timelineExtendBudget(m_project, pRight, true));
+                    maxDelta = qMin(maxDelta, pRight.timelineDuration - minDur);
+                    maxDelta = qMin(maxDelta, timelineExtendBudget(m_project, pLeft, false));
+                    partnerIndices.append({lp.trackIndex, {lp.clipIndex, rp.clipIndex}});
+                    break;
+                }
+            }
+        }
+    }
+
+    if (minDelta > maxDelta)
+        minDelta = maxDelta = 0;
+
+    delta = qBound(minDelta, delta, maxDelta);
+    out.ok = true;
+    out.rightClipIndex = rightClipIndex;
+    out.newCutUs = oldCutUs + delta;
+    out.changed = (delta != 0);
+    out.leftClip = left;
+    out.rightClip = right;
+    if (out.changed) {
+        applyRightEdgeDelta(out.leftClip, delta);
+        applyLeftEdgeDelta(out.rightClip, delta);
+    }
+    for (const auto &entry : std::as_const(partnerIndices)) {
+        RollPartnerPair pair;
+        pair.trackIndex = entry.first;
+        pair.leftIndex = entry.second.first;
+        pair.rightIndex = entry.second.second;
+        pair.leftClip = m_project.tracks().at(pair.trackIndex).clips.at(pair.leftIndex);
+        pair.rightClip = m_project.tracks().at(pair.trackIndex).clips.at(pair.rightIndex);
+        if (out.changed) {
+            applyRightEdgeDelta(pair.leftClip, delta);
+            applyLeftEdgeDelta(pair.rightClip, delta);
+        }
+        out.partners.append(pair);
+    }
+    return out;
+}
+
+QVariantMap AppController::previewRollEdit(int trackIndex, int leftClipIndex, double targetCutSeconds) const
+{
+    const RollComputation c = computeRollEdit(trackIndex, leftClipIndex, targetCutSeconds, true);
+    if (!c.ok)
+        return {{QStringLiteral("ok"), false}};
+    return QVariantMap{
+        {QStringLiteral("ok"), true},
+        {QStringLiteral("changed"), c.changed},
+        {QStringLiteral("cutSeconds"), drift::usToSeconds(c.newCutUs)},
+        {QStringLiteral("leftId"), c.leftClip.id},
+        {QStringLiteral("leftStart"), drift::usToSeconds(c.leftClip.timelineStart)},
+        {QStringLiteral("leftDuration"), drift::usToSeconds(c.leftClip.timelineDuration)},
+        {QStringLiteral("leftIn"), drift::usToSeconds(c.leftClip.srcIn)},
+        {QStringLiteral("leftOut"), drift::usToSeconds(c.leftClip.srcOut)},
+        {QStringLiteral("rightId"), c.rightClip.id},
+        {QStringLiteral("rightStart"), drift::usToSeconds(c.rightClip.timelineStart)},
+        {QStringLiteral("rightDuration"), drift::usToSeconds(c.rightClip.timelineDuration)},
+        {QStringLiteral("rightIn"), drift::usToSeconds(c.rightClip.srcIn)},
+        {QStringLiteral("rightOut"), drift::usToSeconds(c.rightClip.srcOut)},
+    };
+}
+
+bool AppController::commitRollEdit(int trackIndex, int leftClipIndex, double targetCutSeconds)
+{
+    const RollComputation c = computeRollEdit(trackIndex, leftClipIndex, targetCutSeconds, true);
+    if (!c.ok || !c.changed) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return false;
+    }
+
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+
+    drift::Track &track = m_project.tracks()[trackIndex];
+    track.clips[leftClipIndex] = c.leftClip;
+    track.clips[c.rightClipIndex] = c.rightClip;
+    syncOverlapTransitionsOnTrack(track);
+
+    for (const RollPartnerPair &pair : c.partners) {
+        drift::Track &pTrack = m_project.tracks()[pair.trackIndex];
+        pTrack.clips[pair.leftIndex] = pair.leftClip;
+        pTrack.clips[pair.rightIndex] = pair.rightClip;
+        syncOverlapTransitionsOnTrack(pTrack);
+    }
+
+    syncLinkedAdjustments(m_project);
+    pushProjectEdit(before, tr("Roll edit"));
+    finishEdit(tr("Cut rolled"));
+    return true;
+}
+
+AppController::SlideComputation AppController::computeSlideEdit(int trackIndex, int clipIndex,
+                                                                double targetStartSeconds, bool snap) const
+{
+    SlideComputation out;
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return out;
+    const drift::Track &track = m_project.tracks().at(trackIndex);
+    if (track.locked || clipIndex < 0 || clipIndex >= track.clips.size())
+        return out;
+
+    const drift::Clip &clip = track.clips.at(clipIndex);
+    const drift::TimeUs minDur = drift::minClipDurationUs(m_project.fps());
+    const drift::TimeUs rawStartUs = qMax<drift::TimeUs>(0, drift::secondsToUs(targetStartSeconds));
+    const drift::TimeUs snappedStartUs = snap ? snapTimeForGesture(rawStartUs) : rawStartUs;
+    drift::TimeUs delta = snappedStartUs - clip.timelineStart;
+
+    int prevIdx = -1;
+    int nextIdx = -1;
+    findAdjacentNeighbors(track, clipIndex, &prevIdx, &nextIdx);
+    const bool touchesPrev = prevIdx >= 0
+                             && qAbs(clip.timelineStart - track.clips.at(prevIdx).timelineEnd()) <= kEditTouchToleranceUs;
+    const bool touchesNext = nextIdx >= 0
+                             && qAbs(track.clips.at(nextIdx).timelineStart - clip.timelineEnd()) <= kEditTouchToleranceUs;
+
+    drift::TimeUs minDelta = -clip.timelineStart;
+    drift::TimeUs maxDelta = drift::secondsToUs(36000.0);
+
+    if (prevIdx >= 0) {
+        const drift::Clip &prev = track.clips.at(prevIdx);
+        if (touchesPrev) {
+            minDelta = qMax(minDelta, minDur - prev.timelineDuration);
+            maxDelta = qMin(maxDelta, timelineExtendBudget(m_project, prev, false));
+        } else {
+            minDelta = qMax(minDelta, prev.timelineEnd() - clip.timelineStart);
+        }
+    }
+    if (nextIdx >= 0) {
+        const drift::Clip &next = track.clips.at(nextIdx);
+        if (touchesNext) {
+            minDelta = qMax(minDelta, -timelineExtendBudget(m_project, next, true));
+            maxDelta = qMin(maxDelta, next.timelineDuration - minDur);
+        } else {
+            maxDelta = qMin(maxDelta, next.timelineStart - clip.timelineEnd());
+        }
+    }
+
+    QList<SlidePartnerItem> partnerItems;
+    if (!m_ignoreGrouping && !clip.linkId.isEmpty()) {
+        const QList<drift::ClipRef> partners = drift::linkedPartners(m_project, clip);
+        for (const drift::ClipRef &ref : partners) {
+            if (ref.trackIndex == trackIndex || m_project.tracks().at(ref.trackIndex).locked)
+                continue;
+            const drift::Track &pTrack = m_project.tracks().at(ref.trackIndex);
+            const drift::Clip &pClip = pTrack.clips.at(ref.clipIndex);
+            minDelta = qMax(minDelta, -pClip.timelineStart);
+
+            int pPrev = -1;
+            int pNext = -1;
+            findAdjacentNeighbors(pTrack, ref.clipIndex, &pPrev, &pNext);
+            const bool pTouchPrev = pPrev >= 0
+                                    && qAbs(pClip.timelineStart - pTrack.clips.at(pPrev).timelineEnd()) <= kEditTouchToleranceUs;
+            const bool pTouchNext = pNext >= 0
+                                    && qAbs(pTrack.clips.at(pNext).timelineStart - pClip.timelineEnd()) <= kEditTouchToleranceUs;
+
+            if (pPrev >= 0) {
+                const drift::Clip &prev = pTrack.clips.at(pPrev);
+                if (pTouchPrev) {
+                    minDelta = qMax(minDelta, minDur - prev.timelineDuration);
+                    maxDelta = qMin(maxDelta, timelineExtendBudget(m_project, prev, false));
+                } else {
+                    minDelta = qMax(minDelta, prev.timelineEnd() - pClip.timelineStart);
+                }
+            }
+            if (pNext >= 0) {
+                const drift::Clip &next = pTrack.clips.at(pNext);
+                if (pTouchNext) {
+                    minDelta = qMax(minDelta, -timelineExtendBudget(m_project, next, true));
+                    maxDelta = qMin(maxDelta, next.timelineDuration - minDur);
+                } else {
+                    maxDelta = qMin(maxDelta, next.timelineStart - pClip.timelineEnd());
+                }
+            }
+
+            SlidePartnerItem item;
+            item.trackIndex = ref.trackIndex;
+            item.clipIndex = ref.clipIndex;
+            item.prevIndex = pTouchPrev ? pPrev : -1;
+            item.nextIndex = pTouchNext ? pNext : -1;
+            item.clip = pClip;
+            if (item.prevIndex >= 0)
+                item.prevClip = pTrack.clips.at(item.prevIndex);
+            if (item.nextIndex >= 0)
+                item.nextClip = pTrack.clips.at(item.nextIndex);
+            partnerItems.append(item);
+        }
+    }
+
+    if (minDelta > maxDelta)
+        minDelta = maxDelta = 0;
+
+    delta = qBound(minDelta, delta, maxDelta);
+    out.ok = true;
+    out.changed = (delta != 0);
+    out.clip = clip;
+    out.clip.timelineStart += delta;
+    if (touchesPrev) {
+        out.prevClipIndex = prevIdx;
+        out.prevClip = track.clips.at(prevIdx);
+        if (out.changed)
+            applyRightEdgeDelta(out.prevClip, delta);
+    }
+    if (touchesNext) {
+        out.nextClipIndex = nextIdx;
+        out.nextClip = track.clips.at(nextIdx);
+        if (out.changed)
+            applyLeftEdgeDelta(out.nextClip, delta);
+    }
+    for (SlidePartnerItem &item : partnerItems) {
+        item.clip.timelineStart += delta;
+        if (item.prevIndex >= 0 && out.changed)
+            applyRightEdgeDelta(item.prevClip, delta);
+        if (item.nextIndex >= 0 && out.changed)
+            applyLeftEdgeDelta(item.nextClip, delta);
+        out.partners.append(item);
+    }
+    return out;
+}
+
+QVariantMap AppController::previewSlideEdit(int trackIndex, int clipIndex, double targetStartSeconds) const
+{
+    const SlideComputation c = computeSlideEdit(trackIndex, clipIndex, targetStartSeconds, true);
+    if (!c.ok)
+        return {{QStringLiteral("ok"), false}};
+    QVariantMap result{
+        {QStringLiteral("ok"), true},
+        {QStringLiteral("changed"), c.changed},
+        {QStringLiteral("clipId"), c.clip.id},
+        {QStringLiteral("start"), drift::usToSeconds(c.clip.timelineStart)},
+        {QStringLiteral("duration"), drift::usToSeconds(c.clip.timelineDuration)},
+        {QStringLiteral("inPoint"), drift::usToSeconds(c.clip.srcIn)},
+        {QStringLiteral("outPoint"), drift::usToSeconds(c.clip.srcOut)},
+    };
+    if (c.prevClipIndex >= 0) {
+        result.insert(QStringLiteral("prevId"), c.prevClip.id);
+        result.insert(QStringLiteral("prevStart"), drift::usToSeconds(c.prevClip.timelineStart));
+        result.insert(QStringLiteral("prevDuration"), drift::usToSeconds(c.prevClip.timelineDuration));
+        result.insert(QStringLiteral("prevIn"), drift::usToSeconds(c.prevClip.srcIn));
+        result.insert(QStringLiteral("prevOut"), drift::usToSeconds(c.prevClip.srcOut));
+    }
+    if (c.nextClipIndex >= 0) {
+        result.insert(QStringLiteral("nextId"), c.nextClip.id);
+        result.insert(QStringLiteral("nextStart"), drift::usToSeconds(c.nextClip.timelineStart));
+        result.insert(QStringLiteral("nextDuration"), drift::usToSeconds(c.nextClip.timelineDuration));
+        result.insert(QStringLiteral("nextIn"), drift::usToSeconds(c.nextClip.srcIn));
+        result.insert(QStringLiteral("nextOut"), drift::usToSeconds(c.nextClip.srcOut));
+    }
+    return result;
+}
+
+bool AppController::commitSlideEdit(int trackIndex, int clipIndex, double targetStartSeconds)
+{
+    const SlideComputation c = computeSlideEdit(trackIndex, clipIndex, targetStartSeconds, true);
+    if (!c.ok || !c.changed) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return false;
+    }
+
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+
+    drift::Track &track = m_project.tracks()[trackIndex];
+    track.clips[clipIndex] = c.clip;
+    if (c.prevClipIndex >= 0)
+        track.clips[c.prevClipIndex] = c.prevClip;
+    if (c.nextClipIndex >= 0)
+        track.clips[c.nextClipIndex] = c.nextClip;
+    syncOverlapTransitionsOnTrack(track);
+
+    for (const SlidePartnerItem &item : c.partners) {
+        drift::Track &pTrack = m_project.tracks()[item.trackIndex];
+        pTrack.clips[item.clipIndex] = item.clip;
+        if (item.prevIndex >= 0)
+            pTrack.clips[item.prevIndex] = item.prevClip;
+        if (item.nextIndex >= 0)
+            pTrack.clips[item.nextIndex] = item.nextClip;
+        syncOverlapTransitionsOnTrack(pTrack);
+    }
+
+    syncLinkedAdjustments(m_project);
+    pushProjectEdit(before, tr("Slide edit"));
+    finishEdit(tr("Clip slid"));
+    return true;
+}
+
 // Writes a computed trim back to the project and brings everything that hangs off the clip with
 // it. Shared by both edges.
 int AppController::applyTrim(int trackIndex, int clipIndex, const TrimComputation &computed, int side)

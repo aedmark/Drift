@@ -38,10 +38,52 @@ float softClip(float sample)
 
 double volumeForClip(const drift::Clip &clip, drift::TimeUs timelineUs)
 {
-    if (clip.volume.isEmpty())
-        return 1.0;
-    const drift::TimeUs relative = qMax<drift::TimeUs>(0, timelineUs - clip.timelineStart);
-    return qBound(0.0, clip.volume.evaluateAt(relative), 2.0);
+    double vol = 1.0;
+    if (!clip.volume.isEmpty()) {
+        const drift::TimeUs relative = qMax<drift::TimeUs>(0, timelineUs - clip.timelineStart);
+        vol = qBound(0.0, clip.volume.evaluateAt(relative), 2.0);
+    }
+    return vol * qBound(0.01, clip.normalizeGain, 16.0);
+}
+
+void applyClipAudioSwitches(QVector<float> &out, const drift::Clip &clip)
+{
+    const bool needMode = clip.audioChannelMode != drift::AudioChannelMode::Stereo;
+    const bool needInvert = clip.invertPhase;
+    if (!needMode && !needInvert)
+        return;
+
+    const int frames = out.size() / 2;
+    for (int i = 0; i < frames; ++i) {
+        float l = out[i * 2];
+        float r = out[i * 2 + 1];
+        switch (clip.audioChannelMode) {
+        case drift::AudioChannelMode::LeftOnly:
+            r = l;
+            break;
+        case drift::AudioChannelMode::RightOnly:
+            l = r;
+            break;
+        case drift::AudioChannelMode::CombineMono: {
+            const float m = 0.5f * (l + r);
+            l = m;
+            r = m;
+            break;
+        }
+        case drift::AudioChannelMode::SwapChannels:
+            std::swap(l, r);
+            break;
+        case drift::AudioChannelMode::Stereo:
+        default:
+            break;
+        }
+        if (needInvert) {
+            l = -l;
+            r = -r;
+        }
+        out[i * 2] = l;
+        out[i * 2 + 1] = r;
+    }
 }
 
 // Balance law: attenuate one side, leave the other alone. Unity at centre, unlike a
@@ -101,7 +143,9 @@ drift::TimeUs framesToUs(int frames, int sampleRate)
 quint64 clipAudioIdentity(const drift::Clip &clip)
 {
     return qHashMulti(0, clip.path, clip.srcIn, clip.srcOut, clip.timelineStart, clip.timelineDuration,
-                      clip.reverse, clip.speed, clip.speedCurve.isEmpty(), clip.speedCurve.speedAt(0.0),
+                      clip.reverse, clip.speed, clip.pitchSemitones, clip.lockPitchToStretch,
+                      static_cast<int>(clip.audioChannelMode), clip.invertPhase,
+                      clip.speedCurve.isEmpty(), clip.speedCurve.speedAt(0.0),
                       clip.speedCurve.speedAt(0.25), clip.speedCurve.speedAt(0.5),
                       clip.speedCurve.speedAt(0.75), clip.speedCurve.speedAt(1.0));
 }
@@ -228,11 +272,12 @@ void AudioMixer::readClipAudio(QVector<float> &out, const drift::Clip &clip, qui
     if (wantFrames <= 0)
         return;
 
-    // Whether a clip is retimed is a property of the clip, not of the moment. A ramp that happens
-    // to pass through 1.0 in this block still goes through the stretcher: bypassing it for one
+    // Whether a clip is retimed or pitch-shifted is a property of the clip, not of the moment. A ramp that
+    // happens to pass through 1.0 in this block still goes through the stretcher: bypassing it for one
     // block would skip the source read, leave the retimer's cursor where it was, and re-enter the
     // stream with a hole in it.
-    if (!clip.hasSpeedCurve() && qFuzzyCompare(clip.effectiveSpeed(), 1.0)) {
+    if (!clip.hasSpeedCurve() && !clip.hasVelocityEnvelope() && qFuzzyCompare(clip.effectiveSpeed(), 1.0)
+        && std::abs(clip.pitchSemitones) <= 1e-4) {
         // Frame counts are derived in the sample domain, never by going through microseconds. A
         // block whose duration is not a whole number of microseconds — 1024 frames at 48 kHz is
         // 21333.33 — used to truncate twice, once into µs and once back out, and ask the decoder
@@ -257,6 +302,7 @@ void AudioMixer::readClipAudio(QVector<float> &out, const drift::Clip &clip, qui
             }
         }
         silencePastEnd(out, winStartUs, endUs, sampleRate);
+        applyClipAudioSwitches(out, clip);
         return;
     }
 
@@ -294,6 +340,8 @@ void AudioMixer::readClipAudio(QVector<float> &out, const drift::Clip &clip, qui
     // order, which is exactly what the retimer's cursor means; it walks backwards from there.
     block.sourceStartUs = toSource(playStartUs);
     block.tempo = tempo;
+    block.pitchSemitones = clip.pitchSemitones;
+    block.lockPitchToStretch = clip.lockPitchToStretch;
     block.reverse = clip.reverse;
 
     const QString path = clip.path;
@@ -309,6 +357,7 @@ void AudioMixer::readClipAudio(QVector<float> &out, const drift::Clip &clip, qui
         },
         wantFrames, out.data() + leadFrames * 2);
     silencePastEnd(out, winStartUs, endUs, sampleRate);
+    applyClipAudioSwitches(out, clip);
 }
 
 namespace {
@@ -472,41 +521,66 @@ void accumulateClipAudio(const drift::Project &project, const drift::Clip &clip,
     panGainsForTrack(track, &trackPanL, &trackPanR);
     const float trackVol = static_cast<float>(qMax(0.0, track.volume));
 
-    // The clip gain (volume keys, transition, fades, edge ramps) is evaluated at control points
-    // every kGainStep frames and interpolated between them. Each evaluation walks keyframes and
-    // the track's transitions; doing that per sample was most of the mixer's time, and at 32
-    // frames (under a millisecond) the steps are far finer than any of those curves change.
+    // The clip & track gain (volume keys, transition, fades, edge ramps, track volume/pan/mute envelopes)
+    // is evaluated at control points every kGainStep frames and interpolated between them. Each evaluation
+    // walks keyframes and the track's transitions; doing that per sample was most of the mixer's time, and at
+    // 32 frames (under a millisecond) the steps are far finer than any of those curves change.
     constexpr int kGainStep = 32;
-    const auto gainAt = [&](int frame) {
+    const bool hasTrackVolumeEnv = !track.volumeEnvelope.isEmpty() && track.volumeEnvelope.enabled();
+    const bool hasTrackPanEnv = !track.panEnvelope.isEmpty() && track.panEnvelope.enabled();
+    const bool hasTrackMuteEnv = !track.muteEnvelope.isEmpty() && track.muteEnvelope.enabled();
+    const auto channelScalesAt = [&](int frame, float *scaleLOut, float *scaleROut) {
         const drift::TimeUs t =
             timelineStartUs + static_cast<drift::TimeUs>((static_cast<int64_t>(frame) * drift::kUsPerSecond) / sampleRate);
+        if (hasTrackMuteEnv && track.muteEnvelope.evaluateAt(t) < 0.5) {
+            *scaleLOut = 0.0f;
+            *scaleROut = 0.0f;
+            return;
+        }
+        const float envVol = hasTrackVolumeEnv
+                                 ? static_cast<float>(std::clamp(track.volumeEnvelope.evaluateAt(t), 0.0, 2.0))
+                                 : 1.0f;
+        float tPanL = trackPanL;
+        float tPanR = trackPanR;
+        if (hasTrackPanEnv) {
+            const double effectivePan = qBound(-1.0, track.pan + track.panEnvelope.evaluateAt(t), 1.0);
+            tPanL = static_cast<float>(qMin(1.0, 1.0 - effectivePan));
+            tPanR = static_cast<float>(qMin(1.0, 1.0 + effectivePan));
+        }
         // An edge a butt-cut transition covers is shaped by the transition alone.
-        return static_cast<float>(volumeForClip(clip, t) * transitionGainForClip(track, clip, t, edge)
-                                  * clip.fadeMultiplier(t, edge.ownsIn, edge.ownsOut)
-                                  * clip.audioEdgeMultiplier(t, edge.ownsIn, edge.ownsOut));
+        const float clipGain = static_cast<float>(volumeForClip(clip, t) * transitionGainForClip(track, clip, t, edge)
+                                                  * clip.fadeMultiplier(t, edge.ownsIn, edge.ownsOut)
+                                                  * clip.audioEdgeMultiplier(t, edge.ownsIn, edge.ownsOut));
+        *scaleLOut = clipGain * panL * trackVol * envVol * tPanL;
+        *scaleROut = clipGain * panR * trackVol * envVol * tPanR;
     };
-    const float scaleL = panL * trackVol * trackPanL;
-    const float scaleR = panR * trackVol * trackPanR;
 
     float peakL = 0.0f;
     float peakR = 0.0f;
-    float gainA = frames > 0 ? gainAt(0) : 0.0f;
+    float scaleLA = 0.0f;
+    float scaleRA = 0.0f;
+    if (frames > 0)
+        channelScalesAt(0, &scaleLA, &scaleRA);
     for (int start = 0; start < frames; start += kGainStep) {
         const int end = qMin(frames, start + kGainStep);
         // The span's far end: the next control point, or the block's last frame.
-        const float gainB = end < frames ? gainAt(end) : gainAt(frames - 1);
+        float scaleLB = 0.0f;
+        float scaleRB = 0.0f;
+        channelScalesAt(end < frames ? end : frames - 1, &scaleLB, &scaleRB);
         const int span = end < frames ? kGainStep : qMax(1, frames - 1 - start);
-        const float slope = (gainB - gainA) / float(span);
+        const float slopeL = (scaleLB - scaleLA) / float(span);
+        const float slopeR = (scaleRB - scaleRA) / float(span);
         for (int i = start; i < end; ++i) {
-            const float gain = gainA + slope * float(i - start);
-            const float sampleL = chunk[i * 2] * gain * scaleL;
-            const float sampleR = chunk[i * 2 + 1] * gain * scaleR;
+            const float step = float(i - start);
+            const float sampleL = chunk[i * 2] * (scaleLA + slopeL * step);
+            const float sampleR = chunk[i * 2 + 1] * (scaleRA + slopeR * step);
             mixBuffer[i * 2] += sampleL;
             mixBuffer[i * 2 + 1] += sampleR;
             peakL = qMax(peakL, qAbs(sampleL));
             peakR = qMax(peakR, qAbs(sampleR));
         }
-        gainA = gainB;
+        scaleLA = scaleLB;
+        scaleRA = scaleRB;
     }
     if (outPeakL)
         *outPeakL = qMax(*outPeakL, peakL);

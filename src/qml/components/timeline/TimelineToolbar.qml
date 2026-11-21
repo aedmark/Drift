@@ -60,6 +60,8 @@ Item {
         case "select": panel.timelineTool = ""; break
         case "cut": panel.timelineTool = panel.timelineTool === "split" ? "" : "split"; break
         case "slip": panel.timelineTool = panel.timelineTool === "slip" ? "" : "slip"; break
+        case "roll": panel.timelineTool = panel.timelineTool === "roll" ? "" : "roll"; break
+        case "slide": panel.timelineTool = panel.timelineTool === "slide" ? "" : "slide"; break
         case "trimStart": panel.timelineTool = panel.timelineTool === "trimStart" ? "" : "trimStart"; break
         case "trimEnd": panel.timelineTool = panel.timelineTool === "trimEnd" ? "" : "trimEnd"; break
         case "deleteLeft": EditorState.splitSelectedClipLeft(); break
@@ -106,6 +108,8 @@ Item {
         case "select": return panel.timelineTool === ""
         case "cut": return panel.timelineTool === "split"
         case "slip": return panel.timelineTool === "slip"
+        case "roll": return panel.timelineTool === "roll"
+        case "slide": return panel.timelineTool === "slide"
         case "trimStart": return panel.timelineTool === "trimStart"
         case "trimEnd": return panel.timelineTool === "trimEnd"
         case "markIn": return EditorState.workAreaInSeconds >= 0

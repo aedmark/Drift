@@ -38,6 +38,7 @@ Item {
         trackDimmed: area.dimHidden && (area.trackData.hidden === true
                      || (area.trackData.type === "audio" && area.trackData.muted === true))
         slipToolActive: area.panel && area.panel.timelineTool === "slip"
+        slideToolActive: area.panel && area.panel.timelineTool === "slide"
         editor: EditorState
         assets: AssetLibrary
         haptics: Haptics

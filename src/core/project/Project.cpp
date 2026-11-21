@@ -14,6 +14,7 @@
 #include <QtMath>
 
 #include <algorithm>
+#include <cmath>
 
 namespace drift {
 
@@ -387,6 +388,16 @@ QJsonObject clipToJson(const Clip &clip)
         json.insert(QStringLiteral("anchorZ"), keyframesToJson(clip.anchorZ));
     if (!clip.label.isEmpty())
         json.insert(QStringLiteral("label"), clip.label);
+    if (std::abs(clip.pitchSemitones) > 1e-6)
+        json.insert(QStringLiteral("pitchSemitones"), clip.pitchSemitones);
+    if (clip.lockPitchToStretch)
+        json.insert(QStringLiteral("lockPitchToStretch"), true);
+    if (clip.invertPhase)
+        json.insert(QStringLiteral("invertPhase"), true);
+    if (clip.audioChannelMode != AudioChannelMode::Stereo)
+        json.insert(QStringLiteral("audioChannelMode"), audioChannelModeToString(clip.audioChannelMode));
+    if (!qFuzzyCompare(clip.normalizeGain, 1.0))
+        json.insert(QStringLiteral("normalizeGain"), clip.normalizeGain);
     if (!clip.takes.isEmpty()) {
         QJsonArray takesArray;
         for (const ClipTake &take : clip.takes) {
@@ -575,6 +586,11 @@ Clip clipFromJsonV2(const QJsonObject &object, int version, int canvasW = 1920, 
         clip.volume.setKeyframe(0, object.value(QStringLiteral("volume")).toDouble(1.0));
     }
     clip.pan = object.value(QStringLiteral("pan")).toDouble(0.0);
+    clip.pitchSemitones = qBound(-24.0, object.value(QStringLiteral("pitchSemitones")).toDouble(0.0), 24.0);
+    clip.lockPitchToStretch = object.value(QStringLiteral("lockPitchToStretch")).toBool(false);
+    clip.invertPhase = object.value(QStringLiteral("invertPhase")).toBool(false);
+    clip.audioChannelMode = audioChannelModeFromString(object.value(QStringLiteral("audioChannelMode")).toString());
+    clip.normalizeGain = qBound(0.01, object.value(QStringLiteral("normalizeGain")).toDouble(1.0), 16.0);
     clip.opacity = keyframesFromJson(object.value(QStringLiteral("opacity")).toObject());
     clip.rotation = keyframesFromJson(object.value(QStringLiteral("rotation")).toObject());
     clip.rotationX = keyframesFromJson(object.value(QStringLiteral("rotationX")).toObject());
@@ -1077,6 +1093,10 @@ void detachTrack(Track &track)
     track.audioEffects.detach();
     for (Effect &effect : track.audioEffects)
         detachEffect(effect);
+    track.volumeEnvelope.detachSharedData();
+    track.panEnvelope.detachSharedData();
+    track.compositeEnvelope.detachSharedData();
+    track.muteEnvelope.detachSharedData();
 }
 
 } // namespace
@@ -1619,6 +1639,18 @@ Project Project::fromJson(const QJsonObject &object, QString *errorOut)
             track.excludeFromExport = trackObject.value(QStringLiteral("excludeFromExport")).toBool(false);
             track.volume = trackObject.value(QStringLiteral("volume")).toDouble(1.0);
             track.pan = trackObject.value(QStringLiteral("pan")).toDouble(0.0);
+            if (trackObject.contains(QStringLiteral("volumeEnvelope")))
+                track.volumeEnvelope = keyframesFromJson(trackObject.value(QStringLiteral("volumeEnvelope")).toObject());
+            if (trackObject.contains(QStringLiteral("panEnvelope")))
+                track.panEnvelope = keyframesFromJson(trackObject.value(QStringLiteral("panEnvelope")).toObject());
+            if (trackObject.contains(QStringLiteral("compositeEnvelope")))
+                track.compositeEnvelope = keyframesFromJson(trackObject.value(QStringLiteral("compositeEnvelope")).toObject());
+            if (trackObject.contains(QStringLiteral("muteEnvelope")))
+                track.muteEnvelope = keyframesFromJson(trackObject.value(QStringLiteral("muteEnvelope")).toObject());
+            track.showVolumeEnvelope = trackObject.value(QStringLiteral("showVolumeEnvelope")).toBool(false);
+            track.showPanEnvelope = trackObject.value(QStringLiteral("showPanEnvelope")).toBool(false);
+            track.showCompositeEnvelope = trackObject.value(QStringLiteral("showCompositeEnvelope")).toBool(false);
+            track.showMuteEnvelope = trackObject.value(QStringLiteral("showMuteEnvelope")).toBool(false);
             // Projects before clipDisplay only had a waveform-instead-of-filmstrip flag.
             if (trackObject.contains(QStringLiteral("clipDisplay")))
                 track.clipDisplay = static_cast<Track::ClipDisplay>(
@@ -1888,6 +1920,22 @@ QJsonObject Project::toJson(bool includeTranscripts) const
             // Written only when set, so projects without it stay byte-identical.
             if (track.excludeFromExport)
                 trackObject.insert(QStringLiteral("excludeFromExport"), true);
+            if (!track.volumeEnvelope.isEmpty())
+                trackObject.insert(QStringLiteral("volumeEnvelope"), keyframesToJson(track.volumeEnvelope));
+            if (!track.panEnvelope.isEmpty())
+                trackObject.insert(QStringLiteral("panEnvelope"), keyframesToJson(track.panEnvelope));
+            if (!track.compositeEnvelope.isEmpty())
+                trackObject.insert(QStringLiteral("compositeEnvelope"), keyframesToJson(track.compositeEnvelope));
+            if (!track.muteEnvelope.isEmpty())
+                trackObject.insert(QStringLiteral("muteEnvelope"), keyframesToJson(track.muteEnvelope));
+            if (track.showVolumeEnvelope)
+                trackObject.insert(QStringLiteral("showVolumeEnvelope"), true);
+            if (track.showPanEnvelope)
+                trackObject.insert(QStringLiteral("showPanEnvelope"), true);
+            if (track.showCompositeEnvelope)
+                trackObject.insert(QStringLiteral("showCompositeEnvelope"), true);
+            if (track.showMuteEnvelope)
+                trackObject.insert(QStringLiteral("showMuteEnvelope"), true);
             tracksArray.append(trackObject);
         }
         return tracksArray;

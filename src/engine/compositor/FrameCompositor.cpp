@@ -1043,6 +1043,13 @@ double opacityForClip(const drift::Clip &clip, drift::TimeUs timelineUs)
     return value * clip.fadeMultiplier(timelineUs);
 }
 
+double trackCompositeOpacity(const drift::Track &track, drift::TimeUs timelineUs)
+{
+    if (track.compositeEnvelope.isEmpty() || !track.compositeEnvelope.enabled())
+        return 1.0;
+    return qBound(0.0, track.compositeEnvelope.evaluateAt(timelineUs), 1.0);
+}
+
 // Layout is stored in project pixels. Preview/export canvases may be scaled
 // via renderScale — always map project → canvas here so WYSIWYG handles match.
 // The rect is the scaled box with the rotation pivot folded in (see clipPlacementAt).
@@ -2023,6 +2030,8 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
             continue;
 
 
+        const double trackComposite = trackCompositeOpacity(track, timelineUs);
+
         QSet<QString> transitionClipIds;
         drift::TimeUs transitionStart = 0;
         drift::TimeUs transitionEnd = 0;
@@ -2042,6 +2051,8 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
                                         width, height, fps,
                                         laneAdjustmentEffects(project, ti, timelineUs, toClip->id),
                                         drift::laneMasksAt(project, ti, timelineUs, toClip->id));
+                item.from.opacity *= trackComposite;
+                item.to.opacity *= trackComposite;
                 applyParent(item.from, ti);
                 applyParent(item.to, ti);
                 // Both sides of a transition are placed before the shader mixes them, so each one
@@ -2104,7 +2115,7 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
                                       timelineUs, width, height, renderScale, fps);
                 }
                 item.layer.rect = QRectF(0, 0, width, height);
-                item.layer.opacity = opacityForClip(clip, timelineUs);
+                item.layer.opacity = opacityForClip(clip, timelineUs) * trackComposite;
                 item.layer.clipTimeUs = timelineUs - clip.timelineStart;
                 item.layer.frameRate = fps;
                 item.layer.historyScope = t_historyScope;
@@ -2124,6 +2135,7 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
                                        drift::laneMasksAt(project, ti, timelineUs, clip.id), editingText);
             if (!item.layer.valid)
                 continue;
+            item.layer.opacity *= trackComposite;
             applyParent(item.layer, ti);
             applyCamera(item.layer);
 #ifdef DRIFT_WITH_SKIA

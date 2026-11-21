@@ -71,6 +71,15 @@ public:
         TakesRole,
         ActiveTakeIndexRole,
         TakeCountRole,
+        BaseOpacityRole,
+        OpacityKeyframedRole,
+        BaseVolumeRole,
+        VolumeKeyframedRole,
+        PitchSemitonesRole,
+        LockPitchToStretchRole,
+        InvertPhaseRole,
+        AudioChannelModeRole,
+        NormalizeGainRole,
     };
     Q_ENUM(Role)
 
@@ -117,6 +126,15 @@ public:
         int activeTakeIndex = 0;
         int takeCount = 0;
         QVariantList takes;
+        double baseOpacity = 1.0;
+        bool opacityKeyframed = false;
+        double baseVolume = 1.0;
+        bool volumeKeyframed = false;
+        double pitchSemitones = 0.0;
+        bool lockPitchToStretch = false;
+        bool invertPhase = false;
+        QString audioChannelMode;
+        double normalizeGain = 1.0;
 
         // Not roles: typed copies for the scene-graph renderer, derived from the fields above so
         // any change to them already arrives as a changed row.

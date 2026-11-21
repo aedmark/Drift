@@ -189,8 +189,13 @@ QStringList changedTrackFields(const Track &a, const Track &b, int fromIndex, in
         fields.append(QStringLiteral("solo"));
     if (a.excludeFromExport != b.excludeFromExport)
         fields.append(QStringLiteral("exclude_from_export"));
-    if (!qFuzzyCompare(a.volume, b.volume) || !qFuzzyCompare(1.0 + a.pan, 1.0 + b.pan))
+    if (!qFuzzyCompare(a.volume, b.volume) || !qFuzzyCompare(1.0 + a.pan, 1.0 + b.pan)
+        || a.volumeEnvelope.keyframes() != b.volumeEnvelope.keyframes()
+        || a.panEnvelope.keyframes() != b.panEnvelope.keyframes()
+        || a.muteEnvelope.keyframes() != b.muteEnvelope.keyframes())
         fields.append(QStringLiteral("audio"));
+    if (a.compositeEnvelope.keyframes() != b.compositeEnvelope.keyframes())
+        fields.append(QStringLiteral("composite"));
     if (!sameTransitions(a, b))
         fields.append(QStringLiteral("transitions"));
     if (a.adjustmentScope != b.adjustmentScope || a.parentTrackId != b.parentTrackId || a.spanEndTrackId != b.spanEndTrackId)

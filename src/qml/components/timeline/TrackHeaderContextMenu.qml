@@ -84,11 +84,60 @@ ThemedContextMenu {
     // A review track: still shown and heard while editing, never exported. Not offered for a
     // transform or camera layer, whose absence would silently reframe everything under it.
     ThemedMenuItem {
-        visible: (!header.isTransformLayer && !header.isCameraLayer) || header.trackExcludedFromExport
-        height: visible ? implicitHeight : 0
+        visible: header.trackType === "video" || header.trackType === "audio"
+                 || header.trackType === "text" || header.trackType === "shape"
+                 || header.trackType === "subtitle"
         text: header.trackExcludedFromExport ? qsTr("Include in export") : qsTr("Exclude from export")
         icon.name: Theme.icons.film
         onTriggered: EditorState.setTrackExcludedFromExport(header.index, !header.trackExcludedFromExport)
+    }
+    ThemedContextMenu {
+        title: qsTr("Envelopes")
+        icon.name: Theme.icons.trendingUp
+        visible: (header.trackType === "video" || header.trackType === "audio"
+                  || header.trackType === "text" || header.trackType === "shape"
+                  || header.trackType === "subtitle")
+                 && !header.isTransformLayer && !header.isCameraLayer
+
+        ThemedMenuItem {
+            visible: header.trackType === "audio" || header.trackType === "video"
+            text: qsTr("Volume Envelope (Shift+V)")
+            checkable: true
+            checked: column.tracks[header.index]?.showVolumeEnvelope === true
+            onTriggered: EditorState.toggleTrackEnvelope(header.index, "volume")
+        }
+        ThemedMenuItem {
+            visible: header.trackType === "audio" || header.trackType === "video"
+            text: qsTr("Pan Envelope (Shift+P)")
+            checkable: true
+            checked: column.tracks[header.index]?.showPanEnvelope === true
+            onTriggered: EditorState.toggleTrackEnvelope(header.index, "pan")
+        }
+        ThemedMenuItem {
+            visible: header.trackType === "video" || header.trackType === "text"
+                     || header.trackType === "shape" || header.trackType === "subtitle"
+            text: qsTr("Composite Level Envelope (Alt+Shift+V)")
+            checkable: true
+            checked: column.tracks[header.index]?.showCompositeEnvelope === true
+            onTriggered: EditorState.toggleTrackEnvelope(header.index, "composite")
+        }
+        ThemedMenuItem {
+            visible: header.trackType === "audio" || header.trackType === "video"
+            text: qsTr("Mute Envelope (Alt+Shift+M)")
+            checkable: true
+            checked: column.tracks[header.index]?.showMuteEnvelope === true
+            onTriggered: EditorState.toggleTrackEnvelope(header.index, "mute")
+        }
+        ThemedMenuSeparator {}
+        ThemedMenuItem {
+            text: qsTr("Clear All Envelopes")
+            icon.name: Theme.icons.trash
+            enabled: (column.tracks[header.index]?.volumeEnvelopePoints?.length || 0) > 0
+                     || (column.tracks[header.index]?.panEnvelopePoints?.length || 0) > 0
+                     || (column.tracks[header.index]?.compositeEnvelopePoints?.length || 0) > 0
+                     || (column.tracks[header.index]?.muteEnvelopePoints?.length || 0) > 0
+            onTriggered: EditorState.clearAllTrackEnvelopes(header.index)
+        }
     }
     ThemedMenuSeparator {
         visible: header.isTransformLayer || header.transformable

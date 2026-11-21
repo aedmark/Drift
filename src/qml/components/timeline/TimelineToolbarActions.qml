@@ -16,6 +16,10 @@ QtObject {
                  tip: qsTr("Cut mode — click a clip to split it"), shortcut: "bladeTool" },
         "slip": { glyph: Theme.icons.chevronsRightLeft, label: qsTr("Slip mode"),
                   tip: qsTr("Slip mode — drag within clip boundaries to shift media (Alt+drag)"), shortcut: "slipTool" },
+        "roll": { glyph: Theme.icons.split, label: qsTr("Roll edit mode"),
+                  tip: qsTr("Roll edit — drag a cut edge between touching clips to move the edit point"), shortcut: "rollTool" },
+        "slide": { glyph: Theme.icons.moveHorizontal, label: qsTr("Slide edit mode"),
+                   tip: qsTr("Slide edit — drag a clip between touching neighbors without changing its content"), shortcut: "slideTool" },
         "separateAudio": { glyph: Theme.icons.audioLines, label: qsTr("Show audio on separate track"),
                            shortcut: "separateAudio" },
         "unlink": { glyph: Theme.icons.unlink, label: qsTr("Unlink video and audio"),
@@ -60,7 +64,7 @@ QtObject {
         "separateAudio", "unlink", "link"
     ]
     readonly property var defaultMenuItems: [
-        "trimStart", "trimEnd", "separator", "copy", "paste", "duplicate", "separator",
+        "roll", "slide", "trimStart", "trimEnd", "separator", "copy", "paste", "duplicate", "separator",
         "bookmark", "markIn", "markOut", "loop", "clearWorkArea", "separator",
         "merge", "freeze", "adjustmentLayer", "transformLayer", "camera"
     ]

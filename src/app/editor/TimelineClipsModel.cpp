@@ -59,6 +59,15 @@ QList<int> changedRoles(const TimelineClipsModel::Row &a, const TimelineClipsMod
     diff(a.activeTakeIndex != b.activeTakeIndex, TimelineClipsModel::ActiveTakeIndexRole);
     diff(a.takeCount != b.takeCount, TimelineClipsModel::TakeCountRole);
     diff(a.takes != b.takes, TimelineClipsModel::TakesRole);
+    diff(!qFuzzyCompare(a.baseOpacity + 1.0, b.baseOpacity + 1.0), TimelineClipsModel::BaseOpacityRole);
+    diff(a.opacityKeyframed != b.opacityKeyframed, TimelineClipsModel::OpacityKeyframedRole);
+    diff(!qFuzzyCompare(a.baseVolume + 1.0, b.baseVolume + 1.0), TimelineClipsModel::BaseVolumeRole);
+    diff(a.volumeKeyframed != b.volumeKeyframed, TimelineClipsModel::VolumeKeyframedRole);
+    diff(!qFuzzyCompare(a.pitchSemitones + 25.0, b.pitchSemitones + 25.0), TimelineClipsModel::PitchSemitonesRole);
+    diff(a.lockPitchToStretch != b.lockPitchToStretch, TimelineClipsModel::LockPitchToStretchRole);
+    diff(a.invertPhase != b.invertPhase, TimelineClipsModel::InvertPhaseRole);
+    diff(a.audioChannelMode != b.audioChannelMode, TimelineClipsModel::AudioChannelModeRole);
+    diff(!qFuzzyCompare(a.normalizeGain + 1.0, b.normalizeGain + 1.0), TimelineClipsModel::NormalizeGainRole);
     return roles;
 }
 
@@ -241,6 +250,15 @@ QVariant TimelineClipsModel::data(const QModelIndex &index, int role) const
     case ActiveTakeIndexRole: return row.activeTakeIndex;
     case TakeCountRole: return row.takeCount;
     case TakesRole: return row.takes;
+    case BaseOpacityRole: return row.baseOpacity;
+    case OpacityKeyframedRole: return row.opacityKeyframed;
+    case BaseVolumeRole: return row.baseVolume;
+    case VolumeKeyframedRole: return row.volumeKeyframed;
+    case PitchSemitonesRole: return row.pitchSemitones;
+    case LockPitchToStretchRole: return row.lockPitchToStretch;
+    case InvertPhaseRole: return row.invertPhase;
+    case AudioChannelModeRole: return row.audioChannelMode;
+    case NormalizeGainRole: return row.normalizeGain;
     default: return {};
     }
 }
@@ -287,6 +305,15 @@ QHash<int, QByteArray> TimelineClipsModel::roleNames() const
         {ActiveTakeIndexRole, "activeTakeIndex"},
         {TakeCountRole, "takeCount"},
         {TakesRole, "takes"},
+        {BaseOpacityRole, "baseOpacity"},
+        {OpacityKeyframedRole, "opacityKeyframed"},
+        {BaseVolumeRole, "baseVolume"},
+        {VolumeKeyframedRole, "volumeKeyframed"},
+        {PitchSemitonesRole, "pitchSemitones"},
+        {LockPitchToStretchRole, "lockPitchToStretch"},
+        {InvertPhaseRole, "invertPhase"},
+        {AudioChannelModeRole, "audioChannelMode"},
+        {NormalizeGainRole, "normalizeGain"},
     };
 }
 

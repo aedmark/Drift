@@ -2124,6 +2124,15 @@ PanelFrame {
                                         panel: root
                                         trackIndex: trackClipArea.trackIndex
                                     }
+
+                                    // VEGAS-style track automation envelopes (Volume, Pan, Composite, Mute)
+                                    TimelineTrackEnvelope {
+                                        anchors.fill: parent
+                                        z: 15
+                                        panel: root
+                                        trackIndex: trackClipArea.trackIndex
+                                        trackData: trackRow.trackData
+                                    }
                                 }
 
                                 // Right-click a gap to ripple everything after it (and any

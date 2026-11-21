@@ -147,6 +147,16 @@ QHash<QString, QString> defaultShortcuts()
         {QStringLiteral("selectTool"), QStringLiteral("V")},
         {QStringLiteral("bladeTool"), QStringLiteral("B")},
         {QStringLiteral("slipTool"), QStringLiteral("Y")},
+        {QStringLiteral("rollTool"), QStringLiteral("Shift+R")},
+        {QStringLiteral("slideTool"), QStringLiteral("Shift+Y")},
+        {QStringLiteral("cycleEditTool"), QStringLiteral("D")},
+        {QStringLiteral("toggleTrackVolumeEnvelope"), QStringLiteral("Shift+V")},
+        {QStringLiteral("toggleTrackPanEnvelope"), QStringLiteral("Shift+P")},
+        {QStringLiteral("toggleTrackCompositeEnvelope"), QStringLiteral("Alt+Shift+V")},
+        {QStringLiteral("toggleTrackMuteEnvelope"), QStringLiteral("Alt+Shift+M")},
+        {QStringLiteral("normalizeAudio"), QStringLiteral("Shift+N")},
+        {QStringLiteral("pitchUp"), QStringLiteral("Alt+Shift+=")},
+        {QStringLiteral("pitchDown"), QStringLiteral("Alt+Shift+-")},
         // Masking workspace tools. The masking panel claims these only while the pointer is over the
         // preview or it has focus or hover (never in 3D mode), so they stay free on the timeline.
         {QStringLiteral("maskingPolygonTool"), QStringLiteral("P")},
@@ -378,6 +388,316 @@ double AppController::trackPan(int trackIndex) const
     if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
         return 0.0;
     return m_project.tracks().at(trackIndex).pan;
+}
+
+namespace {
+
+bool trackEnvelopeSupported(const drift::Track &track, const QString &kind)
+{
+    if (track.isAdjustment() || track.isTransformLayer() || track.isCameraLayer())
+        return false;
+    if (kind == QLatin1String("volume") || kind == QLatin1String("pan"))
+        return track.type == drift::TrackType::Audio || track.type == drift::TrackType::Video;
+    if (kind == QLatin1String("composite"))
+        return track.type == drift::TrackType::Video || track.type == drift::TrackType::Text
+               || track.type == drift::TrackType::Shape || track.type == drift::TrackType::Subtitle;
+    if (kind == QLatin1String("mute"))
+        return track.type == drift::TrackType::Audio || track.type == drift::TrackType::Video;
+    return false;
+}
+
+drift::KeyframeTrack<double> *trackEnvelopePtr(drift::Track &track, const QString &kind)
+{
+    if (kind == QLatin1String("volume"))
+        return &track.volumeEnvelope;
+    if (kind == QLatin1String("pan"))
+        return &track.panEnvelope;
+    if (kind == QLatin1String("composite"))
+        return &track.compositeEnvelope;
+    if (kind == QLatin1String("mute"))
+        return &track.muteEnvelope;
+    return nullptr;
+}
+
+bool *trackEnvelopeVisiblePtr(drift::Track &track, const QString &kind)
+{
+    if (kind == QLatin1String("volume"))
+        return &track.showVolumeEnvelope;
+    if (kind == QLatin1String("pan"))
+        return &track.showPanEnvelope;
+    if (kind == QLatin1String("composite"))
+        return &track.showCompositeEnvelope;
+    if (kind == QLatin1String("mute"))
+        return &track.showMuteEnvelope;
+    return nullptr;
+}
+
+double trackEnvelopeDefaultValue(const QString &kind)
+{
+    if (kind == QLatin1String("pan"))
+        return 0.0;
+    return 1.0;
+}
+
+double clampTrackEnvelopeValue(const QString &kind, double value)
+{
+    if (kind == QLatin1String("volume"))
+        return std::clamp(value, 0.0, 2.0);
+    if (kind == QLatin1String("pan"))
+        return std::clamp(value, -1.0, 1.0);
+    if (kind == QLatin1String("composite"))
+        return std::clamp(value, 0.0, 1.0);
+    if (kind == QLatin1String("mute"))
+        return value < 0.5 ? 0.0 : 1.0;
+    return value;
+}
+
+QString trackEnvelopeLabel(const QString &kind)
+{
+    if (kind == QLatin1String("volume"))
+        return AppController::tr("volume");
+    if (kind == QLatin1String("pan"))
+        return AppController::tr("pan");
+    if (kind == QLatin1String("composite"))
+        return AppController::tr("composite level");
+    if (kind == QLatin1String("mute"))
+        return AppController::tr("mute");
+    return kind;
+}
+
+} // namespace
+
+void AppController::toggleTrackEnvelope(int trackIndex, const QString &kind)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    const drift::Track &cur = m_project.tracks().at(trackIndex);
+    if (!trackEnvelopeSupported(cur, kind))
+        return;
+
+    const bool nextVisible = !(kind == QLatin1String("volume") ? cur.showVolumeEnvelope
+                               : kind == QLatin1String("pan") ? cur.showPanEnvelope
+                               : kind == QLatin1String("composite") ? cur.showCompositeEnvelope
+                               : cur.showMuteEnvelope);
+    setTrackEnvelopeVisible(trackIndex, kind, nextVisible);
+}
+
+void AppController::setTrackEnvelopeVisible(int trackIndex, const QString &kind, bool visible)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (!trackEnvelopeSupported(track, kind))
+        return;
+    bool *visPtr = trackEnvelopeVisiblePtr(track, kind);
+    drift::KeyframeTrack<double> *envPtr = trackEnvelopePtr(track, kind);
+    if (!visPtr || !envPtr)
+        return;
+    if (*visPtr == visible && (!visible || !envPtr->isEmpty()))
+        return;
+
+    const drift::Project before = m_project;
+    *visPtr = visible;
+    if (visible && envPtr->isEmpty()) {
+        envPtr->setKeyframe(0, trackEnvelopeDefaultValue(kind));
+        if (kind == QLatin1String("mute"))
+            envPtr->setEasing(0, drift::Interpolation::Hold);
+    }
+    pushProjectEdit(before, visible ? tr("Show track %1 envelope").arg(trackEnvelopeLabel(kind))
+                                    : tr("Hide track %1 envelope").arg(trackEnvelopeLabel(kind)));
+    finishEdit(visible ? tr("Track %1 envelope enabled").arg(trackEnvelopeLabel(kind))
+                       : tr("Track %1 envelope hidden").arg(trackEnvelopeLabel(kind)));
+}
+
+void AppController::addTrackEnvelopePoint(int trackIndex, const QString &kind, double timeSeconds, double value)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (track.locked || !trackEnvelopeSupported(track, kind))
+        return;
+    drift::KeyframeTrack<double> *env = trackEnvelopePtr(track, kind);
+    bool *visPtr = trackEnvelopeVisiblePtr(track, kind);
+    if (!env || !visPtr)
+        return;
+
+    const drift::TimeUs timeUs = qMax<drift::TimeUs>(0, drift::secondsToUs(timeSeconds));
+    const double clamped = clampTrackEnvelopeValue(kind, value);
+
+    const drift::Project before = m_project;
+    *visPtr = true;
+    env->setKeyframe(timeUs, clamped);
+    if (kind == QLatin1String("mute"))
+        env->setEasing(timeUs, drift::Interpolation::Hold);
+    pushProjectEdit(before, tr("Add track %1 envelope point").arg(trackEnvelopeLabel(kind)));
+    finishEdit(tr("Envelope point added"));
+}
+
+void AppController::previewMoveTrackEnvelopePoint(int trackIndex, const QString &kind,
+                                                  double oldTimeSeconds, double newTimeSeconds, double newValue)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (track.locked || !trackEnvelopeSupported(track, kind))
+        return;
+    drift::KeyframeTrack<double> *env = trackEnvelopePtr(track, kind);
+    if (!env)
+        return;
+
+    beginImplicitPreviewDrag(tr("Edit track %1 envelope").arg(trackEnvelopeLabel(kind)));
+
+    const drift::TimeUs oldUs = qMax<drift::TimeUs>(0, drift::secondsToUs(oldTimeSeconds));
+    const drift::TimeUs newUs = qMax<drift::TimeUs>(0, drift::secondsToUs(newTimeSeconds));
+    const drift::TimeUs found = env->nearestKeyframe(oldUs, drift::TimeUs{2000});
+    if (found >= 0 && found != newUs)
+        env->removeKeyframe(found);
+    else if (oldUs != newUs)
+        env->removeKeyframe(oldUs);
+
+    const double clamped = clampTrackEnvelopeValue(kind, newValue);
+    env->setKeyframe(newUs, clamped);
+    if (kind == QLatin1String("mute"))
+        env->setEasing(newUs, drift::Interpolation::Hold);
+    m_previewDragDirty = true;
+    emitPreviewFrame();
+}
+
+void AppController::commitMoveTrackEnvelopePoint(int trackIndex, const QString &kind,
+                                                 double oldTimeSeconds, double newTimeSeconds, double newValue)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size()) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return;
+    }
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (track.locked || !trackEnvelopeSupported(track, kind)) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return;
+    }
+    drift::KeyframeTrack<double> *env = trackEnvelopePtr(track, kind);
+    if (!env) {
+        if (m_previewDragActive)
+            cancelPreviewDrag();
+        return;
+    }
+
+    const drift::Project before = m_previewDragActive ? m_previewDragBefore : m_project;
+    if (m_previewDragActive) {
+        m_previewAutoCommit->stop();
+        m_previewDragAuto = false;
+        m_previewDragActive = false;
+        m_previewDragDirty = false;
+        emit previewDragActiveChanged();
+    }
+
+    const drift::TimeUs oldUs = qMax<drift::TimeUs>(0, drift::secondsToUs(oldTimeSeconds));
+    const drift::TimeUs newUs = qMax<drift::TimeUs>(0, drift::secondsToUs(newTimeSeconds));
+    const drift::TimeUs found = env->nearestKeyframe(oldUs, drift::TimeUs{2000});
+    if (found >= 0 && found != newUs)
+        env->removeKeyframe(found);
+    else if (oldUs != newUs)
+        env->removeKeyframe(oldUs);
+
+    const double clamped = clampTrackEnvelopeValue(kind, newValue);
+    env->setKeyframe(newUs, clamped);
+    if (kind == QLatin1String("mute"))
+        env->setEasing(newUs, drift::Interpolation::Hold);
+
+    pushProjectEdit(before, tr("Edit track %1 envelope").arg(trackEnvelopeLabel(kind)));
+    finishEdit(tr("Track %1 envelope updated").arg(trackEnvelopeLabel(kind)));
+}
+
+void AppController::removeTrackEnvelopePoint(int trackIndex, const QString &kind, double timeSeconds)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (track.locked || !trackEnvelopeSupported(track, kind))
+        return;
+    drift::KeyframeTrack<double> *env = trackEnvelopePtr(track, kind);
+    if (!env || env->isEmpty())
+        return;
+
+    const drift::TimeUs targetUs = qMax<drift::TimeUs>(0, drift::secondsToUs(timeSeconds));
+    const drift::TimeUs found = env->nearestKeyframe(targetUs, drift::TimeUs{20000});
+    if (found < 0)
+        return;
+
+    const drift::Project before = m_project;
+    env->removeKeyframe(found);
+    if (env->isEmpty())
+        *trackEnvelopeVisiblePtr(track, kind) = false;
+    pushProjectEdit(before, tr("Remove track %1 envelope point").arg(trackEnvelopeLabel(kind)));
+    finishEdit(tr("Envelope point removed"));
+}
+
+void AppController::clearTrackEnvelope(int trackIndex, const QString &kind)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (track.locked || !trackEnvelopeSupported(track, kind))
+        return;
+    drift::KeyframeTrack<double> *env = trackEnvelopePtr(track, kind);
+    bool *visPtr = trackEnvelopeVisiblePtr(track, kind);
+    if (!env || !visPtr)
+        return;
+    if (env->isEmpty() && !*visPtr)
+        return;
+
+    const drift::Project before = m_project;
+    env->clearKeyframes();
+    *visPtr = false;
+    pushProjectEdit(before, tr("Clear track %1 envelope").arg(trackEnvelopeLabel(kind)));
+    finishEdit(tr("Track %1 envelope cleared").arg(trackEnvelopeLabel(kind)));
+}
+
+void AppController::clearAllTrackEnvelopes(int trackIndex)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Track &track = m_project.tracks()[trackIndex];
+    if (track.locked)
+        return;
+    const bool any = !track.volumeEnvelope.isEmpty() || !track.panEnvelope.isEmpty()
+                     || !track.compositeEnvelope.isEmpty() || !track.muteEnvelope.isEmpty()
+                     || track.showVolumeEnvelope || track.showPanEnvelope
+                     || track.showCompositeEnvelope || track.showMuteEnvelope;
+    if (!any)
+        return;
+
+    const drift::Project before = m_project;
+    track.volumeEnvelope.clearKeyframes();
+    track.panEnvelope.clearKeyframes();
+    track.compositeEnvelope.clearKeyframes();
+    track.muteEnvelope.clearKeyframes();
+    track.showVolumeEnvelope = false;
+    track.showPanEnvelope = false;
+    track.showCompositeEnvelope = false;
+    track.showMuteEnvelope = false;
+    pushProjectEdit(before, tr("Clear all track envelopes"));
+    finishEdit(tr("Track envelopes cleared"));
+}
+
+void AppController::toggleSelectedTrackEnvelope(const QString &kind)
+{
+    int target = -1;
+    if (m_selectedTrack >= 0 && m_selectedTrack < m_project.tracks().size()
+        && trackEnvelopeSupported(m_project.tracks().at(m_selectedTrack), kind)) {
+        target = m_selectedTrack;
+    } else {
+        for (int i = 0; i < m_project.tracks().size(); ++i) {
+            if (trackEnvelopeSupported(m_project.tracks().at(i), kind)) {
+                target = i;
+                break;
+            }
+        }
+    }
+    if (target >= 0)
+        toggleTrackEnvelope(target, kind);
 }
 
 QVariantMap AppController::trackAudioLevels(int trackIndex) const
@@ -1879,6 +2199,20 @@ void AppController::triggerAction(const QString &actionId)
         setPlaying(true);
     } else if (actionId == QStringLiteral("speedDown"))
         m_playback.stepPlaybackRate(-1);
+    else if (actionId == QStringLiteral("toggleTrackVolumeEnvelope"))
+        toggleSelectedTrackEnvelope(QStringLiteral("volume"));
+    else if (actionId == QStringLiteral("toggleTrackPanEnvelope"))
+        toggleSelectedTrackEnvelope(QStringLiteral("pan"));
+    else if (actionId == QStringLiteral("toggleTrackCompositeEnvelope"))
+        toggleSelectedTrackEnvelope(QStringLiteral("composite"));
+    else if (actionId == QStringLiteral("toggleTrackMuteEnvelope"))
+        toggleSelectedTrackEnvelope(QStringLiteral("mute"));
+    else if (actionId == QStringLiteral("normalizeAudio"))
+        normalizeSelectedClipAudio();
+    else if (actionId == QStringLiteral("pitchUp"))
+        nudgeSelectedClipPitch(1.0);
+    else if (actionId == QStringLiteral("pitchDown"))
+        nudgeSelectedClipPitch(-1.0);
 }
 
 void AppController::undo()

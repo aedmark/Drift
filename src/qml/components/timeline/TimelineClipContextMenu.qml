@@ -295,6 +295,101 @@ ThemedContextMenu {
         visible: owner.clipData.kind === "video" || owner.clipData.kind === "audio"
         onTriggered: EditorState.setClipLoop(owner.trackIndex, owner.clipIndex, !owner.clipData.loop)
     }
+    ThemedContextMenu {
+        title: qsTr("Audio Switches")
+        icon.name: Theme.icons.audioLines
+        visible: (owner.clipData.kind === "audio"
+                  || (owner.clipData.kind === "video" && !!owner.clipData.hasEmbeddedAudio))
+                 && !owner.isTransformClip
+
+        ThemedMenuItem {
+            text: qsTr("Normalize (Shift+N)")
+            icon.name: Theme.icons.sliders
+            onTriggered: EditorState.normalizeClipAudio(owner.trackIndex, owner.clipIndex, -0.1)
+        }
+        ThemedMenuItem {
+            text: qsTr("Reset Normalization")
+            visible: Math.abs((owner.clipData.normalizeGain !== undefined ? owner.clipData.normalizeGain : 1.0) - 1.0) > 0.005
+            onTriggered: EditorState.resetClipNormalize(owner.trackIndex, owner.clipIndex)
+        }
+        ThemedMenuSeparator {}
+        ThemedMenuItem {
+            text: qsTr("Invert Phase")
+            checkable: true
+            checked: !!owner.clipData.invertPhase
+            onTriggered: EditorState.setClipInvertPhase(owner.trackIndex, owner.clipIndex, !owner.clipData.invertPhase)
+        }
+        ThemedMenuItem {
+            text: qsTr("Lock Pitch to Stretch")
+            checkable: true
+            checked: !!owner.clipData.lockPitchToStretch
+            onTriggered: EditorState.setClipLockPitchToStretch(owner.trackIndex, owner.clipIndex, !owner.clipData.lockPitchToStretch)
+        }
+        ThemedContextMenu {
+            title: qsTr("Channels")
+
+            ThemedMenuItem {
+                text: qsTr("Stereo (Normal)")
+                checkable: true
+                checked: (owner.clipData.audioChannelMode || "stereo") === "stereo"
+                onTriggered: EditorState.setClipAudioChannelMode(owner.trackIndex, owner.clipIndex, "stereo")
+            }
+            ThemedMenuItem {
+                text: qsTr("Left Only")
+                checkable: true
+                checked: owner.clipData.audioChannelMode === "leftOnly"
+                onTriggered: EditorState.setClipAudioChannelMode(owner.trackIndex, owner.clipIndex, "leftOnly")
+            }
+            ThemedMenuItem {
+                text: qsTr("Right Only")
+                checkable: true
+                checked: owner.clipData.audioChannelMode === "rightOnly"
+                onTriggered: EditorState.setClipAudioChannelMode(owner.trackIndex, owner.clipIndex, "rightOnly")
+            }
+            ThemedMenuItem {
+                text: qsTr("Combine Mono (L+R)")
+                checkable: true
+                checked: owner.clipData.audioChannelMode === "combineMono"
+                onTriggered: EditorState.setClipAudioChannelMode(owner.trackIndex, owner.clipIndex, "combineMono")
+            }
+            ThemedMenuItem {
+                text: qsTr("Swap Channels")
+                checkable: true
+                checked: owner.clipData.audioChannelMode === "swapChannels"
+                onTriggered: EditorState.setClipAudioChannelMode(owner.trackIndex, owner.clipIndex, "swapChannels")
+            }
+        }
+        ThemedContextMenu {
+            title: qsTr("Pitch Shift")
+
+            ThemedMenuItem {
+                text: qsTr("+12 Semitones (+1 Octave)")
+                onTriggered: EditorState.setClipPitchSemitones(owner.trackIndex, owner.clipIndex,
+                                                               (owner.clipData.pitchSemitones || 0) + 12)
+            }
+            ThemedMenuItem {
+                text: qsTr("+1 Semitone (Alt+Shift+=)")
+                onTriggered: EditorState.setClipPitchSemitones(owner.trackIndex, owner.clipIndex,
+                                                               (owner.clipData.pitchSemitones || 0) + 1)
+            }
+            ThemedMenuItem {
+                text: qsTr("-1 Semitone (Alt+Shift+-)")
+                onTriggered: EditorState.setClipPitchSemitones(owner.trackIndex, owner.clipIndex,
+                                                               (owner.clipData.pitchSemitones || 0) - 1)
+            }
+            ThemedMenuItem {
+                text: qsTr("-12 Semitones (-1 Octave)")
+                onTriggered: EditorState.setClipPitchSemitones(owner.trackIndex, owner.clipIndex,
+                                                               (owner.clipData.pitchSemitones || 0) - 12)
+            }
+            ThemedMenuSeparator {}
+            ThemedMenuItem {
+                text: qsTr("Reset Pitch (0 st)")
+                enabled: Math.abs(owner.clipData.pitchSemitones || 0) > 0.01
+                onTriggered: EditorState.setClipPitchSemitones(owner.trackIndex, owner.clipIndex, 0)
+            }
+        }
+    }
     ThemedMenuItem {
         text: qsTr("Remove silence")
         icon.name: Theme.icons.audioLines

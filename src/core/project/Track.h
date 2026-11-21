@@ -53,6 +53,16 @@ struct Track
     bool excludeFromExport = false;
     double volume = 1.0;
     double pan = 0.0;
+    // Timeline-time track automation envelopes (VEGAS parity).
+    KeyframeTrack<double> volumeEnvelope;
+    KeyframeTrack<double> panEnvelope;
+    KeyframeTrack<double> compositeEnvelope;
+    KeyframeTrack<double> muteEnvelope;
+    // View-only flags: which track automation envelopes are shown in the timeline lane.
+    bool showVolumeEnvelope = false;
+    bool showPanEnvelope = false;
+    bool showCompositeEnvelope = false;
+    bool showMuteEnvelope = false;
     // view-only, video tracks: how clips draw. Video = filmstrip only, Both = filmstrip with a
     // waveform bar along the bottom, Waveform = waveform instead of the filmstrip.
     enum class ClipDisplay { Video = 0, Both = 1, Waveform = 2 };

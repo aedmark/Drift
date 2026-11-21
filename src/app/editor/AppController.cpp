@@ -1072,6 +1072,20 @@ QVariantList AppController::tracks() const
         for (const drift::Transition &transition : track.transitions)
             transitions.append(transitionToMap(m_project, track, transition));
 
+        const auto envelopeToVariant = [](const drift::KeyframeTrack<double> &env) {
+            QVariantList pts;
+            const auto &keys = env.keyframes();
+            pts.reserve(keys.size());
+            for (auto it = keys.constBegin(); it != keys.constEnd(); ++it) {
+                pts.append(QVariantMap{
+                    {QStringLiteral("time"), drift::usToSeconds(it.key())},
+                    {QStringLiteral("value"), it->value},
+                    {QStringLiteral("hold"), it->hold},
+                });
+            }
+            return pts;
+        };
+
         result.append(QVariantMap{
             {QStringLiteral("id"), track.id},
             {QStringLiteral("type"), drift::trackTypeToString(track.type)},
@@ -1108,6 +1122,14 @@ QVariantList AppController::tracks() const
             {QStringLiteral("showChannelWaveforms"), track.showChannelWaveforms},
             {QStringLiteral("heightScale"), track.heightScale},
             {QStringLiteral("lanesCollapsed"), track.lanesCollapsed},
+            {QStringLiteral("showVolumeEnvelope"), track.showVolumeEnvelope},
+            {QStringLiteral("showPanEnvelope"), track.showPanEnvelope},
+            {QStringLiteral("showCompositeEnvelope"), track.showCompositeEnvelope},
+            {QStringLiteral("showMuteEnvelope"), track.showMuteEnvelope},
+            {QStringLiteral("volumeEnvelopePoints"), envelopeToVariant(track.volumeEnvelope)},
+            {QStringLiteral("panEnvelopePoints"), envelopeToVariant(track.panEnvelope)},
+            {QStringLiteral("compositeEnvelopePoints"), envelopeToVariant(track.compositeEnvelope)},
+            {QStringLiteral("muteEnvelopePoints"), envelopeToVariant(track.muteEnvelope)},
         });
     }
 

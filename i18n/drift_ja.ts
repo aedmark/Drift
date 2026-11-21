@@ -2759,6 +2759,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Roll edit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cut rolled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slide edit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clip slid</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Trim clip</source>
         <translation>クリップをトリム</translation>
     </message>
@@ -3178,6 +3194,46 @@
     </message>
     <message>
         <source>Slip tool</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Roll edit tool</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slide edit tool</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cycle timeline edit tool</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle track volume envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle track pan envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle track composite level envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle track mute envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalize selected audio clip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pitch shift selected clip up 1 semitone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pitch shift selected clip down 1 semitone</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3743,6 +3799,98 @@
     <message>
         <source>Clip pan updated</source>
         <translation>クリップのパンを更新しました</translation>
+    </message>
+    <message>
+        <source>Adjust clip opacity</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clip opacity %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust clip gain</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clip gain -inf dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clip gain %1 dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pitch shift clip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pitch %1%2 st</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lock pitch to stretch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unlock pitch from stretch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pitch locked to stretch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pitch preserved during stretch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invert clip phase</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Restore clip phase</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Phase inverted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Phase normal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Change audio channel mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio channels updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selected clip contains silence; cannot normalize</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalize audio</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalized (%1%2 dB)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalized selected audio to %1 dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset audio normalization</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalization reset</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Rotation snapped</source>
@@ -5023,6 +5171,78 @@
         <translation>トラックのロックを解除しました</translation>
     </message>
     <message>
+        <source>volume</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>pan</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>composite level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>mute</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show track %1 envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hide track %1 envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track %1 envelope enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track %1 envelope hidden</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add track %1 envelope point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Envelope point added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit track %1 envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track %1 envelope updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove track %1 envelope point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Envelope point removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear track %1 envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track %1 envelope cleared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear all track envelopes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track envelopes cleared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Move track</source>
         <translation>トラックを移動</translation>
     </message>
@@ -6102,6 +6322,66 @@
     <message>
         <source>Centre</source>
         <translation>中央</translation>
+    </message>
+    <message>
+        <source>Pitch shift</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>st</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset pitch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Channels: Stereo</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Channels: Left Only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Channels: Right Only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Channels: Combine Mono (L+R)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Channels: Swap L/R</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>✓ Invert Phase</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invert Phase</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>✓ Lock Pitch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lock Pitch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalize (-0.1 dB)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalized (%1%2 dB)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation type="unfinished">リセット</translation>
     </message>
     <message>
         <source>Audio track</source>
@@ -25001,6 +25281,74 @@ If playback stutters, try another.</source>
         <translation>ループ</translation>
     </message>
     <message>
+        <source>Audio Switches</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Normalize (Shift+N)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset Normalization</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invert Phase</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lock Pitch to Stretch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Channels</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stereo (Normal)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Left Only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Right Only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Combine Mono (L+R)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Swap Channels</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pitch Shift</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>+12 Semitones (+1 Octave)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>+1 Semitone (Alt+Shift+=)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>-1 Semitone (Alt+Shift+-)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>-12 Semitones (-1 Octave)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset Pitch (0 st)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Remove silence</source>
         <translation>無音部分を削除</translation>
     </message>
@@ -25627,6 +25975,22 @@ If playback stutters, try another.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Roll edit mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Roll edit — drag a cut edge between touching clips to move the edit point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slide edit mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Slide edit — drag a clip between touching neighbors without changing its content</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Show audio on separate track</source>
         <translation>音声を別のトラックに表示する</translation>
     </message>
@@ -25832,6 +26196,92 @@ If playback stutters, try another.</source>
     </message>
 </context>
 <context>
+    <name>TimelineTopEdgeHandle</name>
+    <message>
+        <source>Gain: -inf dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Gain: %1%2 dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Opacity: %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust clip gain</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust clip opacity</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>TimelineTrackEnvelope</name>
+    <message>
+        <source>Volume: -inf dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Volume: %1%2 dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pan: Center</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pan: %1% L</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pan: %1% R</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Composite: %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mute: Muted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mute: Active</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>+ Key</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Insert track envelope keyframe at playhead</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit track envelope</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unmute here</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mute here</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset to default</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete point</source>
+        <translation type="unfinished">ポイントを削除</translation>
+    </message>
+</context>
+<context>
     <name>TimelineTrackItem</name>
     <message>
         <source>Procedural package not found. The clip renders nothing until it is installed again.</source>
@@ -25874,6 +26324,10 @@ If playback stutters, try another.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Slide edit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>%1, track %2</source>
         <translation>%1, トラック %2</translation>
     </message>
@@ -25897,6 +26351,10 @@ If playback stutters, try another.</source>
     </message>
     <message>
         <source>Drag to trim the end (Ctrl+drag to time stretch)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Roll edit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -26177,6 +26635,30 @@ If playback stutters, try another.</source>
     <message>
         <source>Exclude from export</source>
         <translation>エクスポートから除外</translation>
+    </message>
+    <message>
+        <source>Envelopes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Volume Envelope (Shift+V)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pan Envelope (Shift+P)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Composite Level Envelope (Alt+Shift+V)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mute Envelope (Alt+Shift+M)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear All Envelopes</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Add camera clip at playhead</source>

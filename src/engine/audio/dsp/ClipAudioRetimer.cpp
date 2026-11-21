@@ -52,6 +52,8 @@ struct ClipAudioRetimer::Impl
     quint64 identity = 0;
     int sampleRate = 0;
     double tempo = -1.0;
+    double pitchSemitones = 0.0;
+    bool lockPitchToStretch = false;
     bool reverse = false;
     int reservoir = 0;
     bool flushed = false;
@@ -68,7 +70,7 @@ struct ClipAudioRetimer::Impl
 
     void prepare(int rate);
     void restart(drift::TimeUs sourceStartUs);
-    void applyTempo(double value);
+    void applyRetiming(double tempoValue, double pitchValue, bool lockPitch);
     bool refillStaging(const SourcePull &pull);
     void pushStaging();
     void drainIntoFifo();
@@ -87,6 +89,8 @@ void ClipAudioRetimer::Impl::prepare(int rate)
     // window stay on auto: they are tempo-dependent, and a speed ramp changes tempo every block.
     stretcher->setSetting(SETTING_USE_QUICKSEEK, 0);
     tempo = -1.0;
+    pitchSemitones = 0.0;
+    lockPitchToStretch = false;
     // Whatever is buffered belongs to the old rate, and so does the position it was read from.
     lastTimelineEndUs = -1;
 }
@@ -102,16 +106,30 @@ void ClipAudioRetimer::Impl::restart(drift::TimeUs sourceStartUs)
     srcCursorUs = qMax<drift::TimeUs>(0, sourceStartUs);
 }
 
-void ClipAudioRetimer::Impl::applyTempo(double value)
+void ClipAudioRetimer::Impl::applyRetiming(double tempoValue, double pitchValue, bool lockPitch)
 {
     // clip.speed comes back from project JSON without the range the setters enforce, so a zero or a
     // negative can reach here — inside SoundTouch that is a divide by zero.
-    const double clamped = qBound(drift::kMinCurveSpeed, value, drift::kMaxCurveSpeed);
-    if (std::abs(clamped - tempo) < 1e-9)
+    const double clampedTempo = qBound(drift::kMinCurveSpeed, tempoValue, drift::kMaxCurveSpeed);
+    const double clampedPitch = qBound(-24.0, pitchValue, 24.0);
+    if (std::abs(clampedTempo - tempo) < 1e-9
+        && std::abs(clampedPitch - pitchSemitones) < 1e-6
+        && lockPitch == lockPitchToStretch) {
         return;
+    }
 
-    tempo = clamped;
-    stretcher->setTempo(clamped);
+    tempo = clampedTempo;
+    pitchSemitones = clampedPitch;
+    lockPitchToStretch = lockPitch;
+
+    if (lockPitch) {
+        stretcher->setTempo(1.0);
+        stretcher->setRate(clampedTempo);
+    } else {
+        stretcher->setRate(1.0);
+        stretcher->setTempo(clampedTempo);
+    }
+    stretcher->setPitchSemiTones(clampedPitch);
     // Both of these move with tempo, so they are only meaningful once it is set.
     reservoir = std::max(64, stretcher->getSetting(SETTING_NOMINAL_OUTPUT_SEQUENCE));
 }
@@ -222,7 +240,7 @@ void ClipAudioRetimer::process(const ClipAudioBlock &block, const SourcePull &pu
         m_impl->reverse = block.reverse;
         m_impl->restart(block.sourceStartUs);
     }
-    m_impl->applyTempo(block.tempo);
+    m_impl->applyRetiming(block.tempo, block.pitchSemitones, block.lockPitchToStretch);
 
     // The stretcher emits in batches, so opening the stream one batch ahead is what keeps a short
     // batch from punching a hole later. Once it is running, one block's worth is enough. Nothing is

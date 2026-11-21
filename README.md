@@ -58,6 +58,8 @@ Edit at the speed of thought with classic NLE timeline mechanics:
 - **A/B Split-Screen Video Compare**: Compare live footage against FX bypass, clipboard snapshots, reference frames, or adjacent video tracks with draggable vertical/horizontal wipe splitters.
 - **Media Pool FX**: Apply non-destructive GPU effect chains directly to source media assets before they reach the timeline.
 
+> See the **[Drift Mojave Roadmap](docs/ROADMAP.md)** for upcoming VEGAS Pro parity tiers (`v1.1+` through `v1.3+`).
+
 ---
 
 ## Drift Mojave Versioning Scheme

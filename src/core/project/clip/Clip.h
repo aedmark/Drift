@@ -44,6 +44,11 @@ ClipType clipTypeFromString(const QString &type);
 // one camera serves the whole sequence for as long as the clip lasts.
 enum class AdjustmentKind { VideoEffects, AudioEffects, Mask, Transform, Camera };
 
+enum class AudioChannelMode { Stereo = 0, LeftOnly, RightOnly, CombineMono, SwapChannels };
+
+QString audioChannelModeToString(AudioChannelMode mode);
+AudioChannelMode audioChannelModeFromString(const QString &mode);
+
 QString adjustmentKindToString(AdjustmentKind kind);
 AdjustmentKind adjustmentKindFromString(const QString &kind);
 
@@ -288,6 +293,11 @@ struct Clip
     // tag dropped). 0 = show the file as its own tag says.
     int rotationCorrection = 0;
     KeyframeTrack<double> volume;
+    double pitchSemitones = 0.0;
+    bool lockPitchToStretch = false;
+    bool invertPhase = false;
+    AudioChannelMode audioChannelMode = AudioChannelMode::Stereo;
+    double normalizeGain = 1.0;
     QList<Effect> effects;
     QList<Effect> audioEffects; // libavfilter chains applied to this clip's audio in the mixer
 

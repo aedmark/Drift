@@ -90,6 +90,36 @@ AdjustmentKind adjustmentKindFromString(const QString &kind)
     return AdjustmentKind::VideoEffects;
 }
 
+QString audioChannelModeToString(AudioChannelMode mode)
+{
+    switch (mode) {
+    case AudioChannelMode::LeftOnly:
+        return QStringLiteral("leftOnly");
+    case AudioChannelMode::RightOnly:
+        return QStringLiteral("rightOnly");
+    case AudioChannelMode::CombineMono:
+        return QStringLiteral("combineMono");
+    case AudioChannelMode::SwapChannels:
+        return QStringLiteral("swapChannels");
+    case AudioChannelMode::Stereo:
+    default:
+        return QStringLiteral("stereo");
+    }
+}
+
+AudioChannelMode audioChannelModeFromString(const QString &mode)
+{
+    if (mode == QLatin1String("leftOnly"))
+        return AudioChannelMode::LeftOnly;
+    if (mode == QLatin1String("rightOnly"))
+        return AudioChannelMode::RightOnly;
+    if (mode == QLatin1String("combineMono"))
+        return AudioChannelMode::CombineMono;
+    if (mode == QLatin1String("swapChannels"))
+        return AudioChannelMode::SwapChannels;
+    return AudioChannelMode::Stereo;
+}
+
 QString blendModeToString(BlendMode mode)
 {
     switch (mode) {

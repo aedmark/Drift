@@ -546,6 +546,10 @@ private slots:
     void importFileNameStaysStorable();
     void splatInputsAreModelPaths();
     void vegasMediaPoolFxPreTimelineProcessing();
+    void trackEnvelopesCrudUndoAndRoundTrip();
+    void topEdgeClipHandlesUndoAndValues();
+    void audioSwitchesPitchAndNormalizeUndoRoundTrip();
+    void rollAndSlideEditsClampPartnersAndUndo();
 };
 
 // A file dragged in from the file manager has no bin row yet, so the timeline's drop preview
@@ -18885,6 +18889,247 @@ void EditorStateTest::vegasMediaPoolFxPreTimelineProcessing()
     state.clearAssetAudioEffects(QStringLiteral("asset_a1"));
     QCOMPARE(state.project()->asset(QStringLiteral("asset_a1"))->audioEffects.size(), 0);
     QVERIFY(!library.hasEffects(QStringLiteral("asset_a1")));
+}
+
+void EditorStateTest::trackEnvelopesCrudUndoAndRoundTrip()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    appendLinkedVideoAudioPair(*state.project());
+
+    state.toggleTrackEnvelope(1, QStringLiteral("volume"));
+    QVERIFY(state.tracks().at(1).toMap().value(QStringLiteral("showVolumeEnvelope")).toBool());
+    QCOMPARE(state.tracks().at(1).toMap().value(QStringLiteral("volumeEnvelopePoints")).toList().size(), 1);
+
+    state.addTrackEnvelopePoint(1, QStringLiteral("volume"), 1.5, 0.5);
+    QCOMPARE(state.project()->tracks().at(1).volumeEnvelope.keyframes().size(), 2);
+    QCOMPARE(state.project()->tracks().at(1).volumeEnvelope.evaluateAt(drift::secondsToUs(1.5)), 0.5);
+
+    state.previewMoveTrackEnvelopePoint(1, QStringLiteral("volume"), 1.5, 2.0, 1.5);
+    state.commitMoveTrackEnvelopePoint(1, QStringLiteral("volume"), 2.0, 2.0, 1.5);
+    QVERIFY(qAbs(state.project()->tracks().at(1).volumeEnvelope.evaluateAt(drift::secondsToUs(2.0)) - 1.5) < 1e-4);
+
+    state.undo();
+    QVERIFY(qAbs(state.project()->tracks().at(1).volumeEnvelope.evaluateAt(drift::secondsToUs(1.5)) - 0.5) < 1e-4);
+    state.redo();
+    QVERIFY(qAbs(state.project()->tracks().at(1).volumeEnvelope.evaluateAt(drift::secondsToUs(2.0)) - 1.5) < 1e-4);
+
+    state.toggleTrackEnvelope(0, QStringLiteral("composite"));
+    state.addTrackEnvelopePoint(0, QStringLiteral("composite"), 1.0, 0.4);
+    state.toggleTrackEnvelope(1, QStringLiteral("mute"));
+    state.addTrackEnvelopePoint(1, QStringLiteral("mute"), 1.0, 0.0);
+
+    // JSON persistence round-trip
+    QString err;
+    const drift::Project reloaded = drift::Project::fromJson(state.project()->toJson(), &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    QVERIFY(reloaded.tracks().at(1).showVolumeEnvelope);
+    QVERIFY(qAbs(reloaded.tracks().at(1).volumeEnvelope.evaluateAt(drift::secondsToUs(2.0)) - 1.5) < 1e-4);
+    QVERIFY(qAbs(reloaded.tracks().at(0).compositeEnvelope.evaluateAt(drift::secondsToUs(1.0)) - 0.4) < 1e-4);
+    QCOMPARE(reloaded.tracks().at(1).muteEnvelope.evaluateAt(drift::secondsToUs(1.0)), 0.0);
+
+    state.clearAllTrackEnvelopes(1);
+    QVERIFY(state.project()->tracks().at(1).volumeEnvelope.isEmpty());
+    QVERIFY(!state.project()->tracks().at(1).showVolumeEnvelope);
+}
+
+void EditorStateTest::topEdgeClipHandlesUndoAndValues()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    appendLinkedVideoAudioPair(*state.project());
+    state.notifyTracksChanged();
+
+    auto *vModel = qobject_cast<TimelineClipsModel *>(state.clipsModel(0));
+    auto *aModel = qobject_cast<TimelineClipsModel *>(state.clipsModel(1));
+    QVERIFY(vModel && aModel);
+
+    // Video clip top-edge opacity drag -> single undo step
+    const int initialUndo = state.undoHistory().size();
+    state.previewClipBaseOpacity(0, 0, 0.6);
+    QCOMPARE(vModel->data(vModel->index(0), TimelineClipsModel::BaseOpacityRole).toDouble(), 0.6);
+    state.commitClipBaseOpacity(0, 0, 0.6);
+    QCOMPARE(state.undoHistory().size(), initialUndo + 1);
+    QCOMPARE(vModel->data(vModel->index(0), TimelineClipsModel::BaseOpacityRole).toDouble(), 0.6);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).opacity.evaluateAt(0), 0.6);
+    const QVariantList opacityPts =
+        state.clipAt(0, 0).value(QStringLiteral("keyframes")).toMap().value(QStringLiteral("opacity")).toMap().value(QStringLiteral("points")).toList();
+    QVERIFY(!opacityPts.isEmpty());
+    QCOMPARE(opacityPts.first().toMap().value(QStringLiteral("value")).toDouble(), 0.6);
+
+    state.undo();
+    QCOMPARE(vModel->data(vModel->index(0), TimelineClipsModel::BaseOpacityRole).toDouble(), 1.0);
+
+    // Audio clip top-edge gain drag -> single undo step
+    state.previewClipBaseVolume(1, 0, 0.4);
+    QCOMPARE(aModel->data(aModel->index(0), TimelineClipsModel::BaseVolumeRole).toDouble(), 0.4);
+    state.commitClipBaseVolume(1, 0, 0.4);
+    QCOMPARE(aModel->data(aModel->index(0), TimelineClipsModel::BaseVolumeRole).toDouble(), 0.4);
+    state.undo();
+    QCOMPARE(aModel->data(aModel->index(0), TimelineClipsModel::BaseVolumeRole).toDouble(), 1.0);
+}
+
+void EditorStateTest::audioSwitchesPitchAndNormalizeUndoRoundTrip()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString wavPath = dir.filePath(QStringLiteral("quiet.wav"));
+    {
+        QFile f(wavPath);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        constexpr int kRate = 48000;
+        constexpr int kFrames = 24000;
+        const quint32 dataBytes = kFrames * 4u;
+        auto appendU32 = [&](QByteArray &b, quint32 v) {
+            b.append(char(v & 0xff));
+            b.append(char((v >> 8) & 0xff));
+            b.append(char((v >> 16) & 0xff));
+            b.append(char((v >> 24) & 0xff));
+        };
+        auto appendU16 = [&](QByteArray &b, quint16 v) {
+            b.append(char(v & 0xff));
+            b.append(char((v >> 8) & 0xff));
+        };
+        QByteArray hdr;
+        hdr.append("RIFF", 4);
+        appendU32(hdr, 36u + dataBytes);
+        hdr.append("WAVE", 4);
+        hdr.append("fmt ", 4);
+        appendU32(hdr, 16);
+        appendU16(hdr, 1);
+        appendU16(hdr, 2);
+        appendU32(hdr, kRate);
+        appendU32(hdr, kRate * 4);
+        appendU16(hdr, 4);
+        appendU16(hdr, 16);
+        hdr.append("data", 4);
+        appendU32(hdr, dataBytes);
+        f.write(hdr);
+        QByteArray pcm(static_cast<int>(dataBytes), 0);
+        auto *samples = reinterpret_cast<int16_t *>(pcm.data());
+        for (int i = 0; i < kFrames; ++i) {
+            const int16_t s = static_cast<int16_t>(0.20 * 32767.0 * std::sin(2.0 * M_PI * 440.0 * double(i) / kRate));
+            samples[i * 2] = s;
+            samples[i * 2 + 1] = s;
+        }
+        f.write(pcm);
+    }
+
+    AssetLibrary library;
+    AppController state(&library);
+    state.project()->tracks().clear();
+    state.project()->tracks().append(drift::Track{.type = drift::TrackType::Audio});
+    drift::Clip ac;
+    ac.id = QStringLiteral("aud-sw");
+    ac.type = drift::ClipType::Audio;
+    ac.path = wavPath;
+    ac.timelineStart = 0;
+    ac.timelineDuration = drift::secondsToUs(0.5);
+    ac.srcIn = 0;
+    ac.srcOut = drift::secondsToUs(0.5);
+    state.project()->tracks()[0].clips.append(ac);
+    state.selectClip(0, 0);
+
+    // Measure raw peak at default pitch so normalization is deterministic against the exact 0.20 sine peak.
+    QVERIFY(state.normalizeClipAudio(0, 0, -0.1));
+    const double expectedGain = std::pow(10.0, -0.1 / 20.0) / 0.20;
+    QVERIFY(qAbs(state.project()->tracks().at(0).clips.at(0).normalizeGain - expectedGain) < 0.08);
+
+    state.setClipPitchSemitones(0, 0, 3.0);
+    state.nudgeSelectedClipPitch(2.0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).pitchSemitones, 5.0);
+
+    state.setClipLockPitchToStretch(0, 0, true);
+    state.setClipInvertPhase(0, 0, true);
+    state.setClipAudioChannelMode(0, 0, QStringLiteral("combineMono"));
+
+    // JSON persistence round-trip
+    QString err;
+    const drift::Project reloaded = drift::Project::fromJson(state.project()->toJson(), &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    const drift::Clip &rc = reloaded.tracks().at(0).clips.at(0);
+    QCOMPARE(rc.pitchSemitones, 5.0);
+    QVERIFY(rc.lockPitchToStretch);
+    QVERIFY(rc.invertPhase);
+    QCOMPARE(rc.audioChannelMode, drift::AudioChannelMode::CombineMono);
+    QVERIFY(qAbs(rc.normalizeGain - expectedGain) < 0.08);
+
+    state.resetClipNormalize(0, 0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).normalizeGain, 1.0);
+    state.undo();
+    QVERIFY(qAbs(state.project()->tracks().at(0).clips.at(0).normalizeGain - expectedGain) < 0.08);
+}
+
+void EditorStateTest::rollAndSlideEditsClampPartnersAndUndo()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    state.project()->tracks().clear();
+    state.project()->tracks().append(drift::Track{.type = drift::TrackType::Video});
+    state.project()->tracks().append(drift::Track{.type = drift::TrackType::Audio});
+
+    drift::MediaAsset asset;
+    asset.id = QStringLiteral("a1");
+    asset.path = QStringLiteral("/tmp/media.mp4");
+    asset.kind = drift::MediaKind::Video;
+    asset.durationUs = drift::secondsToUs(10.0);
+    state.project()->assets().insert(asset.id, asset);
+    state.project()->assetOrder().append(asset.id);
+
+    auto makeClip = [&](const QString &id, const QString &link, drift::ClipType type,
+                        double start, double dur, double srcIn) {
+        drift::Clip c;
+        c.id = id;
+        c.linkId = link;
+        c.assetId = asset.id;
+        c.path = asset.path;
+        c.type = type;
+        c.timelineStart = drift::secondsToUs(start);
+        c.timelineDuration = drift::secondsToUs(dur);
+        c.srcIn = drift::secondsToUs(srcIn);
+        c.srcOut = drift::secondsToUs(srcIn + dur);
+        return c;
+    };
+
+    // Three touching linked pairs: A[0..2], B[2..4], C[4..6], each with 1..9s media handles
+    state.project()->tracks()[0].clips.append(makeClip(QStringLiteral("v1"), QStringLiteral("L1"), drift::ClipType::Video, 0.0, 2.0, 2.0));
+    state.project()->tracks()[0].clips.append(makeClip(QStringLiteral("v2"), QStringLiteral("L2"), drift::ClipType::Video, 2.0, 2.0, 2.0));
+    state.project()->tracks()[0].clips.append(makeClip(QStringLiteral("v3"), QStringLiteral("L3"), drift::ClipType::Video, 4.0, 2.0, 2.0));
+    state.project()->tracks()[1].clips.append(makeClip(QStringLiteral("a1"), QStringLiteral("L1"), drift::ClipType::Audio, 0.0, 2.0, 2.0));
+    state.project()->tracks()[1].clips.append(makeClip(QStringLiteral("a2"), QStringLiteral("L2"), drift::ClipType::Audio, 2.0, 2.0, 2.0));
+    state.project()->tracks()[1].clips.append(makeClip(QStringLiteral("a3"), QStringLiteral("L3"), drift::ClipType::Audio, 4.0, 2.0, 2.0));
+    state.setSnapEnabled(false);
+
+    QCOMPARE(state.rollLeftClipForEdge(0, 0, 1), 0);
+    QCOMPARE(state.rollLeftClipForEdge(0, 1, -1), 0);
+
+    // Roll cut between v1 & v2 from 2.0s to 2.5s
+    QVERIFY(state.commitRollEdit(0, 0, 2.5));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineDuration, drift::secondsToUs(2.5));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(2.5));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineDuration, drift::secondsToUs(1.5));
+    // Linked audio track rolled identically
+    QCOMPARE(state.project()->tracks().at(1).clips.at(0).timelineDuration, drift::secondsToUs(2.5));
+    QCOMPARE(state.project()->tracks().at(1).clips.at(1).timelineStart, drift::secondsToUs(2.5));
+
+    state.undo();
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineDuration, drift::secondsToUs(2.0));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(2.0));
+
+    // Slide middle clip v2 from 2.0s to 2.6s -> v1 extends to 2.6s, v2 stays 2.0s at 2.6..4.6, v3 trims to 4.6..6.0
+    QVERIFY(state.commitSlideEdit(0, 1, 2.6));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineDuration, drift::secondsToUs(2.6));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(2.6));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineDuration, drift::secondsToUs(2.0));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(2).timelineStart, drift::secondsToUs(4.6));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(2).timelineDuration, drift::secondsToUs(1.4));
+    // Linked audio track slid identically
+    QCOMPARE(state.project()->tracks().at(1).clips.at(1).timelineStart, drift::secondsToUs(2.6));
+
+    state.undo();
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineDuration, drift::secondsToUs(2.0));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(2.0));
+    QCOMPARE(state.project()->tracks().at(0).clips.at(2).timelineStart, drift::secondsToUs(4.0));
 }
 
 QTEST_MAIN(EditorStateTest)

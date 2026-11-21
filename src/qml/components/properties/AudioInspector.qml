@@ -136,6 +136,152 @@ Item {
             }
         }
 
+        // ----- Audio Switches & Pitch Shifting (VEGAS parity) ---------------
+        Column {
+            id: switchesSection
+            width: parent.width
+            spacing: Theme.spacingSm
+            visible: root.clipKind === "audio" || root.clipKind === "video"
+
+            readonly property real pitchVal: {
+                void root.clipDataRevision
+                return (root.clipData && root.clipData.pitchSemitones !== undefined)
+                       ? root.clipData.pitchSemitones : 0.0
+            }
+            readonly property bool lockPitch: {
+                void root.clipDataRevision
+                return !!(root.clipData && root.clipData.lockPitchToStretch)
+            }
+            readonly property bool invertPhase: {
+                void root.clipDataRevision
+                return !!(root.clipData && root.clipData.invertPhase)
+            }
+            readonly property string channelMode: {
+                void root.clipDataRevision
+                return (root.clipData && root.clipData.audioChannelMode) ? root.clipData.audioChannelMode : "stereo"
+            }
+            readonly property real normalizeGain: {
+                void root.clipDataRevision
+                return (root.clipData && root.clipData.normalizeGain !== undefined)
+                       ? root.clipData.normalizeGain : 1.0
+            }
+
+            Row {
+                width: parent.width
+
+                Text {
+                    width: parent.width / 2
+                    text: qsTr("Pitch shift")
+                    color: Theme.c.audioInspector.foregroundMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
+                }
+
+                Text {
+                    width: parent.width / 2
+                    horizontalAlignment: Text.AlignRight
+                    text: (switchesSection.pitchVal > 0.05 ? "+" : "")
+                          + switchesSection.pitchVal.toFixed(1) + " " + qsTr("st")
+                    color: Theme.c.audioInspector.foreground
+                    font.family: Theme.monoFontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+            }
+
+            ThemedSlider {
+                id: pitchSlider
+                label: qsTr("Pitch shift")
+                width: parent.width
+                from: -24
+                to: 24
+                stepSize: 0.5
+                Binding on value {
+                    when: !pitchSlider.pressed
+                    value: switchesSection.pitchVal
+                }
+                onMoved: EditorState.setClipPitchSemitones(
+                             EditorState.selectedTrack, EditorState.selectedClip, value)
+            }
+
+            ThemedButton {
+                text: qsTr("Reset pitch")
+                enabled: Math.abs(switchesSection.pitchVal) >= 0.05
+                onClicked: EditorState.setClipPitchSemitones(
+                               EditorState.selectedTrack, EditorState.selectedClip, 0.0)
+            }
+
+            ThemedComboBox {
+                id: channelModeBox
+                width: parent.width
+                textRole: "label"
+                valueRole: "mode"
+                model: [
+                    { label: qsTr("Channels: Stereo"), mode: "stereo" },
+                    { label: qsTr("Channels: Left Only"), mode: "leftOnly" },
+                    { label: qsTr("Channels: Right Only"), mode: "rightOnly" },
+                    { label: qsTr("Channels: Combine Mono (L+R)"), mode: "combineMono" },
+                    { label: qsTr("Channels: Swap L/R"), mode: "swapChannels" }
+                ]
+                currentIndex: {
+                    for (let i = 0; i < model.length; ++i) {
+                        if (model[i].mode === switchesSection.channelMode)
+                            return i
+                    }
+                    return 0
+                }
+                onActivated: EditorState.setClipAudioChannelMode(
+                                 EditorState.selectedTrack, EditorState.selectedClip, currentValue)
+            }
+
+            Row {
+                width: parent.width
+                spacing: Theme.spacingSm
+
+                ThemedButton {
+                    width: (parent.width - Theme.spacingSm) / 2
+                    text: switchesSection.invertPhase ? qsTr("✓ Invert Phase") : qsTr("Invert Phase")
+                    onClicked: EditorState.setClipInvertPhase(
+                                   EditorState.selectedTrack, EditorState.selectedClip,
+                                   !switchesSection.invertPhase)
+                }
+
+                ThemedButton {
+                    width: (parent.width - Theme.spacingSm) / 2
+                    text: switchesSection.lockPitch ? qsTr("✓ Lock Pitch") : qsTr("Lock Pitch")
+                    onClicked: EditorState.setClipLockPitchToStretch(
+                                   EditorState.selectedTrack, EditorState.selectedClip,
+                                   !switchesSection.lockPitch)
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: Theme.spacingSm
+                visible: root.fileAudio
+
+                ThemedButton {
+                    width: Math.abs(switchesSection.normalizeGain - 1.0) > 0.005
+                           ? (parent.width - Theme.spacingSm) * 0.65 : parent.width
+                    text: {
+                        if (Math.abs(switchesSection.normalizeGain - 1.0) <= 0.005)
+                            return qsTr("Normalize (-0.1 dB)")
+                        const db = 20.0 * Math.log(switchesSection.normalizeGain) / Math.LN10
+                        return qsTr("Normalized (%1%2 dB)").arg(db > 0 ? "+" : "").arg(db.toFixed(1))
+                    }
+                    onClicked: EditorState.normalizeClipAudio(
+                                   EditorState.selectedTrack, EditorState.selectedClip, -0.1)
+                }
+
+                ThemedButton {
+                    visible: Math.abs(switchesSection.normalizeGain - 1.0) > 0.005
+                    width: (parent.width - Theme.spacingSm) * 0.35
+                    text: qsTr("Reset")
+                    onClicked: EditorState.resetClipNormalize(
+                                   EditorState.selectedTrack, EditorState.selectedClip)
+                }
+            }
+        }
+
         // ----- Audio Track Selection (Multi-Track) -------------------------
         Column {
             id: audioTrackSection

@@ -1557,10 +1557,11 @@ void TimelineTrackItem::buildWaveform(int index, const QRectF &area, double clip
 
     // Volume keys are over the whole clip; this area may be just one repeat of it.
     const auto volumeAt = [&row, clipX, fullX, fullWidth, &span](int x) {
+        const double norm = qBound(0.01, row.normalizeGain, 16.0);
         if (row.volumeTyped.isEmpty())
-            return 1.0;
+            return std::clamp(norm, 0.0, 4.0);
         const double seconds = (clipX - fullX + span.left + x + 0.5) / fullWidth * row.duration;
-        return std::clamp(row.volumeTyped.evaluateAt(drift::secondsToUs(seconds)), 0.0, 2.0);
+        return std::clamp(row.volumeTyped.evaluateAt(drift::secondsToUs(seconds)) * norm, 0.0, 4.0);
     };
 
     // Keeps a column inside the clip's rounded corners; a wider extent would paint past the body.
@@ -1947,6 +1948,9 @@ void TimelineTrackItem::mousePressEvent(QMouseEvent *event)
     const bool isAlt = (event->modifiers() & Qt::AltModifier) != 0;
     m_drag.slipping = (isAlt || m_slipToolActive) && !m_drag.rightButton;
     m_drag.slipDeltaSeconds = 0.0;
+    m_drag.sliding = !m_drag.slipping && m_slideToolActive && !m_drag.rightButton;
+    m_drag.slideStartSeconds = m_clips->rows().at(index).start;
+    m_drag.slideTargetStart = m_drag.slideStartSeconds;
 
     if (m_drag.rightButton) {
         if (!wasSelected)
@@ -1962,6 +1966,10 @@ void TimelineTrackItem::mousePressEvent(QMouseEvent *event)
         setKeepMouseGrab(true);
         if (m_editor)
             m_editor->beginPreviewDrag(tr("Slip clip"));
+    } else if (m_drag.sliding) {
+        setKeepMouseGrab(true);
+        if (m_editor)
+            m_editor->beginPreviewDrag(tr("Slide edit"));
     }
 
     // On a pointer the clip owns the press outright; on touch the Flickable may still take it
@@ -2064,6 +2072,42 @@ void TimelineTrackItem::mouseMoveEvent(QMouseEvent *event)
         event->accept();
         return;
     }
+    if (m_drag.sliding) {
+        const QPointF delta = mapFromScene(event->scenePosition()) - m_drag.pressItemPos;
+        const double pps = m_viewState ? m_viewState->pxPerSecond() : 100.0;
+        const double targetStart = std::max(0.0, m_drag.slideStartSeconds + delta.x() / pps);
+        m_drag.slideTargetStart = targetStart;
+        if (m_editor) {
+            const QVariantMap p = m_editor->previewSlideEdit(m_trackIndex, m_drag.clipIndex, targetStart);
+            if (p.value(QStringLiteral("ok")).toBool()) {
+                setLivePreview(m_drag.clipId, true,
+                               p.value(QStringLiteral("start")).toDouble(),
+                               p.value(QStringLiteral("duration")).toDouble(),
+                               p.value(QStringLiteral("inPoint")).toDouble(),
+                               p.value(QStringLiteral("outPoint")).toDouble());
+                const QString prevId = p.value(QStringLiteral("prevId")).toString();
+                if (!prevId.isEmpty()) {
+                    m_drag.slidePrevId = prevId;
+                    setLivePreview(prevId, true,
+                                   p.value(QStringLiteral("prevStart")).toDouble(),
+                                   p.value(QStringLiteral("prevDuration")).toDouble(),
+                                   p.value(QStringLiteral("prevIn")).toDouble(),
+                                   p.value(QStringLiteral("prevOut")).toDouble());
+                }
+                const QString nextId = p.value(QStringLiteral("nextId")).toString();
+                if (!nextId.isEmpty()) {
+                    m_drag.slideNextId = nextId;
+                    setLivePreview(nextId, true,
+                                   p.value(QStringLiteral("nextStart")).toDouble(),
+                                   p.value(QStringLiteral("nextDuration")).toDouble(),
+                                   p.value(QStringLiteral("nextIn")).toDouble(),
+                                   p.value(QStringLiteral("nextOut")).toDouble());
+                }
+            }
+        }
+        event->accept();
+        return;
+    }
     const QPointF delta = mapFromScene(event->scenePosition()) - m_drag.pressItemPos;
     if (!m_drag.moving) {
         const bool pastThreshold = std::abs(delta.x()) > 2.0 || std::abs(delta.y()) > 2.0;
@@ -2114,6 +2158,22 @@ void TimelineTrackItem::finishPress(bool canceled)
                 m_editor->cancelPreviewDrag();
         } else if (m_editor) {
             m_editor->commitSlipClip(m_trackIndex, drag.clipIndex, drag.slipDeltaSeconds);
+        }
+        scheduleRebuild();
+        return;
+    }
+
+    if (drag.sliding) {
+        setLivePreview(drag.clipId, false, 0, 0, 0, 0);
+        if (!drag.slidePrevId.isEmpty())
+            setLivePreview(drag.slidePrevId, false, 0, 0, 0, 0);
+        if (!drag.slideNextId.isEmpty())
+            setLivePreview(drag.slideNextId, false, 0, 0, 0, 0);
+        if (canceled) {
+            if (m_editor)
+                m_editor->cancelPreviewDrag();
+        } else if (m_editor) {
+            m_editor->commitSlideEdit(m_trackIndex, drag.clipIndex, drag.slideTargetStart);
         }
         scheduleRebuild();
         return;
@@ -2238,7 +2298,7 @@ void TimelineTrackItem::setHovered(const QString &clipId, bool body, const QPoin
     }
     const qreal dpr = window() ? window()->devicePixelRatio() : 1.0;
     const bool isAlt = (QGuiApplication::keyboardModifiers() & Qt::AltModifier) != 0;
-    if (m_drag.slipping || (body && (isAlt || m_slipToolActive)))
+    if (m_drag.slipping || m_drag.sliding || (body && (isAlt || m_slipToolActive || m_slideToolActive)))
         setCursor(timelineCursor(TimelineCursorKind::Slip, 0, dpr));
     else if (body && !m_drag.pressed && !narrow)
         setCursor(timelineCursor(TimelineCursorKind::Move, 0, dpr));

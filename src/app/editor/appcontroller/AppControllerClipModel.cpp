@@ -1049,6 +1049,11 @@ QVariantMap AppController::clipToMap(const drift::Clip &clip, const drift::Clip 
         {QStringLiteral("audioStreamIndex"), clip.audioStreamIndex},
         {QStringLiteral("pan"), clip.pan},
         {QStringLiteral("volume"), clip.volume.isEmpty() ? 1.0 : clip.volume.evaluateAt(0)},
+        {QStringLiteral("pitchSemitones"), clip.pitchSemitones},
+        {QStringLiteral("lockPitchToStretch"), clip.lockPitchToStretch},
+        {QStringLiteral("invertPhase"), clip.invertPhase},
+        {QStringLiteral("audioChannelMode"), drift::audioChannelModeToString(clip.audioChannelMode)},
+        {QStringLiteral("normalizeGain"), clip.normalizeGain},
         {QStringLiteral("fadeIn"), drift::usToSeconds(clip.fadeInUs)},
         {QStringLiteral("fadeOut"), drift::usToSeconds(clip.fadeOutUs)},
         {QStringLiteral("fadeInCurve"), drift::fadeCurveToString(clip.fadeInCurve)},
@@ -1198,10 +1203,20 @@ TimelineClipsModel::Row AppController::clipRow(const drift::Clip &clip,
             {QStringLiteral("v"), kv.second.value},
         });
     row.volumeTyped = clip.volume;
+    row.baseOpacity = clip.opacity.isEmpty() ? 1.0 : qBound(0.0, clip.opacity.keyframes().constBegin()->value, 1.0);
+    row.opacityKeyframed = clip.opacity.keyframes().size() > 1;
+    row.baseVolume = clip.volume.isEmpty() ? 1.0 : qBound(0.0, clip.volume.keyframes().constBegin()->value, 2.0);
+    row.volumeKeyframed = clip.volume.keyframes().size() > 1;
+    row.pitchSemitones = clip.pitchSemitones;
+    row.lockPitchToStretch = clip.lockPitchToStretch;
+    row.invertPhase = clip.invertPhase;
+    row.audioChannelMode = drift::audioChannelModeToString(clip.audioChannelMode);
+    row.normalizeGain = clip.normalizeGain;
     const bool carriesAudio = clip.type == drift::ClipType::Audio
                               || (clip.type == drift::ClipType::Video && row.hasEmbeddedAudio);
     if (carriesAudio && clip.volume.keyframes().size() <= 1) {
-        const double gain = clip.volume.isEmpty() ? 1.0 : clip.volume.keyframes().constBegin()->value;
+        const double gain = (clip.volume.isEmpty() ? 1.0 : clip.volume.keyframes().constBegin()->value)
+                            * clip.normalizeGain;
         if (gain <= 0.0) {
             row.volumeLabel = tr("-inf dB");
         } else if (const double db = 20.0 * std::log10(gain); std::abs(db) >= 0.05) {
@@ -1860,6 +1875,16 @@ QVariantList AppController::actions() const
         action(QStringLiteral("selectTool"), tr("Select tool")),
         action(QStringLiteral("bladeTool"), tr("Cut tool / Brush mask")),
         action(QStringLiteral("slipTool"), tr("Slip tool")),
+        action(QStringLiteral("rollTool"), tr("Roll edit tool")),
+        action(QStringLiteral("slideTool"), tr("Slide edit tool")),
+        action(QStringLiteral("cycleEditTool"), tr("Cycle timeline edit tool")),
+        action(QStringLiteral("toggleTrackVolumeEnvelope"), tr("Toggle track volume envelope")),
+        action(QStringLiteral("toggleTrackPanEnvelope"), tr("Toggle track pan envelope")),
+        action(QStringLiteral("toggleTrackCompositeEnvelope"), tr("Toggle track composite level envelope")),
+        action(QStringLiteral("toggleTrackMuteEnvelope"), tr("Toggle track mute envelope")),
+        action(QStringLiteral("normalizeAudio"), tr("Normalize selected audio clip")),
+        action(QStringLiteral("pitchUp"), tr("Pitch shift selected clip up 1 semitone")),
+        action(QStringLiteral("pitchDown"), tr("Pitch shift selected clip down 1 semitone")),
         action(QStringLiteral("maskingPolygonTool"), tr("Polygon mask tool")),
         action(QStringLiteral("maskingAiTool"), tr("AI object mask tool")),
         action(QStringLiteral("maskingBrushSmaller"), tr("Decrease brush size")),

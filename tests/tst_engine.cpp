@@ -598,6 +598,8 @@ private slots:
     void colorGradeDefaultsAreIdentity();
     void vignetteDefaultsMatchLegacy();
     void lookCatalogFindsPacksAndUserLooks();
+    void trackEnvelopesEvaluateInMixerAndCompositor();
+    void audioEventSwitchesAndPitchShiftInMixer();
 
 private:
     static QString makeColorSegmentsVideo(QTemporaryDir &dir);
@@ -19865,6 +19867,252 @@ void EngineTest::rotatedKeepingEyeTurnsInPlace()
     // +rotationX looks up, so the scene slides down.
     const drift::SceneCamera3d tilted = drift::rotatedKeepingEye(camera, 10.0, 0.0);
     QVERIFY(projectedPoint(tilted, canvas, QVector3D(500, 500, 0)).y() > 500.0);
+}
+
+namespace {
+
+bool writeStereoWav(const QString &path, int sampleRate, int frames,
+                    const std::function<void(int, int16_t &, int16_t &)> &gen)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly))
+        return false;
+    const quint32 dataBytes = static_cast<quint32>(frames) * 4u;
+    const quint32 riffSize = 36u + dataBytes;
+    QByteArray header;
+    header.reserve(44);
+    auto appendU32 = [&](quint32 v) {
+        char b[4] = {char(v & 0xff), char((v >> 8) & 0xff), char((v >> 16) & 0xff), char((v >> 24) & 0xff)};
+        header.append(b, 4);
+    };
+    auto appendU16 = [&](quint16 v) {
+        char b[2] = {char(v & 0xff), char((v >> 8) & 0xff)};
+        header.append(b, 2);
+    };
+    header.append("RIFF", 4);
+    appendU32(riffSize);
+    header.append("WAVE", 4);
+    header.append("fmt ", 4);
+    appendU32(16);
+    appendU16(1); // PCM
+    appendU16(2); // stereo
+    appendU32(static_cast<quint32>(sampleRate));
+    appendU32(static_cast<quint32>(sampleRate * 4));
+    appendU16(4);
+    appendU16(16);
+    header.append("data", 4);
+    appendU32(dataBytes);
+    f.write(header);
+
+    QByteArray pcm;
+    pcm.resize(static_cast<qsizetype>(dataBytes));
+    auto *samples = reinterpret_cast<int16_t *>(pcm.data());
+    for (int i = 0; i < frames; ++i) {
+        int16_t l = 0, r = 0;
+        gen(i, l, r);
+        samples[i * 2] = l;
+        samples[i * 2 + 1] = r;
+    }
+    return f.write(pcm) == static_cast<qint64>(dataBytes);
+}
+
+} // namespace
+
+void EngineTest::trackEnvelopesEvaluateInMixerAndCompositor()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    constexpr int kRate = 48000;
+    const QString wavPath = dir.filePath(QStringLiteral("stereo_tone.wav"));
+    // Constant +0.25 sample on both channels avoids phase-dependent block alignment in checks.
+    const int16_t val = static_cast<int16_t>(0.25 * 32767.0);
+    QVERIFY(writeStereoWav(wavPath, kRate, kRate * 2, [&](int, int16_t &l, int16_t &r) {
+        l = val;
+        r = val;
+    }));
+
+    const QString imgPath = dir.filePath(QStringLiteral("white.png"));
+    QImage white(32, 32, QImage::Format_RGBA8888);
+    white.fill(Qt::white);
+    QVERIFY(white.save(imgPath));
+
+    drift::Project project;
+    project.setResolution(32, 32);
+    project.tracks().clear();
+
+    drift::Track vTrack;
+    vTrack.type = drift::TrackType::Video;
+    drift::Clip imgClip;
+    imgClip.id = QStringLiteral("img-env");
+    imgClip.type = drift::ClipType::Image;
+    imgClip.path = imgPath;
+    imgClip.timelineStart = 0;
+    imgClip.timelineDuration = drift::secondsToUs(2.0);
+    imgClip.srcIn = 0;
+    imgClip.srcOut = drift::secondsToUs(2.0);
+    vTrack.clips.append(imgClip);
+    vTrack.compositeEnvelope.setKeyframe(0, 1.0);
+    vTrack.compositeEnvelope.setKeyframe(drift::secondsToUs(1.0), 0.25);
+
+    drift::Track aTrack;
+    aTrack.type = drift::TrackType::Audio;
+    drift::Clip aClip;
+    aClip.id = QStringLiteral("aud-env");
+    aClip.type = drift::ClipType::Audio;
+    aClip.path = wavPath;
+    aClip.timelineStart = 0;
+    aClip.timelineDuration = drift::secondsToUs(2.0);
+    aClip.srcIn = 0;
+    aClip.srcOut = drift::secondsToUs(2.0);
+    aTrack.clips.append(aClip);
+    aTrack.volumeEnvelope.setKeyframe(0, 0.5);
+    aTrack.volumeEnvelope.setKeyframe(drift::secondsToUs(1.0), 2.0);
+    aTrack.panEnvelope.setKeyframe(0, -1.0);
+    aTrack.panEnvelope.setKeyframe(drift::secondsToUs(0.5), 0.0);
+    aTrack.panEnvelope.setKeyframe(drift::secondsToUs(1.0), 1.0);
+    aTrack.muteEnvelope.setKeyframe(0, 1.0);
+    aTrack.muteEnvelope.setEasing(0, drift::Interpolation::Hold);
+    aTrack.muteEnvelope.setKeyframe(drift::secondsToUs(1.5), 0.0);
+    aTrack.muteEnvelope.setEasing(drift::secondsToUs(1.5), drift::Interpolation::Hold);
+
+    project.tracks().append(vTrack);
+    project.tracks().append(aTrack);
+
+    // Compositor: compositeEnvelope scales layer.opacity over timeline time.
+    FrameCompositor compositor;
+    compositor.setProject(&project);
+    GpuScene scene0, scene1;
+    QVERIFY(compositor.buildSceneAt(0, {}, &scene0));
+    QCOMPARE(scene0.items.size(), 1);
+    QVERIFY(qAbs(scene0.items.at(0).layer.opacity - 1.0) < 0.01);
+    QVERIFY(compositor.buildSceneAt(drift::secondsToUs(1.0), {}, &scene1));
+    QCOMPARE(scene1.items.size(), 1);
+    QVERIFY(qAbs(scene1.items.at(0).layer.opacity - 0.25) < 0.01);
+
+    // Mixer: check t=0 (vol=0.5, pan=-1 -> L~=0.125, R~=0), t=1.0s (vol=2.0, pan=+1 -> L~=0, R~=0.5), t=1.6s (muted -> 0).
+    AudioMixer mixer;
+    mixer.setProject(&project);
+    mixer.setMasterClipEnabled(false);
+    QVector<float> buf(512 * 2, 0.0f);
+
+    mixer.mix(0, 512, kRate, buf.data());
+    QVERIFY(qAbs(buf.at(0) - 0.125f) < 0.01f);
+    QVERIFY(qAbs(buf.at(1)) < 0.01f);
+
+    mixer.resetClipAudioState();
+    mixer.mix(drift::secondsToUs(1.0), 512, kRate, buf.data());
+    QVERIFY(qAbs(buf.at(0)) < 0.01f);
+    QVERIFY(qAbs(buf.at(1) - 0.50f) < 0.02f);
+
+    mixer.resetClipAudioState();
+    mixer.mix(drift::secondsToUs(1.6), 512, kRate, buf.data());
+    for (float s : buf)
+        QVERIFY(qAbs(s) < 1e-5f);
+}
+
+void EngineTest::audioEventSwitchesAndPitchShiftInMixer()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    constexpr int kRate = 48000;
+    const QString wavPath = dir.filePath(QStringLiteral("asym.wav"));
+    const int16_t lVal = static_cast<int16_t>(0.40 * 32767.0);
+    const int16_t rVal = static_cast<int16_t>(0.10 * 32767.0);
+    QVERIFY(writeStereoWav(wavPath, kRate, kRate * 2, [&](int, int16_t &l, int16_t &r) {
+        l = lVal;
+        r = rVal;
+    }));
+
+    drift::Project project;
+    project.tracks().clear();
+    drift::Track aTrack;
+    aTrack.type = drift::TrackType::Audio;
+    drift::Clip clip;
+    clip.id = QStringLiteral("sw-1");
+    clip.type = drift::ClipType::Audio;
+    clip.path = wavPath;
+    clip.timelineStart = 0;
+    clip.timelineDuration = drift::secondsToUs(1.5);
+    clip.srcIn = 0;
+    clip.srcOut = drift::secondsToUs(1.5);
+    aTrack.clips.append(clip);
+    project.tracks().append(aTrack);
+
+    AudioMixer mixer;
+    mixer.setProject(&project);
+    mixer.setMasterClipEnabled(false);
+    QVector<float> buf(256 * 2, 0.0f);
+
+    // LeftOnly + invertPhase + normalizeGain=2.0 -> L = -0.80, R = -0.80
+    project.tracks()[0].clips[0].audioChannelMode = drift::AudioChannelMode::LeftOnly;
+    project.tracks()[0].clips[0].invertPhase = true;
+    project.tracks()[0].clips[0].normalizeGain = 2.0;
+    mixer.mix(0, 256, kRate, buf.data());
+    QVERIFY(qAbs(buf.at(0) + 0.80f) < 0.02f);
+    QVERIFY(qAbs(buf.at(1) + 0.80f) < 0.02f);
+
+    // CombineMono -> (0.4 + 0.1)/2 = 0.25 on both channels
+    project.tracks()[0].clips[0].audioChannelMode = drift::AudioChannelMode::CombineMono;
+    project.tracks()[0].clips[0].invertPhase = false;
+    project.tracks()[0].clips[0].normalizeGain = 1.0;
+    mixer.resetClipAudioState();
+    mixer.mix(0, 256, kRate, buf.data());
+    QVERIFY(qAbs(buf.at(0) - 0.25f) < 0.02f);
+    QVERIFY(qAbs(buf.at(1) - 0.25f) < 0.02f);
+
+    // SwapChannels -> L = 0.10, R = 0.40
+    project.tracks()[0].clips[0].audioChannelMode = drift::AudioChannelMode::SwapChannels;
+    mixer.resetClipAudioState();
+    mixer.mix(0, 256, kRate, buf.data());
+    QVERIFY(qAbs(buf.at(0) - 0.10f) < 0.02f);
+    QVERIFY(qAbs(buf.at(1) - 0.40f) < 0.02f);
+
+    // ClipAudioRetimer pitch shift & lockPitchToStretch (SoundTouch active)
+    drift::ClipAudioRetimer retimer;
+    auto sinePull = [&](drift::TimeUs startUs, int frames, float *dst) {
+        const double startSec = drift::usToSeconds(startUs);
+        for (int i = 0; i < frames; ++i) {
+            const float s = static_cast<float>(0.5 * std::sin(2.0 * M_PI * 440.0 * (startSec + double(i) / kRate)));
+            dst[i * 2] = s;
+            dst[i * 2 + 1] = s;
+        }
+        return frames;
+    };
+    QVector<float> pitchOut(1024 * 2, 0.0f);
+    double maxRms = 0.0;
+    for (int b = 0; b < 8; ++b) {
+        drift::ClipAudioBlock block;
+        block.identity = 42;
+        block.sampleRate = kRate;
+        block.timelineStartUs = static_cast<drift::TimeUs>(b) * 1024 * drift::kUsPerSecond / kRate;
+        block.tempo = 1.0;
+        block.pitchSemitones = 7.0;
+        block.lockPitchToStretch = false;
+        retimer.process(block, sinePull, 1024, pitchOut.data());
+        double sq = 0.0;
+        for (float v : pitchOut)
+            sq += v * v;
+        maxRms = qMax(maxRms, std::sqrt(sq / pitchOut.size()));
+    }
+    QVERIFY(maxRms > 0.1);
+
+    retimer.reset();
+    maxRms = 0.0;
+    for (int b = 0; b < 8; ++b) {
+        drift::ClipAudioBlock block;
+        block.identity = 43;
+        block.sampleRate = kRate;
+        block.timelineStartUs = static_cast<drift::TimeUs>(b) * 1024 * drift::kUsPerSecond / kRate;
+        block.tempo = 1.5;
+        block.pitchSemitones = -3.0;
+        block.lockPitchToStretch = true;
+        retimer.process(block, sinePull, 1024, pitchOut.data());
+        double sq = 0.0;
+        for (float v : pitchOut)
+            sq += v * v;
+        maxRms = qMax(maxRms, std::sqrt(sq / pitchOut.size()));
+    }
+    QVERIFY(maxRms > 0.1);
 }
 
 #include "tst_engine.moc"

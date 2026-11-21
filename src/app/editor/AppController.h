@@ -983,6 +983,12 @@ public:
     Q_INVOKABLE QVariantMap previewSlipClip(int trackIndex, int clipIndex, double deltaSeconds) const;
     Q_INVOKABLE bool commitSlipClip(int trackIndex, int clipIndex, double deltaSeconds);
     Q_INVOKABLE bool nudgeSlipClip(int trackIndex, int clipIndex, int frames);
+    // Roll & Slide editing tools (VEGAS parity).
+    Q_INVOKABLE int rollLeftClipForEdge(int trackIndex, int clipIndex, int side) const;
+    Q_INVOKABLE QVariantMap previewRollEdit(int trackIndex, int leftClipIndex, double targetCutSeconds) const;
+    Q_INVOKABLE bool commitRollEdit(int trackIndex, int leftClipIndex, double targetCutSeconds);
+    Q_INVOKABLE QVariantMap previewSlideEdit(int trackIndex, int clipIndex, double targetStartSeconds) const;
+    Q_INVOKABLE bool commitSlideEdit(int trackIndex, int clipIndex, double targetStartSeconds);
 
     // Opens and closes a trim drag. Scoping the gesture lets a repeated pointer position be
     // rejected before any work is done, and lets the caller find out whether the edge ever
@@ -1261,6 +1267,20 @@ public:
     // previewSetClipSpeed does; setClipPan is the one-shot for typing or resetting to centre.
     Q_INVOKABLE void previewSetClipPan(int trackIndex, int clipIndex, double pan);
     Q_INVOKABLE void setClipPan(int trackIndex, int clipIndex, double pan);
+    // Direct top-edge clip handles (video opacity 0..1, audio gain 0..2).
+    Q_INVOKABLE void previewClipBaseOpacity(int trackIndex, int clipIndex, double opacity);
+    Q_INVOKABLE void commitClipBaseOpacity(int trackIndex, int clipIndex, double opacity);
+    Q_INVOKABLE void previewClipBaseVolume(int trackIndex, int clipIndex, double gain);
+    Q_INVOKABLE void commitClipBaseVolume(int trackIndex, int clipIndex, double gain);
+    // Audio event switches & pitch shifting.
+    Q_INVOKABLE void setClipPitchSemitones(int trackIndex, int clipIndex, double semitones);
+    Q_INVOKABLE void nudgeSelectedClipPitch(double deltaSemitones);
+    Q_INVOKABLE void setClipLockPitchToStretch(int trackIndex, int clipIndex, bool lock);
+    Q_INVOKABLE void setClipInvertPhase(int trackIndex, int clipIndex, bool invert);
+    Q_INVOKABLE void setClipAudioChannelMode(int trackIndex, int clipIndex, const QString &mode);
+    Q_INVOKABLE bool normalizeClipAudio(int trackIndex, int clipIndex, double targetPeakDb = -0.1);
+    Q_INVOKABLE bool normalizeSelectedClipAudio(double targetPeakDb = -0.1);
+    Q_INVOKABLE void resetClipNormalize(int trackIndex, int clipIndex);
     Q_INVOKABLE void setClipRotationSnap(int trackIndex, int clipIndex, double degrees);
     // Discrete, lossless orientation fix (absolute 0/90/180/270, as the inspector shows it) —
     // distinct from the free decorative "Angle" above. Re-fits the clip's box for the new
@@ -1763,6 +1783,18 @@ public:
     Q_INVOKABLE void setTrackHeightScale(int trackIndex, double scale);
     Q_INVOKABLE double trackHeightScale(int trackIndex) const;
     Q_INVOKABLE void nudgeTrackHeightScale(int trackIndex, int steps);
+    // Track automation envelopes ("volume", "pan", "composite", "mute").
+    Q_INVOKABLE void toggleTrackEnvelope(int trackIndex, const QString &kind);
+    Q_INVOKABLE void setTrackEnvelopeVisible(int trackIndex, const QString &kind, bool visible);
+    Q_INVOKABLE void addTrackEnvelopePoint(int trackIndex, const QString &kind, double timeSeconds, double value);
+    Q_INVOKABLE void previewMoveTrackEnvelopePoint(int trackIndex, const QString &kind,
+                                                   double oldTimeSeconds, double newTimeSeconds, double newValue);
+    Q_INVOKABLE void commitMoveTrackEnvelopePoint(int trackIndex, const QString &kind,
+                                                  double oldTimeSeconds, double newTimeSeconds, double newValue);
+    Q_INVOKABLE void removeTrackEnvelopePoint(int trackIndex, const QString &kind, double timeSeconds);
+    Q_INVOKABLE void clearTrackEnvelope(int trackIndex, const QString &kind);
+    Q_INVOKABLE void clearAllTrackEnvelopes(int trackIndex);
+    Q_INVOKABLE void toggleSelectedTrackEnvelope(const QString &kind);
     // The touch timeline has no per-lane resize handle and no room in the tool strip for a control
     // per lane, so its buttons move the whole stack. One tracksChanged for the sweep rather than
     // one per track — each emission relays the entire track list into QML.
@@ -2154,6 +2186,47 @@ protected:
         drift::TimeUs sourceDeltaUs = 0;
     };
     SlipComputation computeSlipClip(int trackIndex, int clipIndex, double deltaSeconds) const;
+
+    struct RollPartnerPair {
+        int trackIndex = -1;
+        int leftIndex = -1;
+        int rightIndex = -1;
+        drift::Clip leftClip;
+        drift::Clip rightClip;
+    };
+    struct RollComputation {
+        bool ok = false;
+        bool changed = false;
+        int rightClipIndex = -1;
+        drift::TimeUs newCutUs = 0;
+        drift::Clip leftClip;
+        drift::Clip rightClip;
+        QList<RollPartnerPair> partners;
+    };
+    RollComputation computeRollEdit(int trackIndex, int leftClipIndex, double targetCutSeconds,
+                                    bool snap = true) const;
+
+    struct SlidePartnerItem {
+        int trackIndex = -1;
+        int clipIndex = -1;
+        int prevIndex = -1;
+        int nextIndex = -1;
+        drift::Clip clip;
+        drift::Clip prevClip;
+        drift::Clip nextClip;
+    };
+    struct SlideComputation {
+        bool ok = false;
+        bool changed = false;
+        int prevClipIndex = -1;
+        int nextClipIndex = -1;
+        drift::Clip clip;
+        drift::Clip prevClip;
+        drift::Clip nextClip;
+        QList<SlidePartnerItem> partners;
+    };
+    SlideComputation computeSlideEdit(int trackIndex, int clipIndex, double targetStartSeconds,
+                                      bool snap = true) const;
 
     void notifyTracksChanged();
 

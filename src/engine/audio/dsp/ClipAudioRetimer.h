@@ -25,6 +25,8 @@ struct ClipAudioBlock
     drift::TimeUs timelineStartUs = 0;
     drift::TimeUs sourceStartUs = 0;
     double tempo = 1.0;
+    double pitchSemitones = 0.0;
+    bool lockPitchToStretch = false;
     bool reverse = false;
 };
 
