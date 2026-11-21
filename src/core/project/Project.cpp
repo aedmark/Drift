@@ -1079,6 +1079,135 @@ void detachClip(Clip &clip)
         detachEffect(effect);
 }
 
+QJsonArray audioSendsToJson(const QList<AudioSend> &sends)
+{
+    QJsonArray array;
+    for (const AudioSend &send : sends) {
+        if (send.busId.isEmpty())
+            continue;
+        array.append(QJsonObject{
+            {QStringLiteral("busId"), send.busId},
+            {QStringLiteral("level"), send.level},
+            {QStringLiteral("preFader"), send.preFader},
+            {QStringLiteral("enabled"), send.enabled},
+        });
+    }
+    return array;
+}
+
+QList<AudioSend> audioSendsFromJson(const QJsonArray &array)
+{
+    QList<AudioSend> sends;
+    for (const QJsonValue &val : array) {
+        const QJsonObject obj = val.toObject();
+        AudioSend send;
+        send.busId = obj.value(QStringLiteral("busId")).toString();
+        if (send.busId.isEmpty())
+            continue;
+        send.level = qBound(0.0, obj.value(QStringLiteral("level")).toDouble(0.0), 2.0);
+        send.preFader = obj.value(QStringLiteral("preFader")).toBool(false);
+        send.enabled = obj.value(QStringLiteral("enabled")).toBool(true);
+        sends.append(send);
+    }
+    return sends;
+}
+
+QJsonArray audioBusesToJson(const QList<AudioBus> &buses)
+{
+    QJsonArray array;
+    for (const AudioBus &bus : buses) {
+        QJsonObject obj{
+            {QStringLiteral("id"), bus.id},
+            {QStringLiteral("name"), bus.name},
+            {QStringLiteral("volume"), bus.volume},
+            {QStringLiteral("pan"), bus.pan},
+            {QStringLiteral("muted"), bus.muted},
+            {QStringLiteral("solo"), bus.solo},
+        };
+        if (!bus.audioEffects.isEmpty())
+            obj.insert(QStringLiteral("audioEffects"), effectsToJson(bus.audioEffects));
+        array.append(obj);
+    }
+    return array;
+}
+
+QList<AudioBus> audioBusesFromJson(const QJsonArray &array)
+{
+    QList<AudioBus> buses;
+    for (const QJsonValue &val : array) {
+        const QJsonObject obj = val.toObject();
+        AudioBus bus;
+        bus.id = obj.value(QStringLiteral("id")).toString();
+        if (bus.id.isEmpty())
+            continue;
+        bus.name = obj.value(QStringLiteral("name")).toString();
+        bus.volume = qBound(0.0, obj.value(QStringLiteral("volume")).toDouble(1.0), 2.0);
+        bus.pan = qBound(-1.0, obj.value(QStringLiteral("pan")).toDouble(0.0), 1.0);
+        bus.muted = obj.value(QStringLiteral("muted")).toBool(false);
+        bus.solo = obj.value(QStringLiteral("solo")).toBool(false);
+        bus.audioEffects = effectsFromJson(obj.value(QStringLiteral("audioEffects")).toArray());
+        buses.append(bus);
+    }
+    return buses;
+}
+
+QJsonObject trackMotionToJson(const TrackMotion &motion)
+{
+    QJsonObject obj{
+        {QStringLiteral("enabled"), motion.enabled},
+        {QStringLiteral("posX"), motion.posX},
+        {QStringLiteral("posY"), motion.posY},
+        {QStringLiteral("scaleX"), motion.scaleX},
+        {QStringLiteral("scaleY"), motion.scaleY},
+        {QStringLiteral("rotationDeg"), motion.rotationDeg},
+        {QStringLiteral("rotationXDeg"), motion.rotationXDeg},
+        {QStringLiteral("rotationYDeg"), motion.rotationYDeg},
+        {QStringLiteral("zOffset"), motion.zOffset},
+        {QStringLiteral("opacity"), motion.opacity},
+    };
+    if (!motion.posXTrack.isEmpty())
+        obj.insert(QStringLiteral("posXTrack"), keyframesToJson(motion.posXTrack));
+    if (!motion.posYTrack.isEmpty())
+        obj.insert(QStringLiteral("posYTrack"), keyframesToJson(motion.posYTrack));
+    if (!motion.scaleXTrack.isEmpty())
+        obj.insert(QStringLiteral("scaleXTrack"), keyframesToJson(motion.scaleXTrack));
+    if (!motion.scaleYTrack.isEmpty())
+        obj.insert(QStringLiteral("scaleYTrack"), keyframesToJson(motion.scaleYTrack));
+    if (!motion.rotationTrack.isEmpty())
+        obj.insert(QStringLiteral("rotationTrack"), keyframesToJson(motion.rotationTrack));
+    if (!motion.opacityTrack.isEmpty())
+        obj.insert(QStringLiteral("opacityTrack"), keyframesToJson(motion.opacityTrack));
+    return obj;
+}
+
+TrackMotion trackMotionFromJson(const QJsonObject &obj)
+{
+    TrackMotion motion;
+    motion.enabled = obj.value(QStringLiteral("enabled")).toBool(false);
+    motion.posX = obj.value(QStringLiteral("posX")).toDouble(0.0);
+    motion.posY = obj.value(QStringLiteral("posY")).toDouble(0.0);
+    motion.scaleX = obj.value(QStringLiteral("scaleX")).toDouble(1.0);
+    motion.scaleY = obj.value(QStringLiteral("scaleY")).toDouble(1.0);
+    motion.rotationDeg = obj.value(QStringLiteral("rotationDeg")).toDouble(0.0);
+    motion.rotationXDeg = obj.value(QStringLiteral("rotationXDeg")).toDouble(0.0);
+    motion.rotationYDeg = obj.value(QStringLiteral("rotationYDeg")).toDouble(0.0);
+    motion.zOffset = obj.value(QStringLiteral("zOffset")).toDouble(0.0);
+    motion.opacity = qBound(0.0, obj.value(QStringLiteral("opacity")).toDouble(1.0), 1.0);
+    if (obj.contains(QStringLiteral("posXTrack")))
+        motion.posXTrack = keyframesFromJson(obj.value(QStringLiteral("posXTrack")).toObject());
+    if (obj.contains(QStringLiteral("posYTrack")))
+        motion.posYTrack = keyframesFromJson(obj.value(QStringLiteral("posYTrack")).toObject());
+    if (obj.contains(QStringLiteral("scaleXTrack")))
+        motion.scaleXTrack = keyframesFromJson(obj.value(QStringLiteral("scaleXTrack")).toObject());
+    if (obj.contains(QStringLiteral("scaleYTrack")))
+        motion.scaleYTrack = keyframesFromJson(obj.value(QStringLiteral("scaleYTrack")).toObject());
+    if (obj.contains(QStringLiteral("rotationTrack")))
+        motion.rotationTrack = keyframesFromJson(obj.value(QStringLiteral("rotationTrack")).toObject());
+    if (obj.contains(QStringLiteral("opacityTrack")))
+        motion.opacityTrack = keyframesFromJson(obj.value(QStringLiteral("opacityTrack")).toObject());
+    return motion;
+}
+
 void detachTrack(Track &track)
 {
     track.clips.detach();
@@ -1093,6 +1222,16 @@ void detachTrack(Track &track)
     track.audioEffects.detach();
     for (Effect &effect : track.audioEffects)
         detachEffect(effect);
+    track.audioSends.detach();
+    track.effects.detach();
+    for (Effect &effect : track.effects)
+        detachEffect(effect);
+    track.motion.posXTrack.detachSharedData();
+    track.motion.posYTrack.detachSharedData();
+    track.motion.scaleXTrack.detachSharedData();
+    track.motion.scaleYTrack.detachSharedData();
+    track.motion.rotationTrack.detachSharedData();
+    track.motion.opacityTrack.detachSharedData();
     track.volumeEnvelope.detachSharedData();
     track.panEnvelope.detachSharedData();
     track.compositeEnvelope.detachSharedData();
@@ -1121,6 +1260,15 @@ Project Project::detachedCopy() const
     out.m_masterAudioEffects.detach();
     for (Effect &effect : out.m_masterAudioEffects)
         detachEffect(effect);
+    out.m_masterVideoEffects.detach();
+    for (Effect &effect : out.m_masterVideoEffects)
+        detachEffect(effect);
+    out.m_audioBuses.detach();
+    for (AudioBus &bus : out.m_audioBuses) {
+        bus.audioEffects.detach();
+        for (Effect &effect : bus.audioEffects)
+            detachEffect(effect);
+    }
     out.m_assetOrder.detach();
     out.m_assetsById.detach();
     out.m_binFolderOrder.detach();
@@ -1677,6 +1825,15 @@ Project Project::fromJson(const QJsonObject &object, QString *errorOut)
                 track.transitions.append(transitionFromJson(transitionValue.toObject()));
 
             track.audioEffects = effectsFromJson(trackObject.value(QStringLiteral("audioEffects")).toArray());
+            track.outputBusId = trackObject.value(QStringLiteral("outputBusId")).toString();
+            track.audioSends = audioSendsFromJson(trackObject.value(QStringLiteral("audioSends")).toArray());
+            track.effects = effectsFromJson(trackObject.value(QStringLiteral("effects")).toArray());
+            if (trackObject.contains(QStringLiteral("motion")))
+                track.motion = trackMotionFromJson(trackObject.value(QStringLiteral("motion")).toObject());
+            track.compositeParentTrackId =
+                trackObject.value(QStringLiteral("compositeParentTrackId")).toString();
+            track.compositeBlendMode = blendModeFromString(
+                trackObject.value(QStringLiteral("compositeBlendMode")).toString());
 
             tracks.append(track);
         }
@@ -1830,6 +1987,10 @@ Project Project::fromJson(const QJsonObject &object, QString *errorOut)
     }
     project.m_masterAudioEffects =
         effectsFromJson(object.value(QStringLiteral("masterAudioEffects")).toArray());
+    project.m_masterVideoEffects =
+        effectsFromJson(object.value(QStringLiteral("masterVideoEffects")).toArray());
+    project.m_audioBuses =
+        audioBusesFromJson(object.value(QStringLiteral("audioBuses")).toArray());
 
     // After the track block: an empty timeline routes through resetToDefaultTimeline(), which mints
     // a fresh id and timestamps. Read them last so a saved project keeps its own.
@@ -1936,6 +2097,19 @@ QJsonObject Project::toJson(bool includeTranscripts) const
                 trackObject.insert(QStringLiteral("showCompositeEnvelope"), true);
             if (track.showMuteEnvelope)
                 trackObject.insert(QStringLiteral("showMuteEnvelope"), true);
+            if (!track.outputBusId.isEmpty())
+                trackObject.insert(QStringLiteral("outputBusId"), track.outputBusId);
+            if (!track.audioSends.isEmpty())
+                trackObject.insert(QStringLiteral("audioSends"), audioSendsToJson(track.audioSends));
+            if (!track.effects.isEmpty())
+                trackObject.insert(QStringLiteral("effects"), effectsToJson(track.effects));
+            if (!track.motion.isDefault())
+                trackObject.insert(QStringLiteral("motion"), trackMotionToJson(track.motion));
+            if (!track.compositeParentTrackId.isEmpty())
+                trackObject.insert(QStringLiteral("compositeParentTrackId"), track.compositeParentTrackId);
+            if (track.compositeBlendMode != BlendMode::Normal)
+                trackObject.insert(QStringLiteral("compositeBlendMode"),
+                                   blendModeToString(track.compositeBlendMode));
             tracksArray.append(trackObject);
         }
         return tracksArray;
@@ -1984,6 +2158,10 @@ QJsonObject Project::toJson(bool includeTranscripts) const
         root.insert(QStringLiteral("sequences"), sequencesArray);
     if (!m_masterAudioEffects.isEmpty())
         root.insert(QStringLiteral("masterAudioEffects"), effectsToJson(m_masterAudioEffects));
+    if (!m_masterVideoEffects.isEmpty())
+        root.insert(QStringLiteral("masterVideoEffects"), effectsToJson(m_masterVideoEffects));
+    if (!m_audioBuses.isEmpty())
+        root.insert(QStringLiteral("audioBuses"), audioBusesToJson(m_audioBuses));
     if (!m_teleprompterScript.isEmpty())
         root.insert(QStringLiteral("teleprompterScript"), m_teleprompterScript);
     if (!m_openSequenceTabs.isEmpty())

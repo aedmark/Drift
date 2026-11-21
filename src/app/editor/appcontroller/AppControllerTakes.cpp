@@ -1,9 +1,12 @@
 #include "app/editor/appcontroller/AppControllerInternal.h"
 #include "app/editor/AppController.h"
 #include "app/bin/AssetLibrary.h"
+#include "core/edit/TimelineOps.h"
 
 #include <QFileInfo>
+#include <QTimer>
 #include <QUuid>
+#include <algorithm>
 
 using namespace drift::appcontroller_detail;
 
@@ -310,4 +313,265 @@ QVariantList AppController::takesForClip(int trackIndex, int clipIndex) const
         });
     }
     return result;
+}
+
+// --- Inline Multicamera Mode (Tier 2C) ---------------------------------------
+
+bool AppController::findActiveInlineMulticamClip(int *outTrackIndex, int *outClipIndex) const
+{
+    if (outTrackIndex)
+        *outTrackIndex = -1;
+    if (outClipIndex)
+        *outClipIndex = -1;
+
+    const auto isMultiTakeVideo = [](const drift::Track &track, const drift::Clip &clip) {
+        return track.type == drift::TrackType::Video && !track.hidden
+               && clip.type == drift::ClipType::Video && clip.takes.size() >= 2;
+    };
+
+    const QList<drift::Track> &tracks = m_project.tracks();
+    if (isValidClipIndex(m_selectedTrack, m_selectedClip)) {
+        const drift::Track &selTrack = tracks.at(m_selectedTrack);
+        const drift::Clip &selClip = selTrack.clips.at(m_selectedClip);
+        if (isMultiTakeVideo(selTrack, selClip) && selClip.containsTime(m_playheadUs)) {
+            if (outTrackIndex)
+                *outTrackIndex = m_selectedTrack;
+            if (outClipIndex)
+                *outClipIndex = m_selectedClip;
+            return true;
+        }
+    }
+
+    for (int ti = 0; ti < tracks.size(); ++ti) {
+        const drift::Track &track = tracks.at(ti);
+        if (track.type != drift::TrackType::Video || track.hidden)
+            continue;
+        for (int ci = 0; ci < track.clips.size(); ++ci) {
+            const drift::Clip &clip = track.clips.at(ci);
+            if (clip.type == drift::ClipType::Video && clip.takes.size() >= 2
+                && clip.containsTime(m_playheadUs)) {
+                if (outTrackIndex)
+                    *outTrackIndex = ti;
+                if (outClipIndex)
+                    *outClipIndex = ci;
+                return true;
+            }
+        }
+    }
+
+    if (isValidClipIndex(m_selectedTrack, m_selectedClip)) {
+        const drift::Track &selTrack = tracks.at(m_selectedTrack);
+        const drift::Clip &selClip = selTrack.clips.at(m_selectedClip);
+        if (isMultiTakeVideo(selTrack, selClip)) {
+            if (outTrackIndex)
+                *outTrackIndex = m_selectedTrack;
+            if (outClipIndex)
+                *outClipIndex = m_selectedClip;
+            return true;
+        }
+    }
+    return false;
+}
+
+QVariantList AppController::inlineMulticamTakes() const
+{
+    int ti = -1;
+    int ci = -1;
+    if (!findActiveInlineMulticamClip(&ti, &ci))
+        return {};
+    const drift::Clip &clip = m_project.tracks().at(ti).clips.at(ci);
+    QVariantList out;
+    out.reserve(clip.takes.size());
+    for (int i = 0; i < clip.takes.size(); ++i) {
+        const drift::ClipTake &take = clip.takes.at(i);
+        out.append(QVariantMap{
+            {QStringLiteral("index"), i},
+            {QStringLiteral("name"), take.name.isEmpty() ? tr("Angle %1").arg(i + 1) : take.name},
+            {QStringLiteral("active"), i == clip.activeTakeIndex},
+            {QStringLiteral("assetId"), take.assetId},
+        });
+    }
+    return out;
+}
+
+bool AppController::createMulticamTrackFromSelection()
+{
+    QList<QPair<int, int>> pairs = m_selection;
+    if (isValidClipIndex(m_selectedTrack, m_selectedClip)
+        && !pairs.contains(qMakePair(m_selectedTrack, m_selectedClip))) {
+        pairs.prepend(qMakePair(m_selectedTrack, m_selectedClip));
+    }
+
+    const QList<drift::Track> &tracks = m_project.tracks();
+    QList<QPair<int, int>> videoClips;
+    for (const auto &pair : std::as_const(pairs)) {
+        if (!isValidClipIndex(pair.first, pair.second))
+            continue;
+        if (tracks.at(pair.first).type != drift::TrackType::Video)
+            continue;
+        if (tracks.at(pair.first).clips.at(pair.second).type != drift::ClipType::Video)
+            continue;
+        if (!videoClips.contains(pair))
+            videoClips.append(pair);
+    }
+    if (videoClips.size() < 2)
+        return false;
+
+    std::stable_sort(videoClips.begin(), videoClips.end(),
+                     [&tracks](const QPair<int, int> &a, const QPair<int, int> &b) {
+                         if (a.first != b.first)
+                             return a.first < b.first;
+                         return tracks.at(a.first).clips.at(a.second).timelineStart
+                                < tracks.at(b.first).clips.at(b.second).timelineStart;
+                     });
+
+    const int targetTrack = videoClips.first().first;
+    drift::TimeUs minStart = tracks.at(videoClips.first().first).clips.at(videoClips.first().second).timelineStart;
+    drift::TimeUs maxEnd = tracks.at(videoClips.first().first).clips.at(videoClips.first().second).timelineEnd();
+    for (const auto &pair : std::as_const(videoClips)) {
+        const drift::Clip &c = tracks.at(pair.first).clips.at(pair.second);
+        minStart = qMin(minStart, c.timelineStart);
+        maxEnd = qMax(maxEnd, c.timelineEnd());
+    }
+    if (maxEnd <= minStart)
+        return false;
+
+    drift::Clip combined = tracks.at(videoClips.first().first).clips.at(videoClips.first().second);
+    combined.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    combined.linkId.clear();
+    combined.timelineStart = minStart;
+    combined.timelineDuration = maxEnd - minStart;
+    combined.takes.clear();
+
+    for (const auto &pair : std::as_const(videoClips)) {
+        const drift::Clip &src = tracks.at(pair.first).clips.at(pair.second);
+        if (!src.takes.isEmpty()) {
+            for (const drift::ClipTake &existing : src.takes)
+                combined.takes.append(existing);
+        } else {
+            drift::ClipTake t;
+            t.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            t.name = src.name.isEmpty() ? QFileInfo(src.path).fileName() : src.name;
+            t.assetId = src.assetId;
+            t.path = src.path;
+            t.srcIn = src.srcIn;
+            t.srcOut = src.srcOut;
+            t.audioStreamIndex = src.audioStreamIndex;
+            t.thumbnailPath = src.thumbnailPath;
+            t.filmstripPath = src.filmstripPath;
+            t.effects = src.effects;
+            combined.takes.append(t);
+        }
+    }
+    if (combined.takes.size() < 2)
+        return false;
+    combined.activeTakeIndex = 0;
+
+    const drift::Project before = m_project.detachedCopy();
+    loadActiveTakeIntoClip(combined, m_project);
+
+    // Remove source clips in descending (trackIndex, clipIndex) order so indices stay valid.
+    QList<QPair<int, int>> toRemove = videoClips;
+    std::sort(toRemove.begin(), toRemove.end(),
+              [](const QPair<int, int> &a, const QPair<int, int> &b) {
+                  if (a.first != b.first)
+                      return a.first > b.first;
+                  return a.second > b.second;
+              });
+    for (const auto &pair : std::as_const(toRemove))
+        m_project.tracks()[pair.first].clips.removeAt(pair.second);
+
+    QList<drift::Clip> &targetClips = m_project.tracks()[targetTrack].clips;
+    int insertIdx = targetClips.size();
+    for (int i = 0; i < targetClips.size(); ++i) {
+        if (targetClips.at(i).timelineStart >= combined.timelineStart) {
+            insertIdx = i;
+            break;
+        }
+    }
+    targetClips.insert(insertIdx, combined);
+
+    pushProjectEdit(before, tr("Create multicamera track"));
+    syncClipModels();
+    finishEdit(tr("Multicamera track created"));
+    selectClip(targetTrack, insertIdx);
+    emit inlineMulticamChanged();
+    if (m_inlineMulticamEnabled)
+        refreshInlineMulticamFrames();
+    return true;
+}
+
+void AppController::setInlineMulticamEnabled(bool enabled)
+{
+    if (m_inlineMulticamEnabled == enabled)
+        return;
+    m_inlineMulticamEnabled = enabled;
+    if (enabled) {
+        if (!m_multicamTimer) {
+            m_multicamTimer = new QTimer(this);
+            m_multicamTimer->setInterval(66);
+            connect(m_multicamTimer, &QTimer::timeout, this, [this] { refreshMulticamTiles(); });
+        }
+        if (m_playing)
+            m_multicamTimer->start();
+        refreshInlineMulticamFrames();
+    } else if (!m_multicamActive && m_multicamTimer) {
+        m_multicamTimer->stop();
+    }
+    emit inlineMulticamChanged();
+}
+
+void AppController::toggleInlineMulticam()
+{
+    setInlineMulticamEnabled(!m_inlineMulticamEnabled);
+}
+
+bool AppController::punchMulticamTake(int takeIndex)
+{
+    int ti = -1;
+    int ci = -1;
+    if (!findActiveInlineMulticamClip(&ti, &ci))
+        return false;
+
+    const drift::Clip &check = m_project.tracks().at(ti).clips.at(ci);
+    if (takeIndex < 0 || takeIndex >= check.takes.size())
+        return false;
+
+    const drift::TimeUs offset = m_playheadUs - check.timelineStart;
+    const drift::TimeUs minEdge = drift::minClipDurationUs(m_project.fps());
+
+    const drift::Project before = m_project.detachedCopy();
+    drift::Clip &clip = m_project.tracks()[ti].clips[ci];
+    syncClipToActiveTake(clip);
+
+    int selectIdx = ci;
+    if (offset >= minEdge && clip.timelineDuration - offset >= minEdge) {
+        drift::Clip tail = clip;
+        if (drift::splitClipAtOffset(clip, tail, offset, m_project.fps())) {
+            tail.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            tail.activeTakeIndex = takeIndex;
+            loadActiveTakeIntoClip(tail, m_project);
+            m_project.tracks()[ti].clips.insert(ci + 1, tail);
+            selectIdx = ci + 1;
+        } else {
+            if (clip.activeTakeIndex == takeIndex)
+                return false;
+            clip.activeTakeIndex = takeIndex;
+            loadActiveTakeIntoClip(clip, m_project);
+        }
+    } else {
+        if (clip.activeTakeIndex == takeIndex)
+            return false;
+        clip.activeTakeIndex = takeIndex;
+        loadActiveTakeIntoClip(clip, m_project);
+    }
+
+    pushProjectEdit(before, tr("Cut multicam angle"));
+    syncClipModels();
+    finishEdit(tr("Multicam angle cut"));
+    selectClip(ti, selectIdx);
+    emit inlineMulticamChanged();
+    if (m_inlineMulticamEnabled)
+        refreshInlineMulticamFrames();
+    return true;
 }

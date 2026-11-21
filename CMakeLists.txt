@@ -2352,6 +2352,7 @@ qt_add_qml_module(drift
         src/qml/components/preview/multicam/MulticamAngleTile.qml
         src/qml/components/preview/multicam/MulticamAngleCaption.qml
         src/qml/components/preview/multicam/MulticamAngleBadge.qml
+        src/qml/components/preview/multicam/InlineMulticamOverlay.qml
         src/qml/components/preview/media/MediaPreviewTrimSpan.qml
         src/qml/components/preview/media/MediaPreviewTrimShade.qml
         src/qml/components/preview/media/MediaPreviewTrimHandle.qml

@@ -361,6 +361,20 @@ drift::TimeUs firstDrawnUs(const drift::Track &track, const drift::Clip &clip)
     return firstUs;
 }
 
+QList<drift::Effect> resolvedEffectList(const QList<drift::Effect> &effects, drift::TimeUs timeUs)
+{
+    if (t_bypassEffects || effects.isEmpty())
+        return {};
+    QList<drift::Effect> filtered;
+    filtered.reserve(effects.size());
+    for (const drift::Effect &effect : effects) {
+        if (!effect.enabled)
+            continue;
+        filtered.append(effect.resolvedAt(timeUs));
+    }
+    return filtered;
+}
+
 QList<drift::Effect> resolvedClipEffects(const drift::Clip &clip, drift::TimeUs clipTimeUs,
                                          const drift::Project *project = nullptr);
 QList<drift::Effect> laneAdjustmentEffects(const drift::Project &project, int trackIndex,
@@ -2128,10 +2142,12 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
             const bool editingText = !nested && clip.type == drift::ClipType::Text && options.textEdit.active()
                                      && options.textEdit.clipId == clip.id;
             GpuItem item;
-            item.blend = clip.blendMode;
+            item.blend = clip.blendMode != drift::BlendMode::Normal ? clip.blendMode
+                                                                    : track.compositeBlendMode;
+            QList<drift::Effect> trackAndLaneEffects = resolvedEffectList(track.effects, timelineUs);
+            trackAndLaneEffects += laneAdjustmentEffects(project, ti, timelineUs, clip.id);
             item.layer = buildGpuLayer(project, clip, timelineUs, projectWidth, projectHeight, renderScale, width,
-                                       height, fps,
-                                       laneAdjustmentEffects(project, ti, timelineUs, clip.id),
+                                       height, fps, trackAndLaneEffects,
                                        drift::laneMasksAt(project, ti, timelineUs, clip.id), editingText);
             if (!item.layer.valid)
                 continue;
@@ -2163,6 +2179,25 @@ GpuScene buildGpuScene(const drift::Project &project, drift::TimeUs timelineUs, 
                                    clip.timelineToSourceUs(timelineUs)};
                 occluders.insert(clip.id, nearestOccluder);
             }
+        }
+    }
+
+    if (!nested && !editorView && !project.masterVideoEffects().isEmpty()) {
+        const QList<drift::Effect> masterFx =
+            resolvedEffectList(project.masterVideoEffects(), timelineUs);
+        if (!masterFx.isEmpty()) {
+            GpuItem item;
+            item.isAdjustment = true;
+            item.blend = drift::BlendMode::Normal;
+            item.layer.valid = true;
+            item.layer.effects = masterFx;
+            item.layer.rect = QRectF(0, 0, width, height);
+            item.layer.opacity = 1.0;
+            item.layer.clipTimeUs = timelineUs;
+            item.layer.frameRate = fps;
+            item.layer.historyScope = t_historyScope;
+            item.layer.historyKey = streamIdFor(QStringLiteral("__master_video_fx__"));
+            scene.items.append(item);
         }
     }
 

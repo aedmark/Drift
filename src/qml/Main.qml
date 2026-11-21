@@ -1590,6 +1590,13 @@ ApplicationWindow {
         enabled: !window.showStartScreen
         focus: true
         Keys.onPressed: function(event) {
+            if (EditorState.inlineMulticamEnabled && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
+                    && event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
+                if (EditorState.punchMulticamTake(event.key - Qt.Key_1)) {
+                    event.accepted = true
+                    return
+                }
+            }
             const id = EditorState.actionForArrowChord(event.key, event.modifiers)
             if (id === "")
                 return

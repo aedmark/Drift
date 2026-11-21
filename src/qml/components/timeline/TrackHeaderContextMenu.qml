@@ -170,6 +170,125 @@ ThemedContextMenu {
         icon.name: Theme.icons.maximize
         onTriggered: EditorState.addTransformLayerAbove(header.index)
     }
+    ThemedContextMenu {
+        id: trackVideoFxMenu
+        title: qsTr("Track Video FX")
+        icon.name: Theme.icons.sparkles
+        visible: header.transformable
+
+        Repeater {
+            model: (column.tracks[header.index]?.effects || []).length
+            delegate: ThemedMenuItem {
+                required property int index
+                readonly property var effectItem: (column.tracks[header.index]?.effects || [])[index] || ({})
+                text: (effectItem.label || effectItem.catalogId || qsTr("Effect"))
+                      + (effectItem.enabled === false ? qsTr(" [Bypassed]") : "")
+                icon.name: effectItem.enabled !== false ? Theme.icons.check : Theme.icons.slash
+                onTriggered: EditorState.setTrackVideoEffectEnabled(header.index, index, effectItem.enabled === false)
+            }
+        }
+        ThemedMenuSeparator { visible: (column.tracks[header.index]?.effects || []).length > 0 }
+        ThemedContextMenu {
+            id: trackAddVideoFxSub
+            title: qsTr("Add video effect…")
+            Instantiator {
+                model: EditorState.effectCatalog()
+                delegate: ThemedMenuItem {
+                    required property var modelData
+                    text: modelData.displayName || modelData.name || modelData.id || ""
+                    onTriggered: EditorState.addTrackVideoEffect(header.index, modelData.id)
+                }
+                onObjectAdded: (idx, item) => trackAddVideoFxSub.insertItem(idx, item)
+                onObjectRemoved: (idx, item) => trackAddVideoFxSub.removeItem(item)
+            }
+        }
+        ThemedMenuItem {
+            visible: (column.tracks[header.index]?.effects || []).length > 0
+            text: qsTr("Remove all video effects")
+            icon.name: Theme.icons.trash
+            onTriggered: {
+                const fx = column.tracks[header.index]?.effects || []
+                for (let i = fx.length - 1; i >= 0; i--)
+                    EditorState.removeTrackVideoEffect(header.index, i)
+            }
+        }
+    }
+    ThemedContextMenu {
+        title: qsTr("Track Motion")
+        icon.name: Theme.icons.move
+        visible: header.transformable
+
+        ThemedMenuItem {
+            readonly property bool motionOn: column.tracks[header.index]?.motion?.enabled === true
+            text: motionOn ? qsTr("Disable track motion") : qsTr("Enable track motion")
+            icon.name: motionOn ? Theme.icons.check : ""
+            onTriggered: EditorState.setTrackMotion(header.index, { enabled: !motionOn })
+        }
+        ThemedMenuSeparator {}
+        ThemedMenuItem {
+            text: qsTr("PiP Top-Right (30%)")
+            onTriggered: EditorState.setTrackMotion(header.index, { enabled: true, scaleX: 0.3, scaleY: 0.3, posX: 0.32, posY: -0.32, rotationDeg: 0.0 })
+        }
+        ThemedMenuItem {
+            text: qsTr("PiP Top-Left (30%)")
+            onTriggered: EditorState.setTrackMotion(header.index, { enabled: true, scaleX: 0.3, scaleY: 0.3, posX: -0.32, posY: -0.32, rotationDeg: 0.0 })
+        }
+        ThemedMenuItem {
+            text: qsTr("PiP Bottom-Right (30%)")
+            onTriggered: EditorState.setTrackMotion(header.index, { enabled: true, scaleX: 0.3, scaleY: 0.3, posX: 0.32, posY: 0.32, rotationDeg: 0.0 })
+        }
+        ThemedMenuItem {
+            text: qsTr("PiP Bottom-Left (30%)")
+            onTriggered: EditorState.setTrackMotion(header.index, { enabled: true, scaleX: 0.3, scaleY: 0.3, posX: -0.32, posY: 0.32, rotationDeg: 0.0 })
+        }
+        ThemedMenuItem {
+            text: qsTr("Center 50%")
+            onTriggered: EditorState.setTrackMotion(header.index, { enabled: true, scaleX: 0.5, scaleY: 0.5, posX: 0.0, posY: 0.0, rotationDeg: 0.0 })
+        }
+        ThemedMenuSeparator {}
+        ThemedMenuItem {
+            text: qsTr("Reset track motion")
+            onTriggered: EditorState.resetTrackMotion(header.index)
+        }
+    }
+    ThemedContextMenu {
+        id: compositeParentMenu
+        title: qsTr("Composite Parent Track")
+        icon.name: Theme.icons.layers
+        visible: header.transformable
+
+        ThemedMenuItem {
+            text: qsTr("None (Independent)")
+            icon.name: (column.tracks[header.index]?.compositeParentTrackId || "") === "" ? Theme.icons.check : ""
+            onTriggered: EditorState.setTrackCompositeParent(header.index, "")
+        }
+        Repeater {
+            model: column.tracks.length
+            delegate: ThemedMenuItem {
+                required property int index
+                readonly property var cand: column.tracks[index] || ({})
+                visible: index !== header.index && (cand.type === "video" || cand.type === "text" || cand.type === "shape")
+                text: cand.name && cand.name.length > 0 ? cand.name : (qsTr("Track %1").arg(index + 1))
+                icon.name: (column.tracks[header.index]?.compositeParentTrackId || "") === cand.id ? Theme.icons.check : ""
+                onTriggered: EditorState.setTrackCompositeParent(header.index, cand.id || "")
+            }
+        }
+    }
+    ThemedContextMenu {
+        title: qsTr("Track Composite Mode")
+        visible: header.transformable
+
+        Repeater {
+            model: ["Normal", "Multiply", "Screen", "Overlay", "Add", "Soft Light", "Difference"]
+            delegate: ThemedMenuItem {
+                required property string modelData
+                readonly property string modeId: modelData.toLowerCase().replace(" ", "")
+                text: modelData
+                icon.name: (column.tracks[header.index]?.compositeBlendMode || "normal") === modeId ? Theme.icons.check : ""
+                onTriggered: EditorState.setTrackCompositeBlendMode(header.index, modeId)
+            }
+        }
+    }
     ThemedMenuSeparator {
         visible: column.tracks[header.index].type === "video"
     }

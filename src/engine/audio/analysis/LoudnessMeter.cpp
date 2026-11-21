@@ -1,5 +1,8 @@
 #include "engine/audio/analysis/LoudnessMeter.h"
 
+#include <QMutex>
+#include <QMutexLocker>
+
 #include <QtMath>
 
 #include <algorithm>
@@ -490,6 +493,261 @@ LoudnessReport analyzeLoudness(qint64 totalFrames, int sampleRate,
         }
     }
     return report;
+}
+
+struct RealtimeLoudnessMeter::State
+{
+    mutable QMutex mutex;
+    int sampleRate = 48000;
+    int hopFrames = 4800; // 100 ms
+
+    Biquad hpL;
+    Biquad hpR;
+    Biquad shL;
+    Biquad shR;
+    TruePeakFollower peakL;
+    TruePeakFollower peakR;
+
+    double currentHopEnergy = 0.0;
+    int currentHopSamples = 0;
+
+    // 100ms hop mean-square powers: last 4 hops = 400ms Momentary, last 30 hops = 3s Short-Term.
+    std::array<double, 30> hopRing{};
+    int hopCount = 0;
+    int hopCursor = 0;
+
+    // 400ms overlapping block energies for EBU R128 gated Integrated LUFS (capped at ~1 hour).
+    QVector<double> gatedBlocks;
+    // 3s short-term energies for approximate LRA.
+    QVector<double> shortTermBlocks;
+
+    double lastTruePeakDbfs = -120.0;
+    double maxHoldTruePeakDbfs = -120.0;
+    bool clipping = false;
+    RealtimeLoudnessSnapshot cachedSnapshot;
+
+    static double powerToLufs(double meanSquare)
+    {
+        if (meanSquare <= 1e-12)
+            return -70.0;
+        return -0.691 + 10.0 * std::log10(meanSquare);
+    }
+
+    static double linearToDbfs(double amp)
+    {
+        if (amp <= 1e-6)
+            return -120.0;
+        return 20.0 * std::log10(amp);
+    }
+
+    void configureFilters(int sr)
+    {
+        sampleRate = qMax(8000, sr);
+        hopFrames = qMax(1, sampleRate / 10);
+        hpL = makeKHighPass(sampleRate);
+        hpR = makeKHighPass(sampleRate);
+        shL = makeKShelf(sampleRate);
+        shR = makeKShelf(sampleRate);
+    }
+
+    void resetAll()
+    {
+        configureFilters(sampleRate);
+        peakL = TruePeakFollower{};
+        peakR = TruePeakFollower{};
+        currentHopEnergy = 0.0;
+        currentHopSamples = 0;
+        hopRing.fill(0.0);
+        hopCount = 0;
+        hopCursor = 0;
+        gatedBlocks.clear();
+        shortTermBlocks.clear();
+        lastTruePeakDbfs = -120.0;
+        maxHoldTruePeakDbfs = -120.0;
+        clipping = false;
+        cachedSnapshot = RealtimeLoudnessSnapshot{};
+    }
+
+    void updateSnapshotMetrics(double chunkTruePeakDbfs, bool chunkClipping)
+    {
+        if (hopCount > 0) {
+            const int mCount = qMin(4, hopCount);
+            double mSum = 0.0;
+            for (int i = 0; i < mCount; ++i) {
+                const int idx = (hopCursor - 1 - i + 30) % 30;
+                mSum += hopRing[static_cast<size_t>(idx)];
+            }
+            cachedSnapshot.momentaryLufs = powerToLufs(mSum / double(mCount));
+
+            const int sCount = qMin(30, hopCount);
+            double sSum = 0.0;
+            for (int i = 0; i < sCount; ++i) {
+                const int idx = (hopCursor - 1 - i + 30) % 30;
+                sSum += hopRing[static_cast<size_t>(idx)];
+            }
+            cachedSnapshot.shortTermLufs = powerToLufs(sSum / double(sCount));
+        }
+
+        if (!gatedBlocks.isEmpty()) {
+            double absSum = 0.0;
+            int absN = 0;
+            for (double e : std::as_const(gatedBlocks)) {
+                if (powerToLufs(e) > -70.0) {
+                    absSum += e;
+                    ++absN;
+                }
+            }
+            if (absN > 0) {
+                const double relThresh = powerToLufs(absSum / double(absN)) - 10.0;
+                double relSum = 0.0;
+                int relN = 0;
+                for (double e : std::as_const(gatedBlocks)) {
+                    if (powerToLufs(e) > relThresh && powerToLufs(e) > -70.0) {
+                        relSum += e;
+                        ++relN;
+                    }
+                }
+                cachedSnapshot.integratedLufs =
+                    relN > 0 ? powerToLufs(relSum / double(relN)) : -70.0;
+            } else {
+                cachedSnapshot.integratedLufs = -70.0;
+            }
+        }
+
+        if (shortTermBlocks.size() >= 6) {
+            QVector<double> absGated;
+            double sum = 0.0;
+            for (double e : std::as_const(shortTermBlocks)) {
+                if (powerToLufs(e) > -70.0) {
+                    absGated.append(e);
+                    sum += e;
+                }
+            }
+            if (!absGated.isEmpty()) {
+                const double rel = powerToLufs(sum / double(absGated.size())) - 20.0;
+                QVector<double> kept;
+                for (double e : absGated) {
+                    const double l = powerToLufs(e);
+                    if (l > rel)
+                        kept.append(l);
+                }
+                if (kept.size() >= 2) {
+                    std::sort(kept.begin(), kept.end());
+                    const int i10 = qBound(0, int(std::floor(0.10 * (kept.size() - 1))), kept.size() - 1);
+                    const int i95 = qBound(0, int(std::floor(0.95 * (kept.size() - 1))), kept.size() - 1);
+                    cachedSnapshot.loudnessRangeLu = qMax(0.0, kept.at(i95) - kept.at(i10));
+                }
+            }
+        }
+
+        lastTruePeakDbfs = chunkTruePeakDbfs;
+        maxHoldTruePeakDbfs = qMax(maxHoldTruePeakDbfs, chunkTruePeakDbfs);
+        clipping = clipping || chunkClipping || chunkTruePeakDbfs > 0.0;
+        cachedSnapshot.truePeakDbfs = lastTruePeakDbfs;
+        cachedSnapshot.maxHoldTruePeakDbfs = maxHoldTruePeakDbfs;
+        cachedSnapshot.clipping = clipping;
+    }
+};
+
+RealtimeLoudnessMeter::RealtimeLoudnessMeter(int sampleRate)
+    : m_state(new State)
+{
+    m_state->sampleRate = qMax(8000, sampleRate);
+    m_state->resetAll();
+}
+
+RealtimeLoudnessMeter::~RealtimeLoudnessMeter()
+{
+    delete m_state;
+}
+
+void RealtimeLoudnessMeter::setSampleRate(int sampleRate)
+{
+    const int sr = qMax(8000, sampleRate);
+    QMutexLocker locker(&m_state->mutex);
+    if (m_state->sampleRate == sr)
+        return;
+    m_state->sampleRate = sr;
+    m_state->resetAll();
+}
+
+void RealtimeLoudnessMeter::reset()
+{
+    QMutexLocker locker(&m_state->mutex);
+    m_state->resetAll();
+}
+
+void RealtimeLoudnessMeter::processInterleavedStereo(const float *samples, int frameCount)
+{
+    if (!samples || frameCount <= 0)
+        return;
+
+    QMutexLocker locker(&m_state->mutex);
+    double chunkPeakAmp = 0.0;
+    bool chunkClipping = false;
+    for (int i = 0; i < frameCount; ++i) {
+        const double l = samples[i * 2];
+        const double r = samples[i * 2 + 1];
+        if (qAbs(l) >= 0.999 || qAbs(r) >= 0.999)
+            chunkClipping = true;
+        chunkPeakAmp = qMax(chunkPeakAmp, m_state->peakL.push(l));
+        chunkPeakAmp = qMax(chunkPeakAmp, m_state->peakR.push(r));
+
+        const double kl = m_state->shL.process(m_state->hpL.process(l));
+        const double kr = m_state->shR.process(m_state->hpR.process(r));
+        m_state->currentHopEnergy += kl * kl + kr * kr;
+        ++m_state->currentHopSamples;
+
+        if (m_state->currentHopSamples >= m_state->hopFrames) {
+            const double hopPower =
+                m_state->currentHopEnergy / double(m_state->currentHopSamples);
+            m_state->hopRing[static_cast<size_t>(m_state->hopCursor)] = hopPower;
+            m_state->hopCursor = (m_state->hopCursor + 1) % 30;
+            m_state->hopCount = qMin(m_state->hopCount + 1, 30);
+            m_state->currentHopEnergy = 0.0;
+            m_state->currentHopSamples = 0;
+
+            if (m_state->hopCount >= 4) {
+                double mSum = 0.0;
+                for (int h = 0; h < 4; ++h) {
+                    const int idx = (m_state->hopCursor - 1 - h + 30) % 30;
+                    mSum += m_state->hopRing[static_cast<size_t>(idx)];
+                }
+                constexpr int kMaxGatedBlocks = 36000;
+                if (m_state->gatedBlocks.size() >= kMaxGatedBlocks)
+                    m_state->gatedBlocks.remove(0, kMaxGatedBlocks / 4);
+                m_state->gatedBlocks.append(mSum / 4.0);
+            }
+            if (m_state->hopCount >= 30 && (m_state->gatedBlocks.size() % 5 == 0)) {
+                double sSum = 0.0;
+                for (int h = 0; h < 30; ++h)
+                    sSum += m_state->hopRing[static_cast<size_t>(h)];
+                constexpr int kMaxShortTermBlocks = 7200;
+                if (m_state->shortTermBlocks.size() >= kMaxShortTermBlocks)
+                    m_state->shortTermBlocks.remove(0, kMaxShortTermBlocks / 4);
+                m_state->shortTermBlocks.append(sSum / 30.0);
+            }
+        }
+    }
+
+    // If a short test buffer didn't complete a full 100ms hop yet, still update momentary
+    // fallback from the partial hop so short renders register energy too.
+    if (m_state->hopCount == 0 && m_state->currentHopSamples > 0) {
+        const double partialPower =
+            m_state->currentHopEnergy / double(m_state->currentHopSamples);
+        m_state->cachedSnapshot.momentaryLufs = State::powerToLufs(partialPower);
+        m_state->cachedSnapshot.shortTermLufs = m_state->cachedSnapshot.momentaryLufs;
+        if (State::powerToLufs(partialPower) > -70.0 && m_state->gatedBlocks.isEmpty())
+            m_state->cachedSnapshot.integratedLufs = State::powerToLufs(partialPower);
+    }
+
+    m_state->updateSnapshotMetrics(State::linearToDbfs(chunkPeakAmp), chunkClipping);
+}
+
+RealtimeLoudnessSnapshot RealtimeLoudnessMeter::snapshot() const
+{
+    QMutexLocker locker(&m_state->mutex);
+    return m_state->cachedSnapshot;
 }
 
 } // namespace drift

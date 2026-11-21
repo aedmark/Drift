@@ -212,7 +212,9 @@ class AppController : public QObject
     Q_PROPERTY(QVariantList availableMicrophones READ availableMicrophones NOTIFY availableMicrophonesChanged)
     Q_PROPERTY(QString currentMicrophoneName READ currentMicrophoneName NOTIFY currentMicrophoneChanged)
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY tracksChanged)
+    Q_PROPERTY(QVariantList audioBuses READ audioBuses NOTIFY audioBusesChanged)
     Q_PROPERTY(QVariantList masterAudioEffects READ masterAudioEffects NOTIFY masterAudioEffectsChanged)
+    Q_PROPERTY(QVariantList masterVideoEffects READ masterVideoEffects NOTIFY masterVideoEffectsChanged)
     // A change token for the bindings that read `tracks` only to re-evaluate on an edit. Reading
     // the list for that rebuilt every clip in the project into QVariantMaps, once per binding,
     // per emission — with two dozen such bindings across the desktop and touch shells.
@@ -320,6 +322,9 @@ class AppController : public QObject
     // There is enough imported video to build a rig from, and no visual clips that building one
     // would disturb. Drives the window's "set this up for me" offer.
     Q_PROPERTY(bool multicamCanSetUp READ multicamCanSetUp NOTIFY multicamChanged)
+    Q_PROPERTY(bool inlineMulticamEnabled READ inlineMulticamEnabled NOTIFY inlineMulticamChanged)
+    Q_PROPERTY(QVariantList inlineMulticamTakes READ inlineMulticamTakes NOTIFY inlineMulticamChanged)
+    Q_PROPERTY(int inlineMulticamRevision READ inlineMulticamRevision NOTIFY inlineMulticamChanged)
     Q_PROPERTY(int selectedTrack READ selectedTrack NOTIFY selectionChanged)
     Q_PROPERTY(int selectedClip READ selectedClip NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList selection READ selection NOTIFY selectionChanged)
@@ -942,6 +947,16 @@ public:
     Q_INVOKABLE bool addTakeFromAsset(int trackIndex, int clipIndex, int assetIndex);
     Q_INVOKABLE bool deleteActiveTake(int trackIndex, int clipIndex);
     Q_INVOKABLE QVariantList takesForClip(int trackIndex, int clipIndex) const;
+
+    // Inline Multicamera Mode (Tier 2C)
+    bool inlineMulticamEnabled() const { return m_inlineMulticamEnabled; }
+    QVariantList inlineMulticamTakes() const;
+    int inlineMulticamRevision() const { return m_inlineMulticamRevision; }
+    Q_INVOKABLE bool createMulticamTrackFromSelection();
+    Q_INVOKABLE void setInlineMulticamEnabled(bool enabled);
+    Q_INVOKABLE void toggleInlineMulticam();
+    Q_INVOKABLE bool punchMulticamTake(int takeIndex);
+    Q_INVOKABLE void refreshInlineMulticamFrames();
     // Shifts every clip on `trackIndex` starting at/after `gapStartSeconds` left by the
     // width of the gap immediately following that position, closing it. Linked partner
     // clips on other tracks (e.g. a companion audio clip) follow along to stay in sync.
@@ -1693,6 +1708,27 @@ public:
     Q_INVOKABLE void previewSetMasterAudioEffectParam(int effectIndex, const QString &key, double value);
     Q_INVOKABLE QVariantList masterAudioEffects() const;
 
+    // Video Track FX, Master Video Output FX, Track Motion & Composite Parent (Tier 2B)
+    Q_INVOKABLE QVariantList trackVideoEffects(int trackIndex) const;
+    Q_INVOKABLE void addTrackVideoEffect(int trackIndex, const QString &effectId);
+    Q_INVOKABLE void removeTrackVideoEffect(int trackIndex, int effectIndex);
+    Q_INVOKABLE void setTrackVideoEffectEnabled(int trackIndex, int effectIndex, bool enabled);
+    Q_INVOKABLE bool setTrackVideoEffectParam(int trackIndex, int effectIndex,
+                                              const QString &key, const QVariant &value);
+    Q_INVOKABLE QVariantList masterVideoEffects() const;
+    Q_INVOKABLE void addMasterVideoEffect(const QString &effectId);
+    Q_INVOKABLE void removeMasterVideoEffect(int effectIndex);
+    Q_INVOKABLE void setMasterVideoEffectEnabled(int effectIndex, bool enabled);
+    Q_INVOKABLE bool setMasterVideoEffectParam(int effectIndex, const QString &key,
+                                               const QVariant &value);
+    Q_INVOKABLE QVariantMap trackMotion(int trackIndex) const;
+    Q_INVOKABLE void setTrackMotion(int trackIndex, const QVariantMap &motion);
+    Q_INVOKABLE void resetTrackMotion(int trackIndex);
+    Q_INVOKABLE QString trackCompositeParent(int trackIndex) const;
+    Q_INVOKABLE bool setTrackCompositeParent(int trackIndex, const QString &parentTrackId);
+    Q_INVOKABLE QString trackCompositeBlendMode(int trackIndex) const;
+    Q_INVOKABLE void setTrackCompositeBlendMode(int trackIndex, const QString &blendMode);
+
     // Media Pool Video FX (P11-04)
     Q_INVOKABLE QVariantList assetEffects(const QString &assetId) const;
     Q_INVOKABLE void addAssetEffect(const QString &assetId, const QString &effectId);
@@ -1762,6 +1798,29 @@ public:
     Q_INVOKABLE double trackPan(int trackIndex) const;
     Q_INVOKABLE QVariantMap trackAudioLevels(int trackIndex) const;
     Q_INVOKABLE QVariantMap masterAudioLevels() const;
+
+    // Audio Sub-Buses, Aux/FX Sends & Real-Time LUFS Metering (Tier 2A)
+    Q_INVOKABLE QVariantList audioBuses() const;
+    Q_INVOKABLE QString addAudioBus(const QString &name = QString());
+    Q_INVOKABLE void removeAudioBus(const QString &busId);
+    Q_INVOKABLE void renameAudioBus(const QString &busId, const QString &name);
+    Q_INVOKABLE void setAudioBusVolume(const QString &busId, double volume);
+    Q_INVOKABLE void setAudioBusPan(const QString &busId, double pan);
+    Q_INVOKABLE void setAudioBusMuted(const QString &busId, bool muted);
+    Q_INVOKABLE void setAudioBusSolo(const QString &busId, bool solo);
+    Q_INVOKABLE QVariantList busAudioEffects(const QString &busId) const;
+    Q_INVOKABLE void addBusAudioEffect(const QString &busId, const QString &effectId);
+    Q_INVOKABLE void removeBusAudioEffect(const QString &busId, int effectIndex);
+    Q_INVOKABLE void setBusAudioEffectEnabled(const QString &busId, int effectIndex, bool enabled);
+    Q_INVOKABLE QString trackOutputBus(int trackIndex) const;
+    Q_INVOKABLE void setTrackOutputBus(int trackIndex, const QString &busId);
+    Q_INVOKABLE QVariantList trackAudioSends(int trackIndex) const;
+    Q_INVOKABLE void setTrackAudioSend(int trackIndex, const QString &busId, double level,
+                                         bool preFader = false, bool enabled = true);
+    Q_INVOKABLE void removeTrackAudioSend(int trackIndex, const QString &busId);
+    Q_INVOKABLE QVariantMap audioBusLevels(const QString &busId) const;
+    Q_INVOKABLE QVariantMap masterLoudness() const;
+    Q_INVOKABLE void resetMasterLoudness();
     // [masterL, masterR, track0L, track0R, ...] in one call, peaks since the previous call.
     // The mixer meters poll this rather than one QVariantMap per strip per tick.
     Q_INVOKABLE QList<float> meterLevels(const QList<int> &trackIndexes) const;
@@ -2074,6 +2133,9 @@ signals:
     void masterVolumeChanged();
     void masterMutedChanged();
     void masterAudioEffectsChanged();
+    void masterVideoEffectsChanged();
+    void audioBusesChanged();
+    void inlineMulticamChanged();
     void assetEffectsChanged(const QString &assetId);
     // Carries the finished benchmark, merged into whatever the dialog already collected.
     void playbackBenchmarkFinished(const QVariantMap &info);
@@ -2712,6 +2774,9 @@ protected:
     // Drives tile refreshes during playback only; scrubbing and paused edits refresh directly
     // off the signal that caused them.
     QTimer *m_multicamTimer = nullptr;
+    bool m_inlineMulticamEnabled = false;
+    int m_inlineMulticamRevision = 0;
+    bool findActiveInlineMulticamClip(int *outTrackIndex, int *outClipIndex) const;
 
     bool m_reverseRendering = false;
     double m_reverseProgress = 0.0;

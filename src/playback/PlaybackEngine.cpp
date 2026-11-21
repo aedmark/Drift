@@ -1206,6 +1206,23 @@ QPair<float, float> PlaybackEngine::masterAudioLevels() const
     return m_mixer.masterLevels();
 }
 
+QPair<float, float> PlaybackEngine::busAudioLevels(const QString &busId) const
+{
+    if (!m_playing)
+        return {0.0f, 0.0f};
+    return m_mixer.busLevels(busId);
+}
+
+drift::RealtimeLoudnessSnapshot PlaybackEngine::masterLoudness() const
+{
+    return m_mixer.masterLoudness();
+}
+
+void PlaybackEngine::resetMasterLoudness()
+{
+    m_mixer.resetMasterLoudness();
+}
+
 QList<float> PlaybackEngine::takeMeterPeaks(const QList<int> &trackIndexes) const
 {
     if (!m_playing)

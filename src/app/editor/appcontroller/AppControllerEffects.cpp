@@ -1990,6 +1990,235 @@ QVariantList AppController::masterAudioEffects() const
     return list;
 }
 
+// --- Audio Sub-Bus FX (Tier 2A) ----------------------------------------------
+
+namespace {
+drift::AudioBus *findAudioBusMut(drift::Project &project, const QString &busId)
+{
+    for (drift::AudioBus &bus : project.audioBuses()) {
+        if (bus.id == busId)
+            return &bus;
+    }
+    return nullptr;
+}
+
+const drift::AudioBus *findAudioBusConst(const drift::Project &project, const QString &busId)
+{
+    for (const drift::AudioBus &bus : project.audioBuses()) {
+        if (bus.id == busId)
+            return &bus;
+    }
+    return nullptr;
+}
+} // namespace
+
+QVariantList AppController::busAudioEffects(const QString &busId) const
+{
+    const drift::AudioBus *bus = findAudioBusConst(m_project, busId);
+    if (!bus)
+        return {};
+    QVariantList list;
+    list.reserve(bus->audioEffects.size());
+    for (int i = 0; i < bus->audioEffects.size(); ++i)
+        list.append(audioEffectToMap(bus->audioEffects.at(i), i, 0));
+    return list;
+}
+
+void AppController::addBusAudioEffect(const QString &busId, const QString &effectId)
+{
+    if (!findAudioBusConst(m_project, busId))
+        return;
+    const AudioEffectEntry *def = audioEffectDefForId(effectId);
+    if (!def)
+        return;
+    const drift::Effect effect = audioEffectFromCatalogEntry(*def, {});
+    const drift::Project before = m_project;
+    if (drift::AudioBus *bus = findAudioBusMut(m_project, busId))
+        bus->audioEffects.append(effect);
+    pushProjectEdit(before, tr("Add bus audio effect"));
+    finishEdit(tr("Bus audio effect added"));
+    emit audioBusesChanged();
+}
+
+void AppController::removeBusAudioEffect(const QString &busId, int effectIndex)
+{
+    const drift::AudioBus *check = findAudioBusConst(m_project, busId);
+    if (!check || effectIndex < 0 || effectIndex >= check->audioEffects.size())
+        return;
+    const drift::Project before = m_project;
+    if (drift::AudioBus *bus = findAudioBusMut(m_project, busId))
+        bus->audioEffects.removeAt(effectIndex);
+    pushProjectEdit(before, tr("Remove bus audio effect"));
+    finishEdit(tr("Bus audio effect removed"));
+    emit audioBusesChanged();
+}
+
+void AppController::setBusAudioEffectEnabled(const QString &busId, int effectIndex, bool enabled)
+{
+    const drift::AudioBus *check = findAudioBusConst(m_project, busId);
+    if (!check || effectIndex < 0 || effectIndex >= check->audioEffects.size())
+        return;
+    if (check->audioEffects.at(effectIndex).enabled == enabled)
+        return;
+    const drift::Project before = m_project;
+    if (drift::AudioBus *bus = findAudioBusMut(m_project, busId))
+        bus->audioEffects[effectIndex].enabled = enabled;
+    pushProjectEdit(before, enabled ? tr("Enable bus audio effect") : tr("Disable bus audio effect"));
+    finishEdit(enabled ? tr("Bus audio effect enabled") : tr("Bus audio effect disabled"));
+    emit audioBusesChanged();
+}
+
+// --- Video Track FX & Master Video Output FX (Tier 2B) ----------------------
+
+namespace {
+bool buildVideoEffectFromId(const QString &effectId, drift::Effect *outEffect)
+{
+    const EffectPresetEntry *def = effectDefForId(effectId);
+    if (!def || !outEffect)
+        return false;
+    drift::Effect effect;
+    effect.name = def->filterName;
+    effect.catalogId = def->meta.id;
+    for (auto it = def->fixedParams.constBegin(); it != def->fixedParams.constEnd(); ++it)
+        effect.parameters.insert(it.key(), it.value());
+    for (const drift::EffectParamSpec &p : def->meta.parameters)
+        p.insertDefault(effect.parameters);
+    *outEffect = std::move(effect);
+    return true;
+}
+
+QVariantList videoEffectsToVariantList(const QList<drift::Effect> &effects)
+{
+    QVariantList list;
+    list.reserve(effects.size());
+    for (int i = 0; i < effects.size(); ++i)
+        list.append(effectToMap(effects.at(i), i, 0));
+    return list;
+}
+} // namespace
+
+QVariantList AppController::trackVideoEffects(int trackIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return {};
+    return videoEffectsToVariantList(m_project.tracks().at(trackIndex).effects);
+}
+
+void AppController::addTrackVideoEffect(int trackIndex, const QString &effectId)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    drift::Effect effect;
+    if (!buildVideoEffectFromId(effectId, &effect))
+        return;
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].effects.append(effect);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Add track video effect"));
+    finishEdit(tr("Track video effect added"));
+    emit tracksChanged();
+}
+
+void AppController::removeTrackVideoEffect(int trackIndex, int effectIndex)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    const QList<drift::Effect> &check = m_project.tracks().at(trackIndex).effects;
+    if (effectIndex < 0 || effectIndex >= check.size())
+        return;
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].effects.removeAt(effectIndex);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Remove track video effect"));
+    finishEdit(tr("Track video effect removed"));
+    emit tracksChanged();
+}
+
+void AppController::setTrackVideoEffectEnabled(int trackIndex, int effectIndex, bool enabled)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    const QList<drift::Effect> &check = m_project.tracks().at(trackIndex).effects;
+    if (effectIndex < 0 || effectIndex >= check.size() || check.at(effectIndex).enabled == enabled)
+        return;
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].effects[effectIndex].enabled = enabled;
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, enabled ? tr("Enable track video effect") : tr("Disable track video effect"));
+    finishEdit(enabled ? tr("Track video effect enabled") : tr("Track video effect disabled"));
+    emit tracksChanged();
+}
+
+bool AppController::setTrackVideoEffectParam(int trackIndex, int effectIndex,
+                                            const QString &key, const QVariant &value)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size() || key.isEmpty())
+        return false;
+    const QList<drift::Effect> &check = m_project.tracks().at(trackIndex).effects;
+    if (effectIndex < 0 || effectIndex >= check.size())
+        return false;
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].effects[effectIndex].parameters.insert(key, value);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Edit track video effect"));
+    finishEdit(tr("Track video effect edited"));
+    emit tracksChanged();
+    return true;
+}
+
+QVariantList AppController::masterVideoEffects() const
+{
+    return videoEffectsToVariantList(m_project.masterVideoEffects());
+}
+
+void AppController::addMasterVideoEffect(const QString &effectId)
+{
+    drift::Effect effect;
+    if (!buildVideoEffectFromId(effectId, &effect))
+        return;
+    const drift::Project before = m_project;
+    m_project.masterVideoEffects().append(effect);
+    pushProjectEdit(before, tr("Add master video effect"));
+    finishEdit(tr("Master video effect added"));
+    emit masterVideoEffectsChanged();
+}
+
+void AppController::removeMasterVideoEffect(int effectIndex)
+{
+    if (effectIndex < 0 || effectIndex >= m_project.masterVideoEffects().size())
+        return;
+    const drift::Project before = m_project;
+    m_project.masterVideoEffects().removeAt(effectIndex);
+    pushProjectEdit(before, tr("Remove master video effect"));
+    finishEdit(tr("Master video effect removed"));
+    emit masterVideoEffectsChanged();
+}
+
+void AppController::setMasterVideoEffectEnabled(int effectIndex, bool enabled)
+{
+    if (effectIndex < 0 || effectIndex >= m_project.masterVideoEffects().size())
+        return;
+    if (m_project.masterVideoEffects().at(effectIndex).enabled == enabled)
+        return;
+    const drift::Project before = m_project;
+    m_project.masterVideoEffects()[effectIndex].enabled = enabled;
+    pushProjectEdit(before, enabled ? tr("Enable master video effect") : tr("Disable master video effect"));
+    finishEdit(enabled ? tr("Master video effect enabled") : tr("Master video effect disabled"));
+    emit masterVideoEffectsChanged();
+}
+
+bool AppController::setMasterVideoEffectParam(int effectIndex, const QString &key, const QVariant &value)
+{
+    if (effectIndex < 0 || effectIndex >= m_project.masterVideoEffects().size() || key.isEmpty())
+        return false;
+    const drift::Project before = m_project;
+    m_project.masterVideoEffects()[effectIndex].parameters.insert(key, value);
+    pushProjectEdit(before, tr("Edit master video effect"));
+    finishEdit(tr("Master video effect edited"));
+    emit masterVideoEffectsChanged();
+    return true;
+}
+
 // --- Media Pool Video & Audio FX (P11-04) -----------------------------------
 
 QVariantList AppController::assetEffects(const QString &assetId) const

@@ -72,4 +72,35 @@ struct LoudnessReport
 LoudnessReport analyzeLoudness(qint64 totalFrames, int sampleRate,
                                const MediaWaveform::FillChunk &fill);
 
+struct RealtimeLoudnessSnapshot
+{
+    double momentaryLufs = -70.0;
+    double shortTermLufs = -70.0;
+    double integratedLufs = -70.0;
+    double truePeakDbfs = -120.0;
+    double maxHoldTruePeakDbfs = -120.0;
+    double loudnessRangeLu = 0.0;
+    bool clipping = false;
+};
+
+// Stateful ITU-R BS.1770 / EBU R128 streaming meter for real-time playback mixing.
+class RealtimeLoudnessMeter
+{
+public:
+    explicit RealtimeLoudnessMeter(int sampleRate = 48000);
+    ~RealtimeLoudnessMeter();
+
+    RealtimeLoudnessMeter(const RealtimeLoudnessMeter &) = delete;
+    RealtimeLoudnessMeter &operator=(const RealtimeLoudnessMeter &) = delete;
+
+    void setSampleRate(int sampleRate);
+    void reset();
+    void processInterleavedStereo(const float *samples, int frameCount);
+    RealtimeLoudnessSnapshot snapshot() const;
+
+private:
+    struct State;
+    State *m_state = nullptr;
+};
+
 } // namespace drift

@@ -920,7 +920,9 @@ AppController::AppController(AssetLibrary *assetLibrary, QObject *parent)
         });
     }
     connect(this, &AppController::playingChanged, this, [this] {
-        if (!m_multicamActive || !m_multicamTimer)
+        if (m_inlineMulticamEnabled && !m_playing)
+            refreshInlineMulticamFrames();
+        if ((!m_multicamActive && !m_inlineMulticamEnabled) || !m_multicamTimer)
             return;
         if (m_playing) {
             m_multicamTimer->start();
@@ -928,6 +930,16 @@ AppController::AppController(AssetLibrary *assetLibrary, QObject *parent)
             m_multicamTimer->stop();
             // Land on the frame the playhead actually stopped at, not the last timer tick.
             refreshMulticamTiles();
+        }
+    });
+    connect(this, &AppController::playheadSecondsChanged, this, [this] {
+        if (m_inlineMulticamEnabled && !m_playing)
+            refreshInlineMulticamFrames();
+    });
+    connect(this, &AppController::selectionChanged, this, [this] {
+        if (m_inlineMulticamEnabled) {
+            emit inlineMulticamChanged();
+            refreshInlineMulticamFrames();
         }
     });
 
@@ -1130,6 +1142,12 @@ QVariantList AppController::tracks() const
             {QStringLiteral("panEnvelopePoints"), envelopeToVariant(track.panEnvelope)},
             {QStringLiteral("compositeEnvelopePoints"), envelopeToVariant(track.compositeEnvelope)},
             {QStringLiteral("muteEnvelopePoints"), envelopeToVariant(track.muteEnvelope)},
+            {QStringLiteral("outputBusId"), track.outputBusId},
+            {QStringLiteral("audioSends"), trackAudioSends(ti)},
+            {QStringLiteral("effects"), trackVideoEffects(ti)},
+            {QStringLiteral("motion"), trackMotion(ti)},
+            {QStringLiteral("compositeParentTrackId"), track.compositeParentTrackId},
+            {QStringLiteral("compositeBlendMode"), drift::blendModeToString(track.compositeBlendMode)},
         });
     }
 
@@ -1159,6 +1177,9 @@ void AppController::syncAfterProjectSwap()
     emit bookmarksChanged();
     emit workAreaChanged();
     emit masterAudioEffectsChanged();
+    emit masterVideoEffectsChanged();
+    emit audioBusesChanged();
+    emit inlineMulticamChanged();
     emit m_projectFile->projectNameChanged();
     emit m_projectFile->backgroundChanged();
     // The timeline and selection refresh is the expensive part. An edit's own push leaves it

@@ -198,6 +198,9 @@ public:
 
     QPair<float, float> trackAudioLevels(int trackIndex) const;
     QPair<float, float> masterAudioLevels() const;
+    QPair<float, float> busAudioLevels(const QString &busId) const;
+    drift::RealtimeLoudnessSnapshot masterLoudness() const;
+    void resetMasterLoudness();
     QList<float> takeMeterPeaks(const QList<int> &trackIndexes) const;
     void setMasterVolume(double vol);
     double masterVolume() const;

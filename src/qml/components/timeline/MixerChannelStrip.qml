@@ -25,11 +25,15 @@ Item {
     property real peakR: 0
     property bool hasFx: false
     property int fxCount: 0
+    property bool isBus: false
+    property string routeLabel: ""
+    property bool hasSends: false
 
     signal muteToggled()
     signal soloToggled()
     signal armToggled()
     signal fxClicked()
+    signal routeClicked()
     signal volumePreviewed(real gain)
     signal volumeCommitted()
     signal volumeSet(real gain)
@@ -102,17 +106,34 @@ Item {
         anchors.right: parent.right
     }
 
-    MixerStripToggle {
-        id: fxButton
+    Row {
+        id: fxRow
         anchors.top: panArea.bottom
         anchors.topMargin: Theme.spacingXs
         anchors.horizontalCenter: parent.horizontalCenter
-        text: strip.fxCount > 0 ? "FX " + strip.fxCount : "FX"
-        tone: "active"
-        checked: strip.hasFx
-        tooltip: strip.master ? (strip.hasFx ? qsTr("Master FX (%1 active)").arg(strip.fxCount) : qsTr("Master FX"))
-                              : (strip.hasFx ? qsTr("Track FX on %1 (%2 active)").arg(strip.name).arg(strip.fxCount) : qsTr("Track FX on %1").arg(strip.name))
-        onClicked: strip.fxClicked()
+        spacing: Theme.spacingXs
+
+        MixerStripToggle {
+            id: fxButton
+            text: strip.fxCount > 0 ? "FX " + strip.fxCount : "FX"
+            tone: "active"
+            checked: strip.hasFx
+            tooltip: strip.master ? (strip.hasFx ? qsTr("Master FX (%1 active)").arg(strip.fxCount) : qsTr("Master FX"))
+                                  : (strip.isBus ? (strip.hasFx ? qsTr("Bus FX on %1 (%2 active)").arg(strip.name).arg(strip.fxCount) : qsTr("Bus FX on %1").arg(strip.name))
+                                                 : (strip.hasFx ? qsTr("Track FX on %1 (%2 active)").arg(strip.name).arg(strip.fxCount) : qsTr("Track FX on %1").arg(strip.name)))
+            onClicked: strip.fxClicked()
+        }
+
+        MixerStripToggle {
+            id: routeButton
+            visible: !strip.master && (strip.isBus || EditorState.audioBuses.length > 0)
+            text: strip.isBus ? "⋯" : (strip.routeLabel.length > 0 ? strip.routeLabel : (strip.hasSends ? "Snd" : "Mst"))
+            tone: "active"
+            checked: !strip.isBus && (strip.routeLabel.length > 0 || strip.hasSends)
+            tooltip: strip.isBus ? qsTr("Bus options (%1)").arg(strip.name)
+                                 : qsTr("Output bus & aux sends for %1").arg(strip.name)
+            onClicked: strip.routeClicked()
+        }
     }
 
     MixerLevelReadout {
@@ -123,7 +144,7 @@ Item {
     // --- Meter + fader ------------------------------------------------------------
     Row {
         id: meterRow
-        anchors.top: fxButton.bottom
+        anchors.top: fxRow.bottom
         anchors.topMargin: Theme.spacingSm
         anchors.bottom: readout.top
         anchors.bottomMargin: Theme.spacingLg

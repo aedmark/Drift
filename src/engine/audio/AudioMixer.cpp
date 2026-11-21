@@ -96,11 +96,16 @@ void panGainsForClip(const drift::Clip &clip, float *leftOut, float *rightOut)
     *rightOut = static_cast<float>(qMin(1.0, 1.0 + pan));
 }
 
+void panGainsForPan(double pan, float *leftOut, float *rightOut)
+{
+    const double clamped = qBound(-1.0, pan, 1.0);
+    *leftOut = static_cast<float>(qMin(1.0, 1.0 - clamped));
+    *rightOut = static_cast<float>(qMin(1.0, 1.0 + clamped));
+}
+
 void panGainsForTrack(const drift::Track &track, float *leftOut, float *rightOut)
 {
-    const double pan = qBound(-1.0, track.pan, 1.0);
-    *leftOut = static_cast<float>(qMin(1.0, 1.0 - pan));
-    *rightOut = static_cast<float>(qMin(1.0, 1.0 + pan));
+    panGainsForPan(track.pan, leftOut, rightOut);
 }
 
 double transitionGainForClip(const drift::Track &track, const drift::Clip &clip, drift::TimeUs timelineUs,
@@ -364,6 +369,70 @@ namespace {
 
 constexpr int kMaxCompositeDepth = 4;
 
+void trackFaderScalesAt(const drift::Track &track, drift::TimeUs t, float trackVol,
+                        float trackPanL, float trackPanR, bool hasVolEnv, bool hasPanEnv,
+                        bool hasMuteEnv, float *outL, float *outR)
+{
+    if (hasMuteEnv && track.muteEnvelope.evaluateAt(t) < 0.5) {
+        *outL = 0.0f;
+        *outR = 0.0f;
+        return;
+    }
+    const float envVol =
+        hasVolEnv ? static_cast<float>(std::clamp(track.volumeEnvelope.evaluateAt(t), 0.0, 2.0))
+                  : 1.0f;
+    float tPanL = trackPanL;
+    float tPanR = trackPanR;
+    if (hasPanEnv) {
+        const double effectivePan = qBound(-1.0, track.pan + track.panEnvelope.evaluateAt(t), 1.0);
+        panGainsForPan(effectivePan, &tPanL, &tPanR);
+    }
+    *outL = trackVol * envVol * tPanL;
+    *outR = trackVol * envVol * tPanR;
+}
+
+void applyTrackFaderToBuffer(float *buffer, const drift::Track &track, drift::TimeUs timelineStartUs,
+                             int sampleCount, int sampleRate)
+{
+    if (!buffer || sampleCount <= 0 || sampleRate <= 0)
+        return;
+    float trackPanL = 1.0f;
+    float trackPanR = 1.0f;
+    panGainsForTrack(track, &trackPanL, &trackPanR);
+    const float trackVol = static_cast<float>(qMax(0.0, track.volume));
+    const bool hasVolEnv = !track.volumeEnvelope.isEmpty() && track.volumeEnvelope.enabled();
+    const bool hasPanEnv = !track.panEnvelope.isEmpty() && track.panEnvelope.enabled();
+    const bool hasMuteEnv = !track.muteEnvelope.isEmpty() && track.muteEnvelope.enabled();
+
+    constexpr int kGainStep = 32;
+    auto evalAt = [&](int frame, float *lOut, float *rOut) {
+        const drift::TimeUs t =
+            timelineStartUs
+            + static_cast<drift::TimeUs>((static_cast<int64_t>(frame) * drift::kUsPerSecond) / sampleRate);
+        trackFaderScalesAt(track, t, trackVol, trackPanL, trackPanR, hasVolEnv, hasPanEnv,
+                           hasMuteEnv, lOut, rOut);
+    };
+    float scaleLA = 0.0f;
+    float scaleRA = 0.0f;
+    evalAt(0, &scaleLA, &scaleRA);
+    for (int start = 0; start < sampleCount; start += kGainStep) {
+        const int end = qMin(sampleCount, start + kGainStep);
+        float scaleLB = 0.0f;
+        float scaleRB = 0.0f;
+        evalAt(end < sampleCount ? end : sampleCount - 1, &scaleLB, &scaleRB);
+        const int span = end < sampleCount ? kGainStep : qMax(1, sampleCount - 1 - start);
+        const float slopeL = (scaleLB - scaleLA) / float(span);
+        const float slopeR = (scaleRB - scaleRA) / float(span);
+        for (int i = start; i < end; ++i) {
+            const float step = float(i - start);
+            buffer[i * 2] *= (scaleLA + slopeL * step);
+            buffer[i * 2 + 1] *= (scaleRA + slopeR * step);
+        }
+        scaleLA = scaleLB;
+        scaleRA = scaleRB;
+    }
+}
+
 void accumulateClipAudio(const drift::Project &project, const drift::Clip &clip,
                          const drift::Track &track, drift::TimeUs timelineStartUs,
                          int sampleCount, int sampleRate, float *mixBuffer,
@@ -372,7 +441,7 @@ void accumulateClipAudio(const drift::Project &project, const drift::Clip &clip,
                          const QList<const drift::Clip *> &laneClips, size_t laneKey,
                          quint64 streamSalt, int depth,
                          quint64 snapshotSerial, float *outPeakL = nullptr,
-                         float *outPeakR = nullptr)
+                         float *outPeakR = nullptr, bool applyTrackFader = true)
 {
     if (clip.path.isEmpty() && clip.sequenceId.isEmpty())
         return;
@@ -532,27 +601,18 @@ void accumulateClipAudio(const drift::Project &project, const drift::Clip &clip,
     const auto channelScalesAt = [&](int frame, float *scaleLOut, float *scaleROut) {
         const drift::TimeUs t =
             timelineStartUs + static_cast<drift::TimeUs>((static_cast<int64_t>(frame) * drift::kUsPerSecond) / sampleRate);
-        if (hasTrackMuteEnv && track.muteEnvelope.evaluateAt(t) < 0.5) {
-            *scaleLOut = 0.0f;
-            *scaleROut = 0.0f;
-            return;
-        }
-        const float envVol = hasTrackVolumeEnv
-                                 ? static_cast<float>(std::clamp(track.volumeEnvelope.evaluateAt(t), 0.0, 2.0))
-                                 : 1.0f;
-        float tPanL = trackPanL;
-        float tPanR = trackPanR;
-        if (hasTrackPanEnv) {
-            const double effectivePan = qBound(-1.0, track.pan + track.panEnvelope.evaluateAt(t), 1.0);
-            tPanL = static_cast<float>(qMin(1.0, 1.0 - effectivePan));
-            tPanR = static_cast<float>(qMin(1.0, 1.0 + effectivePan));
+        float tScaleL = 1.0f;
+        float tScaleR = 1.0f;
+        if (applyTrackFader) {
+            trackFaderScalesAt(track, t, trackVol, trackPanL, trackPanR, hasTrackVolumeEnv,
+                               hasTrackPanEnv, hasTrackMuteEnv, &tScaleL, &tScaleR);
         }
         // An edge a butt-cut transition covers is shaped by the transition alone.
         const float clipGain = static_cast<float>(volumeForClip(clip, t) * transitionGainForClip(track, clip, t, edge)
                                                   * clip.fadeMultiplier(t, edge.ownsIn, edge.ownsOut)
                                                   * clip.audioEdgeMultiplier(t, edge.ownsIn, edge.ownsOut));
-        *scaleLOut = clipGain * panL * trackVol * envVol * tPanL;
-        *scaleROut = clipGain * panR * trackVol * envVol * tPanR;
+        *scaleLOut = clipGain * panL * tScaleL;
+        *scaleROut = clipGain * panR * tScaleR;
     };
 
     float peakL = 0.0f;
@@ -662,6 +722,8 @@ void AudioMixer::resetClipAudioState()
         m_masterLevels = {0.0f, 0.0f};
         m_trackMeterPeaks.clear();
         m_masterMeterPeak = {0.0f, 0.0f};
+        m_busLevels.clear();
+        m_busMeterPeaks.clear();
     }
     // The decoders behind those clips are just as discontinuous. Their sequential fast path cannot
     // see a playhead move on its own — a forward seek shorter than its threshold reads as ordinary
@@ -738,6 +800,48 @@ size_t adjustmentsForClip(const QList<const drift::Clip *> &trackLive, const QSt
 
 } // namespace
 
+void processFixedEffectRack(const QString &stateKey, const QList<drift::Effect> &effects,
+                            quint64 serial, drift::TimeUs timelineStartUs, int sampleCount,
+                            int sampleRate, float *buffer, QMutex &stateMutex,
+                            QHash<QString, std::shared_ptr<ClipAudioState>> &clipAudio)
+{
+    if (effects.isEmpty() || !buffer || sampleCount <= 0)
+        return;
+    std::shared_ptr<ClipAudioState> statePtr;
+    {
+        QMutexLocker locker(&stateMutex);
+        statePtr = clipAudio.value(stateKey);
+        if (!statePtr) {
+            statePtr = std::make_shared<ClipAudioState>();
+            clipAudio.insert(stateKey, statePtr);
+        }
+    }
+    drift::AudioEffectRack &rack = statePtr->rack;
+    const drift::TimeUs lastEndUs = rack.lastTimelineEndUs();
+    const bool continuous =
+        lastEndUs >= 0 && qAbs(timelineStartUs - lastEndUs) <= kTimelineGapToleranceUs;
+
+    ClipAudioState &state = *statePtr;
+    if (serial == 0 || state.effectSpecsSerial != serial) {
+        state.effectSpecs = audioEffectSpecsFor(effects, 0);
+        state.effectSpecsSerial = serial;
+    }
+    bool rebuilt = false;
+    const bool active = rack.configure(state.effectSpecs, sampleRate, &rebuilt);
+    if (active && (!continuous || rebuilt))
+        rack.reset(timelineStartUs);
+    if (active)
+        rack.process(buffer, sampleCount, timelineStartUs);
+}
+
+void addScaledStereo(float *dst, const float *src, float gainL, float gainR, int totalFloats)
+{
+    for (int i = 0; i < totalFloats; i += 2) {
+        dst[i] += src[i] * gainL;
+        dst[i + 1] += src[i + 1] * gainR;
+    }
+}
+
 void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleRate,
                      float *interleavedStereoOut) const
 {
@@ -754,14 +858,29 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
     if (!interleavedStereoOut || sampleCount <= 0 || !project)
         return;
 
+    m_realtimeLoudness.setSampleRate(sampleRate);
     std::memset(interleavedStereoOut, 0, static_cast<size_t>(sampleCount) * 2 * sizeof(float));
 
+    const int totalFloats = sampleCount * 2;
     const QList<drift::Track> &tracks = project->tracks();
     bool anySolo = false;
     for (const drift::Track &t : tracks) {
         if (t.solo) {
             anySolo = true;
             break;
+        }
+    }
+    const QList<drift::AudioBus> &buses = project->audioBuses();
+    bool anyBusSolo = false;
+    QHash<QString, QVector<float>> busBuffers;
+    if (!buses.isEmpty()) {
+        busBuffers.reserve(buses.size());
+        for (const drift::AudioBus &bus : buses) {
+            if (bus.id.isEmpty())
+                continue;
+            if (bus.solo && !bus.muted)
+                anyBusSolo = true;
+            busBuffers.insert(bus.id, QVector<float>(totalFloats, 0.0f));
         }
     }
 
@@ -791,27 +910,48 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
 
         liveAdjustments(adjustments.lanes.value(ti), timelineStartUs, trackLive);
 
+        bool hasPreFaderSend = false;
+        bool hasPostFaderSend = false;
+        for (const drift::AudioSend &send : track.audioSends) {
+            if (!send.enabled || send.level <= 0.0 || !busBuffers.contains(send.busId))
+                continue;
+            if (send.preFader)
+                hasPreFaderSend = true;
+            else
+                hasPostFaderSend = true;
+        }
+
+        const bool hasTrackAudioFx = !track.audioEffects.isEmpty();
+        const bool routedToSubBus =
+            !track.outputBusId.isEmpty() && busBuffers.contains(track.outputBusId);
+        const bool needsTrackBuffer =
+            hasTrackAudioFx || hasPreFaderSend || hasPostFaderSend || routedToSubBus;
+
         float peakL = 0.0f;
         float peakR = 0.0f;
-        const bool hasTrackAudioFx = !track.audioEffects.isEmpty();
 
         float *destBuffer = interleavedStereoOut;
-        if (hasTrackAudioFx) {
-            const int totalFloats = sampleCount * 2;
+        if (needsTrackBuffer) {
             if (m_trackMixBuffer.size() < totalFloats)
                 m_trackMixBuffer.resize(totalFloats);
             std::memset(m_trackMixBuffer.data(), 0, static_cast<size_t>(totalFloats) * sizeof(float));
             destBuffer = m_trackMixBuffer.data();
+        } else if (anyBusSolo && !(anySolo && track.solo)) {
+            // Another sub-bus is soloed and this track isn't soloed directly; skip master write
+            // unless it has sub-bus routing/sends (already captured by needsTrackBuffer above).
+            continue;
         }
 
+        const bool applyFaderInAccumulate = !hasPreFaderSend;
         if (track.type == drift::TrackType::Audio) {
             for (const drift::Clip &clip : track.clips) {
                 if (!clip.enabled)
                     continue;
                 const size_t laneKey = adjustmentsForClip(trackLive, clip.id, live);
                 accumulateClipAudio(*project, clip, track, timelineStartUs, sampleCount, sampleRate,
-                                    destBuffer, m_clipAudioMutex, m_clipAudio,
-                                    live, laneKey, m_streamSalt, m_depth, serial, &peakL, &peakR);
+                                    destBuffer, m_clipAudioMutex, m_clipAudio, live, laneKey,
+                                    m_streamSalt, m_depth, serial, &peakL, &peakR,
+                                    applyFaderInAccumulate);
             }
         } else if (track.type == drift::TrackType::Video) {
             for (const drift::Clip &clip : track.clips) {
@@ -819,54 +959,99 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
                     && !clip.suppressEmbeddedAudio) {
                     const size_t laneKey = adjustmentsForClip(trackLive, clip.id, live);
                     accumulateClipAudio(*project, clip, track, timelineStartUs, sampleCount,
-                                        sampleRate, destBuffer, m_clipAudioMutex,
-                                        m_clipAudio, live, laneKey, m_streamSalt, m_depth, serial,
-                                        &peakL, &peakR);
+                                        sampleRate, destBuffer, m_clipAudioMutex, m_clipAudio,
+                                        live, laneKey, m_streamSalt, m_depth, serial, &peakL,
+                                        &peakR, applyFaderInAccumulate);
                 }
             }
         }
 
-        if (hasTrackAudioFx) {
-            const QString trackKey = QStringLiteral("__track_%1__").arg(track.id);
-            std::shared_ptr<ClipAudioState> statePtr;
-            {
-                QMutexLocker locker(&m_clipAudioMutex);
-                statePtr = m_clipAudio.value(trackKey);
-                if (!statePtr) {
-                    statePtr = std::make_shared<ClipAudioState>();
-                    m_clipAudio.insert(trackKey, statePtr);
+        if (needsTrackBuffer) {
+            if (hasPreFaderSend) {
+                for (const drift::AudioSend &send : track.audioSends) {
+                    if (!send.enabled || !send.preFader || send.level <= 0.0)
+                        continue;
+                    auto it = busBuffers.find(send.busId);
+                    if (it != busBuffers.end()) {
+                        const float g = static_cast<float>(send.level);
+                        addScaledStereo(it->data(), m_trackMixBuffer.data(), g, g, totalFloats);
+                    }
                 }
+                applyTrackFaderToBuffer(m_trackMixBuffer.data(), track, timelineStartUs, sampleCount,
+                                        sampleRate);
             }
-            drift::AudioEffectRack &rack = statePtr->rack;
-            const drift::TimeUs lastEndUs = rack.lastTimelineEndUs();
-            const bool continuous = lastEndUs >= 0
-                                    && qAbs(timelineStartUs - lastEndUs) <= kTimelineGapToleranceUs;
 
-            ClipAudioState &state = *statePtr;
-            if (serial == 0 || state.effectSpecsSerial != serial) {
-                state.effectSpecs = audioEffectSpecsFor(track.audioEffects, 0);
-                state.effectSpecsSerial = serial;
+            if (hasTrackAudioFx) {
+                processFixedEffectRack(QStringLiteral("__track_%1__").arg(track.id),
+                                       track.audioEffects, serial, timelineStartUs, sampleCount,
+                                       sampleRate, m_trackMixBuffer.data(), m_clipAudioMutex,
+                                       m_clipAudio);
             }
-            bool rebuilt = false;
-            const bool active = rack.configure(state.effectSpecs, sampleRate, &rebuilt);
-            if (active && (!continuous || rebuilt))
-                rack.reset(timelineStartUs);
-            if (active)
-                rack.process(m_trackMixBuffer.data(), sampleCount, timelineStartUs);
 
-            // Re-measure post-FX peaks for the track meter and sum into main mix
             peakL = 0.0f;
             peakR = 0.0f;
-            const int totalFloats = sampleCount * 2;
             for (int i = 0; i < totalFloats; i += 2) {
                 peakL = qMax(peakL, qAbs(m_trackMixBuffer[i]));
                 peakR = qMax(peakR, qAbs(m_trackMixBuffer[i + 1]));
-                interleavedStereoOut[i] += m_trackMixBuffer[i];
-                interleavedStereoOut[i + 1] += m_trackMixBuffer[i + 1];
+            }
+
+            if (hasPostFaderSend) {
+                for (const drift::AudioSend &send : track.audioSends) {
+                    if (!send.enabled || send.preFader || send.level <= 0.0)
+                        continue;
+                    auto it = busBuffers.find(send.busId);
+                    if (it != busBuffers.end()) {
+                        const float g = static_cast<float>(send.level);
+                        addScaledStereo(it->data(), m_trackMixBuffer.data(), g, g, totalFloats);
+                    }
+                }
+            }
+
+            if (routedToSubBus) {
+                addScaledStereo(busBuffers[track.outputBusId].data(), m_trackMixBuffer.data(), 1.0f,
+                                1.0f, totalFloats);
+            } else if (!anyBusSolo || (anySolo && track.solo)) {
+                addScaledStereo(interleavedStereoOut, m_trackMixBuffer.data(), 1.0f, 1.0f,
+                                totalFloats);
             }
         }
 
         newTrackLevels.insert(ti, {peakL, peakR});
+    }
+
+    QHash<QString, QPair<float, float>> newBusLevels;
+    for (const drift::AudioBus &bus : buses) {
+        if (bus.id.isEmpty())
+            continue;
+        auto bufIt = busBuffers.find(bus.id);
+        if (bufIt == busBuffers.end())
+            continue;
+        if (bus.muted || (anyBusSolo && !bus.solo)) {
+            newBusLevels.insert(bus.id, {0.0f, 0.0f});
+            continue;
+        }
+        float *busData = bufIt->data();
+        if (!bus.audioEffects.isEmpty()) {
+            processFixedEffectRack(QStringLiteral("__bus_%1__").arg(bus.id), bus.audioEffects,
+                                   serial, timelineStartUs, sampleCount, sampleRate, busData,
+                                   m_clipAudioMutex, m_clipAudio);
+        }
+        float busPanL = 1.0f;
+        float busPanR = 1.0f;
+        panGainsForPan(bus.pan, &busPanL, &busPanR);
+        const float busGainL = static_cast<float>(qMax(0.0, bus.volume)) * busPanL;
+        const float busGainR = static_cast<float>(qMax(0.0, bus.volume)) * busPanR;
+        float bPeakL = 0.0f;
+        float bPeakR = 0.0f;
+        for (int i = 0; i < totalFloats; i += 2) {
+            const float l = busData[i] * busGainL;
+            const float r = busData[i + 1] * busGainR;
+            bPeakL = qMax(bPeakL, qAbs(l));
+            bPeakR = qMax(bPeakR, qAbs(r));
+            interleavedStereoOut[i] += l;
+            interleavedStereoOut[i + 1] += r;
+        }
+        newBusLevels.insert(bus.id, {bPeakL, bPeakR});
     }
 
     // The master bus runs on the summed mix, before the limiter — an adjustment that raises level
@@ -934,6 +1119,8 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
         mPeakR = qMax(mPeakR, qAbs(interleavedStereoOut[i * 2 + 1]));
     }
 
+    m_realtimeLoudness.processInterleavedStereo(interleavedStereoOut, sampleCount);
+
     {
         QMutexLocker lock(&m_levelsMutex);
         for (auto it = newTrackLevels.cbegin(); it != newTrackLevels.cend(); ++it) {
@@ -942,6 +1129,12 @@ void AudioMixer::mix(drift::TimeUs timelineStartUs, int sampleCount, int sampleR
             peak.second = qMax(peak.second, it.value().second);
         }
         m_trackLevels = std::move(newTrackLevels);
+        for (auto it = newBusLevels.cbegin(); it != newBusLevels.cend(); ++it) {
+            QPair<float, float> &peak = m_busMeterPeaks[it.key()];
+            peak.first = qMax(peak.first, it.value().first);
+            peak.second = qMax(peak.second, it.value().second);
+        }
+        m_busLevels = std::move(newBusLevels);
         m_masterLevels = {mPeakL, mPeakR};
         m_masterMeterPeak.first = qMax(m_masterMeterPeak.first, mPeakL);
         m_masterMeterPeak.second = qMax(m_masterMeterPeak.second, mPeakR);
@@ -975,4 +1168,20 @@ QPair<float, float> AudioMixer::masterLevels() const
 {
     QMutexLocker lock(&m_levelsMutex);
     return m_masterLevels;
+}
+
+QPair<float, float> AudioMixer::busLevels(const QString &busId) const
+{
+    QMutexLocker lock(&m_levelsMutex);
+    return m_busLevels.value(busId, {0.0f, 0.0f});
+}
+
+drift::RealtimeLoudnessSnapshot AudioMixer::masterLoudness() const
+{
+    return m_realtimeLoudness.snapshot();
+}
+
+void AudioMixer::resetMasterLoudness()
+{
+    m_realtimeLoudness.reset();
 }

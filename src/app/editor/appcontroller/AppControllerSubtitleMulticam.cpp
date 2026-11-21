@@ -1183,8 +1183,11 @@ void AppController::saveMulticamCombined()
 
 void AppController::refreshMulticamTiles()
 {
-    if (!m_multicamActive)
+    if (!m_multicamActive) {
+        if (m_inlineMulticamEnabled)
+            refreshInlineMulticamFrames();
         return;
+    }
     // A refresh is already running. Dropping this one rather than queueing it means a machine
     // that cannot keep up shows fewer tile updates, not tile updates from further and further
     // in the past.
@@ -1270,6 +1273,98 @@ void AppController::refreshMulticamTiles()
                 MulticamImageStore::setTile(tile.first, tile.second);
             ++m_multicamRevision;
             emit multicamFramesChanged();
+        }, Qt::QueuedConnection);
+    });
+}
+
+void AppController::refreshInlineMulticamFrames()
+{
+    if (!m_inlineMulticamEnabled || m_multicamRefreshing)
+        return;
+
+    int ti = -1;
+    int ci = -1;
+    if (!findActiveInlineMulticamClip(&ti, &ci)) {
+        MulticamImageStore::clear();
+        ++m_inlineMulticamRevision;
+        emit inlineMulticamChanged();
+        return;
+    }
+
+    const drift::Clip &clip = m_project.tracks().at(ti).clips.at(ci);
+    if (clip.takes.isEmpty()) {
+        MulticamImageStore::clear();
+        ++m_inlineMulticamRevision;
+        emit inlineMulticamChanged();
+        return;
+    }
+
+    const int maxWidth = qMax(1, static_cast<int>(std::lround(m_project.width() * kMulticamTileScale)));
+    const int maxHeight = qMax(1, static_cast<int>(std::lround(m_project.height() * kMulticamTileScale)));
+    const drift::TimeUs relUs = qBound<drift::TimeUs>(0, m_playheadUs - clip.timelineStart, clip.timelineDuration);
+
+    struct TakeRead
+    {
+        int index = 0;
+        QString path;
+        quint64 streamId = 0;
+        drift::TimeUs sourceUs = 0;
+        int rotationCorrection = 0;
+    };
+
+    QList<TakeRead> reads;
+    QList<int> emptyTakes;
+    for (int i = 0; i < clip.takes.size(); ++i) {
+        const drift::ClipTake &take = clip.takes.at(i);
+        if (take.path.isEmpty()) {
+            emptyTakes.append(i);
+            continue;
+        }
+        const drift::TimeUs srcUs = take.srcIn + static_cast<drift::TimeUs>(std::llround(double(relUs) * clip.speed));
+        reads.append(TakeRead{i, take.path,
+                              kMulticamStreamSalt ^ ClipReaderPool::streamIdForClip(clip.id + QString::number(i)),
+                              srcUs, clip.rotationCorrection});
+    }
+
+    for (int idx : emptyTakes)
+        MulticamImageStore::setTile(idx, QImage());
+
+    if (reads.isEmpty()) {
+        ++m_inlineMulticamRevision;
+        emit inlineMulticamChanged();
+        return;
+    }
+
+    QList<ClipReaderPool::VideoRequest> requests;
+    requests.reserve(reads.size());
+    for (const TakeRead &read : reads)
+        requests.append(ClipReaderPool::VideoRequest{read.path, read.streamId, read.sourceUs,
+                                                     maxWidth, maxHeight, read.rotationCorrection});
+
+    m_multicamRefreshing = true;
+    const int generation = ++m_multicamGeneration;
+
+    m_multicamRefreshFuture = QtConcurrent::run([this, reads, requests, maxWidth, maxHeight, generation]() {
+        ClipReaderPool::instance().warmVideoFrames(requests);
+
+        QList<QPair<int, QImage>> tiles;
+        tiles.reserve(reads.size());
+        for (const TakeRead &read : reads) {
+            tiles.append(qMakePair(read.index,
+                                   ClipReaderPool::instance().readVideoFrame(
+                                       read.path, read.streamId, read.sourceUs, maxWidth, maxHeight,
+                                       read.rotationCorrection)));
+        }
+
+        QMetaObject::invokeMethod(this, [this, tiles, generation]() {
+            if (generation != m_multicamGeneration)
+                return;
+            m_multicamRefreshing = false;
+
+            for (const auto &tile : tiles)
+                MulticamImageStore::setTile(tile.first, tile.second);
+            ++m_inlineMulticamRevision;
+            emit inlineMulticamChanged();
         }, Qt::QueuedConnection);
     });
 }

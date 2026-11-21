@@ -600,6 +600,8 @@ private slots:
     void lookCatalogFindsPacksAndUserLooks();
     void trackEnvelopesEvaluateInMixerAndCompositor();
     void audioEventSwitchesAndPitchShiftInMixer();
+    void audioSubBusesAuxSendsAndRealtimeLufs();
+    void videoTrackFxMasterFxAndTrackMotionCompositing();
 
 private:
     static QString makeColorSegmentsVideo(QTemporaryDir &dir);
@@ -20113,6 +20115,176 @@ void EngineTest::audioEventSwitchesAndPitchShiftInMixer()
         maxRms = qMax(maxRms, std::sqrt(sq / pitchOut.size()));
     }
     QVERIFY(maxRms > 0.1);
+}
+
+void EngineTest::audioSubBusesAuxSendsAndRealtimeLufs()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    constexpr int kRate = 48000;
+    const QString wavPath = dir.filePath(QStringLiteral("sine_stereo.wav"));
+    constexpr int kTotalFrames = kRate * 1; // 1.0 second
+    QVERIFY(writeStereoWav(wavPath, kRate, kTotalFrames, [&](int i, int16_t &l, int16_t &r) {
+        const double v = 0.4 * std::sin(2.0 * M_PI * 1000.0 * double(i) / double(kRate));
+        const int16_t s = static_cast<int16_t>(v * 32767.0);
+        l = s;
+        r = s;
+    }));
+
+    drift::Project project;
+    project.tracks().clear();
+
+    drift::AudioBus subBus;
+    subBus.id = QStringLiteral("bus-sub");
+    subBus.name = QStringLiteral("Submix");
+    subBus.volume = 0.5;
+    subBus.pan = 0.0;
+
+    drift::AudioBus auxBus;
+    auxBus.id = QStringLiteral("bus-aux");
+    auxBus.name = QStringLiteral("Aux");
+    auxBus.volume = 1.0;
+    auxBus.pan = 1.0; // hard-right only
+    project.setAudioBuses({subBus, auxBus});
+
+    drift::Track aTrack;
+    aTrack.id = QStringLiteral("track-a");
+    aTrack.type = drift::TrackType::Audio;
+    aTrack.volume = 0.25;
+    aTrack.outputBusId = subBus.id;
+    aTrack.audioSends.append(drift::AudioSend{auxBus.id, 0.5, true /*preFader*/, true});
+
+    drift::Clip clip;
+    clip.id = QStringLiteral("clip-bus");
+    clip.type = drift::ClipType::Audio;
+    clip.path = wavPath;
+    clip.timelineStart = 0;
+    clip.timelineDuration = drift::secondsToUs(1.0);
+    clip.srcIn = 0;
+    clip.srcOut = drift::secondsToUs(1.0);
+    aTrack.clips.append(clip);
+    project.tracks().append(aTrack);
+
+    AudioMixer mixer;
+    mixer.setProject(&project);
+    mixer.setMasterClipEnabled(false);
+
+    // Mix 0.6s in chunks to feed multiple 100ms hops into RealtimeLoudnessMeter.
+    QVector<float> buf(4800 * 2, 0.0f);
+    double peakL = 0.0;
+    double peakR = 0.0;
+    for (int block = 0; block < 6; ++block) {
+        const drift::TimeUs tUs = static_cast<drift::TimeUs>(block) * 100000;
+        mixer.mix(tUs, 4800, kRate, buf.data());
+        for (int i = 0; i < 4800; ++i) {
+            peakL = qMax(peakL, qAbs(double(buf[i * 2])));
+            peakR = qMax(peakR, qAbs(double(buf[i * 2 + 1])));
+        }
+    }
+    // Left gets subBus only: 0.4 * 0.25 * 0.5 = 0.05; Right gets subBus (0.05) + preFader aux (0.4 * 0.5 = 0.20) = 0.25.
+    QVERIFY(qAbs(peakL - 0.05) < 0.01);
+    QVERIFY(qAbs(peakR - 0.25) < 0.02);
+
+    const drift::RealtimeLoudnessSnapshot snap = mixer.masterLoudness();
+    QVERIFY(snap.momentaryLufs > -40.0 && snap.momentaryLufs < 0.0);
+    QVERIFY(snap.integratedLufs > -40.0 && snap.integratedLufs < 0.0);
+    QVERIFY(snap.maxHoldTruePeakDbfs > -20.0 && snap.maxHoldTruePeakDbfs < 0.0);
+
+    mixer.resetMasterLoudness();
+    const drift::RealtimeLoudnessSnapshot resetSnap = mixer.masterLoudness();
+    QVERIFY(resetSnap.momentaryLufs <= -69.5);
+    QVERIFY(resetSnap.maxHoldTruePeakDbfs <= -119.5);
+
+    // Muting sub-bus removes sub-bus contribution while keeping pre-fader aux send on right channel.
+    project.audioBuses()[0].muted = true;
+    mixer.resetClipAudioState();
+    mixer.mix(0, 4800, kRate, buf.data());
+    double mutedPeakL = 0.0;
+    double mutedPeakR = 0.0;
+    for (int i = 0; i < 4800; ++i) {
+        mutedPeakL = qMax(mutedPeakL, qAbs(double(buf[i * 2])));
+        mutedPeakR = qMax(mutedPeakR, qAbs(double(buf[i * 2 + 1])));
+    }
+    QVERIFY(mutedPeakL < 1e-4);
+    QVERIFY(qAbs(mutedPeakR - 0.20) < 0.02);
+}
+
+void EngineTest::videoTrackFxMasterFxAndTrackMotionCompositing()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString imgPath = dir.filePath(QStringLiteral("tile.png"));
+    QImage img(64, 64, QImage::Format_RGBA8888);
+    img.fill(Qt::white);
+    QVERIFY(img.save(imgPath));
+
+    drift::Project project;
+    project.setResolution(64, 64);
+    project.tracks().clear();
+
+    drift::Track parentTrack;
+    parentTrack.id = QStringLiteral("parent-v1");
+    parentTrack.type = drift::TrackType::Video;
+    parentTrack.motion.enabled = true;
+    parentTrack.motion.scaleX = 0.5;
+    parentTrack.motion.scaleY = 0.5;
+    parentTrack.motion.posX = 0.25;
+    parentTrack.motion.opacity = 0.8;
+
+    drift::Track childTrack;
+    childTrack.id = QStringLiteral("child-v2");
+    childTrack.type = drift::TrackType::Video;
+    childTrack.compositeParentTrackId = parentTrack.id;
+    childTrack.compositeBlendMode = drift::BlendMode::Multiply;
+
+    drift::Effect trackFx;
+    trackFx.name = QStringLiteral("eq");
+    trackFx.catalogId = QStringLiteral("brightness");
+    trackFx.parameters.insert(QStringLiteral("brightness"), 0.1);
+    childTrack.effects.append(trackFx);
+
+    drift::Clip clip;
+    clip.id = QStringLiteral("clip-v2");
+    clip.type = drift::ClipType::Image;
+    clip.path = imgPath;
+    clip.timelineStart = 0;
+    clip.timelineDuration = drift::secondsToUs(2.0);
+    clip.srcIn = 0;
+    clip.srcOut = drift::secondsToUs(2.0);
+    childTrack.clips.append(clip);
+
+    project.tracks().append(parentTrack);
+    project.tracks().append(childTrack);
+
+    drift::Effect masterFx;
+    masterFx.name = QStringLiteral("eq");
+    masterFx.catalogId = QStringLiteral("contrast");
+    masterFx.parameters.insert(QStringLiteral("contrast"), 1.2);
+    project.setMasterVideoEffects({masterFx});
+
+    const QList<drift::TransformParent> parents = drift::transformParentsAt(project, 0, 1.0);
+    QCOMPARE(parents.size(), 2);
+    QVERIFY(parents.at(1).hasParent);
+    QVERIFY(qAbs(parents.at(1).opacity - 0.8) < 1e-4);
+
+    // Cycle protection: setting parentTrack -> childTrack must still return safely.
+    drift::Project cyclic = project;
+    cyclic.tracks()[0].compositeParentTrackId = childTrack.id;
+    const QList<drift::TransformParent> cyclicParents = drift::transformParentsAt(cyclic, 0, 1.0);
+    QCOMPARE(cyclicParents.size(), 2);
+
+    FrameCompositor compositor;
+    compositor.setProject(&project);
+    GpuScene scene;
+    QVERIFY(compositor.buildSceneAt(0, {}, &scene));
+    QCOMPARE(scene.items.size(), 2);
+    QCOMPARE(scene.items.at(0).blend, drift::BlendMode::Multiply);
+    QCOMPARE(scene.items.at(0).layer.effects.size(), 1);
+    QVERIFY(scene.items.at(0).layer.hasParent);
+    QVERIFY(qAbs(scene.items.at(0).layer.opacity - 0.8) < 1e-4);
+    QVERIFY(scene.items.at(1).isAdjustment);
+    QCOMPARE(scene.items.at(1).layer.effects.size(), 1);
+    QCOMPARE(scene.items.at(1).layer.effects.at(0).catalogId, QStringLiteral("contrast"));
 }
 
 #include "tst_engine.moc"

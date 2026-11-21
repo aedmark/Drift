@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Layouts
 import Drift
 
 PanelFrame {
@@ -9,6 +10,26 @@ PanelFrame {
     property string loudnessText: qsTr("Loudness: not measured")
     property bool loudnessIsError: false
     property bool loudnessNormalizing: false
+    property var liveLoudness: ({
+        momentaryLufs: -70.0,
+        shortTermLufs: -70.0,
+        integratedLufs: -70.0,
+        truePeakDbfs: -120.0,
+        maxHoldTruePeakDbfs: -120.0,
+        loudnessRangeLu: 0.0,
+        clipping: false
+    })
+
+    function refreshLiveLoudness() {
+        liveLoudness = EditorState.masterLoudness()
+    }
+
+    Timer {
+        interval: 150
+        repeat: true
+        running: root.visible && EditorState.playing
+        onTriggered: root.refreshLiveLoudness()
+    }
 
     Connections {
         target: EditorState
@@ -73,6 +94,48 @@ PanelFrame {
             anchors.leftMargin: Theme.spacingMd
             anchors.rightMargin: Theme.spacingMd
             spacing: Theme.spacingSm
+
+            RowLayout {
+                width: parent.width
+                spacing: Theme.spacingSm
+
+                Text {
+                    Layout.fillWidth: true
+                    text: {
+                        const fmt = (v, floor) => v <= floor ? "−∞" : v.toFixed(1)
+                        return qsTr("Master LUFS  M %1 · S %2 · I %3  |  TP %4 dB")
+                            .arg(fmt(root.liveLoudness.momentaryLufs, -69.5))
+                            .arg(fmt(root.liveLoudness.shortTermLufs, -69.5))
+                            .arg(fmt(root.liveLoudness.integratedLufs, -69.5))
+                            .arg(fmt(root.liveLoudness.maxHoldTruePeakDbfs, -119.5))
+                    }
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeXs
+                    color: (root.liveLoudness.clipping || root.liveLoudness.maxHoldTruePeakDbfs > -1.0)
+                           ? Theme.c.audioMixerStrip.destructive
+                           : Theme.c.audioMixerStrip.foregroundMuted
+                    elide: Text.ElideRight
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            EditorState.resetMasterLoudness()
+                            root.refreshLiveLoudness()
+                        }
+                    }
+
+                    ThemedToolTip {
+                        text: qsTr("Real-time ITU-R BS.1770 / EBU R128 loudness (Momentary / Short-Term / Integrated LUFS & True Peak hold). Click to reset.")
+                    }
+                }
+
+                ThemedButton {
+                    text: qsTr("+ Bus")
+                    tooltip: qsTr("Add an audio sub-bus")
+                    onClicked: EditorState.addAudioBus()
+                }
+            }
 
             Row {
                 width: parent.width

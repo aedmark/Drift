@@ -123,6 +123,16 @@ ThemedContextMenu {
                 }
             }
         }))
+        sub.addItem(takeActionComponent.createObject(null, {
+            text: qsTr("Create Multicamera Track from Selection"),
+            actionMethod: function() { EditorState.createMulticamTrackFromSelection() }
+        }))
+        sub.addItem(takeActionComponent.createObject(null, {
+            text: EditorState.inlineMulticamEnabled
+                  ? qsTr("Exit Inline Multicamera Mode (Alt+Shift+C)")
+                  : qsTr("Inline Multicamera Mode (Alt+Shift+C)"),
+            actionMethod: function() { EditorState.toggleInlineMulticam() }
+        }))
 
         let at = count
         for (let i = 0; i < count; i++) {

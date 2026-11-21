@@ -550,6 +550,9 @@ private slots:
     void topEdgeClipHandlesUndoAndValues();
     void audioSwitchesPitchAndNormalizeUndoRoundTrip();
     void rollAndSlideEditsClampPartnersAndUndo();
+    void audioBusesSendsCrudUndoAndRoundTrip();
+    void videoTrackFxMasterFxTrackMotionAndParentCompositeRoundTrip();
+    void inlineMulticamCreateFromSelectionAndPunchTakesUndo();
 };
 
 // A file dragged in from the file manager has no bin row yet, so the timeline's drop preview
@@ -19130,6 +19133,183 @@ void EditorStateTest::rollAndSlideEditsClampPartnersAndUndo()
     QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineDuration, drift::secondsToUs(2.0));
     QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(2.0));
     QCOMPARE(state.project()->tracks().at(0).clips.at(2).timelineStart, drift::secondsToUs(4.0));
+}
+
+void EditorStateTest::audioBusesSendsCrudUndoAndRoundTrip()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    state.project()->tracks().clear();
+    state.project()->tracks().append(drift::Track{.id = QStringLiteral("a1"), .type = drift::TrackType::Audio});
+
+    const QString busId = state.addAudioBus(QStringLiteral("Dialog Bus"));
+    QVERIFY(!busId.isEmpty());
+    QCOMPARE(state.audioBuses().size(), 1);
+
+    state.renameAudioBus(busId, QStringLiteral("Dialogue"));
+    state.setAudioBusVolume(busId, 0.75);
+    state.setAudioBusPan(busId, -0.3);
+    state.setAudioBusMuted(busId, true);
+    state.setAudioBusSolo(busId, true);
+
+    const QVariantList audioCat = state.audioEffectCatalog();
+    QVERIFY(!audioCat.isEmpty());
+    const QString fxId = audioCat.first().toMap().value(QStringLiteral("id")).toString();
+    state.addBusAudioEffect(busId, fxId);
+    QCOMPARE(state.busAudioEffects(busId).size(), 1);
+    state.setBusAudioEffectEnabled(busId, 0, false);
+
+    state.setTrackOutputBus(0, busId);
+    state.setTrackAudioSend(0, busId, 0.5, true /*preFader*/, true);
+    QCOMPARE(state.trackOutputBus(0), busId);
+    QCOMPARE(state.trackAudioSends(0).size(), 1);
+
+    const drift::Project reloaded = drift::Project::fromJson(state.project()->toJson());
+    QCOMPARE(reloaded.audioBuses().size(), 1);
+    QCOMPARE(reloaded.audioBuses().at(0).name, QStringLiteral("Dialogue"));
+    QVERIFY(qAbs(reloaded.audioBuses().at(0).volume - 0.75) < 1e-6);
+    QVERIFY(qAbs(reloaded.audioBuses().at(0).pan + 0.3) < 1e-6);
+    QVERIFY(reloaded.audioBuses().at(0).muted);
+    QVERIFY(reloaded.audioBuses().at(0).solo);
+    QCOMPARE(reloaded.audioBuses().at(0).audioEffects.size(), 1);
+    QVERIFY(!reloaded.audioBuses().at(0).audioEffects.at(0).enabled);
+    QCOMPARE(reloaded.tracks().at(0).outputBusId, busId);
+    QCOMPARE(reloaded.tracks().at(0).audioSends.size(), 1);
+    QVERIFY(reloaded.tracks().at(0).audioSends.at(0).preFader);
+
+    state.removeAudioBus(busId);
+    QCOMPARE(state.audioBuses().size(), 0);
+    QCOMPARE(state.trackOutputBus(0), QString());
+    QCOMPARE(state.trackAudioSends(0).size(), 0);
+
+    state.undo();
+    QCOMPARE(state.audioBuses().size(), 1);
+    QCOMPARE(state.trackOutputBus(0), busId);
+    QCOMPARE(state.trackAudioSends(0).size(), 1);
+}
+
+void EditorStateTest::videoTrackFxMasterFxTrackMotionAndParentCompositeRoundTrip()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    state.project()->tracks().clear();
+    state.project()->tracks().append(drift::Track{.id = QStringLiteral("v1"), .type = drift::TrackType::Video});
+    state.project()->tracks().append(drift::Track{.id = QStringLiteral("v2"), .type = drift::TrackType::Video});
+
+    const QVariantList fxCat = state.effectCatalog();
+    QVERIFY(!fxCat.isEmpty());
+    const QString fxId = fxCat.first().toMap().value(QStringLiteral("id")).toString();
+
+    state.addTrackVideoEffect(0, fxId);
+    QCOMPARE(state.trackVideoEffects(0).size(), 1);
+    state.setTrackVideoEffectEnabled(0, 0, false);
+    QCOMPARE(state.trackVideoEffects(0).at(0).toMap().value(QStringLiteral("enabled")).toBool(), false);
+
+    state.addMasterVideoEffect(fxId);
+    QCOMPARE(state.masterVideoEffects().size(), 1);
+    state.setMasterVideoEffectEnabled(0, false);
+    QCOMPARE(state.masterVideoEffects().at(0).toMap().value(QStringLiteral("enabled")).toBool(), false);
+
+    state.setTrackMotion(1, QVariantMap{
+        {QStringLiteral("enabled"), true},
+        {QStringLiteral("scaleX"), 0.5},
+        {QStringLiteral("scaleY"), 0.5},
+        {QStringLiteral("posX"), 0.2},
+        {QStringLiteral("opacity"), 0.75},
+    });
+    QCOMPARE(state.trackMotion(1).value(QStringLiteral("enabled")).toBool(), true);
+    QVERIFY(qAbs(state.trackMotion(1).value(QStringLiteral("scaleX")).toDouble() - 0.5) < 1e-6);
+
+    // Self-parenting and cyclic parenting must be rejected.
+    QVERIFY(!state.setTrackCompositeParent(0, QStringLiteral("v1")));
+    QVERIFY(state.setTrackCompositeParent(1, QStringLiteral("v1")));
+    QVERIFY(!state.setTrackCompositeParent(0, QStringLiteral("v2")));
+    state.setTrackCompositeBlendMode(1, QStringLiteral("multiply"));
+
+    const drift::Project reloaded = drift::Project::fromJson(state.project()->toJson());
+    QCOMPARE(reloaded.tracks().at(0).effects.size(), 1);
+    QCOMPARE(reloaded.masterVideoEffects().size(), 1);
+    QVERIFY(reloaded.tracks().at(1).motion.enabled);
+    QVERIFY(qAbs(reloaded.tracks().at(1).motion.posX - 0.2) < 1e-6);
+    QCOMPARE(reloaded.tracks().at(1).compositeParentTrackId, QStringLiteral("v1"));
+    QCOMPARE(reloaded.tracks().at(1).compositeBlendMode, drift::BlendMode::Multiply);
+
+    state.undo(); // composite blend mode
+    state.undo(); // composite parent
+    QCOMPARE(state.trackCompositeParent(1), QString());
+    state.resetTrackMotion(1);
+    QCOMPARE(state.trackMotion(1).value(QStringLiteral("enabled")).toBool(), false);
+}
+
+void EditorStateTest::inlineMulticamCreateFromSelectionAndPunchTakesUndo()
+{
+    AssetLibrary library;
+    AppController state(&library);
+    state.project()->tracks().clear();
+    state.project()->tracks().append(drift::Track{.id = QStringLiteral("v1"), .type = drift::TrackType::Video});
+    state.project()->tracks().append(drift::Track{.id = QStringLiteral("v2"), .type = drift::TrackType::Video});
+
+    drift::MediaAsset a1, a2;
+    a1.id = QStringLiteral("cam1");
+    a1.path = QStringLiteral("/tmp/cam1.mp4");
+    a1.kind = drift::MediaKind::Video;
+    a1.durationUs = drift::secondsToUs(6.0);
+    a2.id = QStringLiteral("cam2");
+    a2.path = QStringLiteral("/tmp/cam2.mp4");
+    a2.kind = drift::MediaKind::Video;
+    a2.durationUs = drift::secondsToUs(6.0);
+    state.project()->assets().insert(a1.id, a1);
+    state.project()->assets().insert(a2.id, a2);
+    state.project()->assetOrder().append({a1.id, a2.id});
+
+    drift::Clip c1, c2;
+    c1.id = QStringLiteral("c1");
+    c1.name = QStringLiteral("Cam 1");
+    c1.assetId = a1.id;
+    c1.path = a1.path;
+    c1.type = drift::ClipType::Video;
+    c1.timelineStart = 0;
+    c1.timelineDuration = drift::secondsToUs(4.0);
+    c1.srcIn = 0;
+    c1.srcOut = drift::secondsToUs(4.0);
+
+    c2.id = QStringLiteral("c2");
+    c2.name = QStringLiteral("Cam 2");
+    c2.assetId = a2.id;
+    c2.path = a2.path;
+    c2.type = drift::ClipType::Video;
+    c2.timelineStart = 0;
+    c2.timelineDuration = drift::secondsToUs(4.0);
+    c2.srcIn = 0;
+    c2.srcOut = drift::secondsToUs(4.0);
+
+    state.project()->tracks()[0].clips.append(c1);
+    state.project()->tracks()[1].clips.append(c2);
+
+    state.setSelection({
+        QVariantMap{{QStringLiteral("track"), 0}, {QStringLiteral("clip"), 0}},
+        QVariantMap{{QStringLiteral("track"), 1}, {QStringLiteral("clip"), 0}},
+    });
+    QVERIFY(state.createMulticamTrackFromSelection());
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 1);
+    QCOMPARE(state.project()->tracks().at(1).clips.size(), 0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).takes.size(), 2);
+
+    state.setInlineMulticamEnabled(true);
+    QVERIFY(state.inlineMulticamEnabled());
+    QCOMPARE(state.inlineMulticamTakes().size(), 2);
+
+    state.setPlayheadSeconds(2.0);
+    QVERIFY(state.punchMulticamTake(1));
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 2);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).activeTakeIndex, 0);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).activeTakeIndex, 1);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(1).timelineStart, drift::secondsToUs(2.0));
+
+    // Undoing the punch restores the unsplit 0..4s multi-take clip in one step.
+    state.undo();
+    QCOMPARE(state.project()->tracks().at(0).clips.size(), 1);
+    QCOMPARE(state.project()->tracks().at(0).clips.at(0).timelineDuration, drift::secondsToUs(4.0));
 }
 
 QTEST_MAIN(EditorStateTest)

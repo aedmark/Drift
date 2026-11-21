@@ -28,6 +28,63 @@ enum class AdjustmentScope { AllBelow, ParentTrack, Range, Camera };
 QString adjustmentScopeToString(AdjustmentScope scope);
 AdjustmentScope adjustmentScopeFromString(const QString &scope);
 
+// Parallel aux / FX send from an audio-capable track to an AudioBus.
+struct AudioSend
+{
+    QString busId;
+    double level = 0.0; // Linear gain in [0.0, 2.0].
+    bool preFader = false;
+    bool enabled = true;
+
+    bool operator==(const AudioSend &) const = default;
+};
+
+// Project-level audio submix / FX bus routed to Master.
+struct AudioBus
+{
+    QString id;
+    QString name;
+    double volume = 1.0; // Linear gain in [0.0, 2.0].
+    double pan = 0.0;    // -1.0 (left) .. 1.0 (right).
+    bool muted = false;
+    bool solo = false;
+    QList<Effect> audioEffects;
+};
+
+// Persistent 2D / 3D track-wide motion transform applied to all clips on a video/overlay track.
+struct TrackMotion
+{
+    bool enabled = false;
+    double posX = 0.0;    // Normalized canvas-width offset (-1.0 .. 1.0).
+    double posY = 0.0;    // Normalized canvas-height offset (-1.0 .. 1.0).
+    double scaleX = 1.0;
+    double scaleY = 1.0;
+    double rotationDeg = 0.0;
+    double rotationXDeg = 0.0;
+    double rotationYDeg = 0.0;
+    double zOffset = 0.0; // Normalized 3D Z depth offset.
+    double opacity = 1.0; // Track-wide alpha multiplier [0.0, 1.0].
+
+    KeyframeTrack<double> posXTrack;
+    KeyframeTrack<double> posYTrack;
+    KeyframeTrack<double> scaleXTrack;
+    KeyframeTrack<double> scaleYTrack;
+    KeyframeTrack<double> rotationTrack;
+    KeyframeTrack<double> opacityTrack;
+
+    bool isDefault() const
+    {
+        return !enabled && qFuzzyIsNull(posX) && qFuzzyIsNull(posY)
+               && qFuzzyCompare(scaleX, 1.0) && qFuzzyCompare(scaleY, 1.0)
+               && qFuzzyIsNull(rotationDeg) && qFuzzyIsNull(rotationXDeg)
+               && qFuzzyIsNull(rotationYDeg) && qFuzzyIsNull(zOffset)
+               && qFuzzyCompare(opacity, 1.0) && posXTrack.isEmpty()
+               && posYTrack.isEmpty() && scaleXTrack.isEmpty()
+               && scaleYTrack.isEmpty() && rotationTrack.isEmpty()
+               && opacityTrack.isEmpty();
+    }
+};
+
 struct Track
 {
     // Stable across reorders, unlike the array index. Nested lanes point at their parent by
@@ -84,6 +141,16 @@ struct Track
     // Range tracks only: the last track the layer covers. Kept when that track is moved above
     // the layer, so moving it back restores the group.
     QString spanEndTrackId;
+
+    // Audio routing (Tier 2): empty outputBusId routes directly to Master.
+    QString outputBusId;
+    QList<AudioSend> audioSends;
+
+    // Video track FX, track motion & parent/child compositing (Tier 2).
+    QList<Effect> effects;
+    TrackMotion motion;
+    QString compositeParentTrackId;
+    BlendMode compositeBlendMode = BlendMode::Normal;
 
     bool allowsClipType(ClipType clipType) const;
     // allowsClipType plus the adjustment kind: a Range track holds Transform clips and nothing

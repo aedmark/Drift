@@ -125,6 +125,64 @@ Popup {
             checked: EditorState.preview.maskEditMode
             onToggled: EditorState.preview.maskEditMode = checked
         }
+
+        ThemedSwitch {
+            Layout.columnSpan: 2
+            Layout.fillWidth: true
+            text: qsTr("Inline Multicamera Mode (Alt+Shift+C)")
+            tooltip: qsTr("Split the preview into live clickable angle tiles while cutting multi-take clips")
+            checked: EditorState.inlineMulticamEnabled
+            onToggled: EditorState.setInlineMulticamEnabled(checked)
+        }
+
+        PreviewOptionsRowLabel { text: qsTr("Master FX") }
+        ThemedButton {
+            Layout.fillWidth: true
+            text: EditorState.masterVideoEffects.length > 0
+                  ? qsTr("%1 active…").arg(EditorState.masterVideoEffects.length)
+                  : qsTr("None…")
+            tooltip: qsTr("Master Video Output FX applied after all tracks composite")
+            onClicked: masterVideoFxMenu.open()
+
+            ThemedContextMenu {
+                id: masterVideoFxMenu
+                Repeater {
+                    model: EditorState.masterVideoEffects.length
+                    delegate: ThemedMenuItem {
+                        required property int index
+                        readonly property var effectItem: EditorState.masterVideoEffects[index] || ({})
+                        text: (effectItem.label || effectItem.catalogId || qsTr("Effect"))
+                              + (effectItem.enabled === false ? qsTr(" [Bypassed]") : "")
+                        icon.name: effectItem.enabled !== false ? Theme.icons.check : Theme.icons.slash
+                        onTriggered: EditorState.setMasterVideoEffectEnabled(index, effectItem.enabled === false)
+                    }
+                }
+                ThemedMenuSeparator { visible: EditorState.masterVideoEffects.length > 0 }
+                ThemedContextMenu {
+                    id: addMasterVideoFxSub
+                    title: qsTr("Add master video effect…")
+                    Instantiator {
+                        model: EditorState.effectCatalog()
+                        delegate: ThemedMenuItem {
+                            required property var modelData
+                            text: modelData.displayName || modelData.name || modelData.id || ""
+                            onTriggered: EditorState.addMasterVideoEffect(modelData.id)
+                        }
+                        onObjectAdded: (idx, item) => addMasterVideoFxSub.insertItem(idx, item)
+                        onObjectRemoved: (idx, item) => addMasterVideoFxSub.removeItem(item)
+                    }
+                }
+                ThemedMenuItem {
+                    visible: EditorState.masterVideoEffects.length > 0
+                    text: qsTr("Remove all master effects")
+                    icon.name: Theme.icons.trash
+                    onTriggered: {
+                        for (let i = EditorState.masterVideoEffects.length - 1; i >= 0; i--)
+                            EditorState.removeMasterVideoEffect(i)
+                    }
+                }
+            }
+        }
     }
 
     // Picking a decoder that runs on the other GPU is a legitimate choice — some codecs only the

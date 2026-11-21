@@ -140,7 +140,9 @@ Rectangle {
                         solo: t.solo === true,
                         volume: t.volume !== undefined ? t.volume : 1.0,
                         pan: t.pan !== undefined ? t.pan : 0.0,
-                        audioEffects: t.audioEffects || []
+                        audioEffects: t.audioEffects || [],
+                        outputBusId: t.outputBusId || "",
+                        audioSends: t.audioSends || []
                     })
                 }
                 return result
@@ -179,6 +181,15 @@ Rectangle {
                             strip.applyMeter(levels[2 + i * 2], levels[3 + i * 2], now)
                     }
 
+                    const buses = EditorState.audioBuses
+                    for (let b = 0; b < buses.length; b++) {
+                        const busStrip = busRepeater.itemAt(b)
+                        if (busStrip) {
+                            const bLvl = EditorState.audioBusLevels(buses[b].id)
+                            busStrip.applyMeter(bLvl.left || 0.0, bLvl.right || 0.0, now)
+                        }
+                    }
+
                     const mTargetL = levels[0]
                     const mTargetR = levels[1]
                     const decay = content.meterDecay
@@ -209,6 +220,11 @@ Rectangle {
                     const strip = stripRepeater.itemAt(i)
                     if (strip)
                         strip.clearMeter()
+                }
+                for (let b = 0; b < busRepeater.count; b++) {
+                    const bStrip = busRepeater.itemAt(b)
+                    if (bStrip)
+                        bStrip.clearMeter()
                 }
                 masterLevelL = 0.0
                 masterLevelR = 0.0
@@ -261,6 +277,19 @@ Rectangle {
                             width: Math.max(0, parent.width - Theme.iconSizeMd - parent.spacing)
                             anchors.verticalCenter: parent.verticalCenter
                         }
+                    }
+
+                    IconButton {
+                        id: addBusHeaderBtn
+                        anchors.right: headerCloseBtn.left
+                        anchors.rightMargin: Theme.spacingXs
+                        anchors.verticalCenter: parent.verticalCenter
+                        buttonSize: 24
+                        iconSize: Theme.iconSizeSm
+                        glyph: Theme.icons.plus
+                        variant: "text"
+                        tooltip: qsTr("Add audio sub-bus")
+                        onClicked: EditorState.addAudioBus()
                     }
 
                     IconButton {
@@ -599,8 +628,21 @@ Rectangle {
                                     pan: modelData.pan
                                     hasFx: (modelData.audioEffects || []).length > 0
                                     fxCount: (modelData.audioEffects || []).length
+                                    routeLabel: {
+                                        const bid = modelData.outputBusId || ""
+                                        if (!bid)
+                                            return ""
+                                        const buses = EditorState.audioBuses
+                                        for (let bi = 0; bi < buses.length; bi++) {
+                                            if (buses[bi].id === bid)
+                                                return buses[bi].name.slice(0, 4)
+                                        }
+                                        return "Bus"
+                                    }
+                                    hasSends: (modelData.audioSends || []).length > 0
 
                                     onFxClicked: fxContextMenu.openForTrack(trackIndex, modelData.name, modelData.audioEffects || [])
+                                    onRouteClicked: routeContextMenu.openForTrack(trackIndex, modelData.name, modelData.outputBusId || "", modelData.audioSends || [])
                                     onMuteToggled: EditorState.setTrackMuted(trackIndex, !muted)
                                     onSoloToggled: EditorState.setTrackSolo(trackIndex, !solo)
                                     onArmToggled: {
@@ -628,6 +670,78 @@ Rectangle {
                                     onPanPreviewed: (value) => EditorState.previewTrackPan(trackIndex, value)
                                     onPanCommitted: EditorState.setTrackPan(trackIndex, modelData.pan)
                                     onPanSet: (value) => EditorState.setTrackPan(trackIndex, value)
+                                }
+                            }
+
+                            Repeater {
+                                id: busRepeater
+                                model: EditorState.audioBuses.length
+
+                                delegate: MixerChannelStrip {
+                                    id: busStrip
+                                    required property int index
+                                    readonly property var busData: EditorState.audioBuses[index] || ({})
+                                    readonly property string busId: busData.id || ""
+                                    property real peakHoldTimeL: 0
+                                    property real peakHoldTimeR: 0
+                                    property real liveVolume: busData.volume !== undefined ? busData.volume : 1.0
+                                    property real livePan: busData.pan !== undefined ? busData.pan : 0.0
+
+                                    function applyMeter(targetL, targetR, now) {
+                                        const decay = content.meterDecay
+                                        const peakDecay = content.meterPeakDecay
+                                        levelL = targetL >= levelL ? targetL : Math.max(0.0, levelL - decay)
+                                        levelR = targetR >= levelR ? targetR : Math.max(0.0, levelR - decay)
+                                        if (targetL >= peakL) {
+                                            peakL = targetL
+                                            peakHoldTimeL = now
+                                        } else if (now - peakHoldTimeL > content.meterPeakHoldMs) {
+                                            peakL = Math.max(0.0, peakL - peakDecay)
+                                        }
+                                        if (targetR >= peakR) {
+                                            peakR = targetR
+                                            peakHoldTimeR = now
+                                        } else if (now - peakHoldTimeR > content.meterPeakHoldMs) {
+                                            peakR = Math.max(0.0, peakR - peakDecay)
+                                        }
+                                    }
+
+                                    function clearMeter() {
+                                        levelL = 0
+                                        levelR = 0
+                                        peakL = 0
+                                        peakR = 0
+                                    }
+
+                                    width: root.stripWidth
+                                    height: stripsRow.height
+                                    mixer: root
+                                    isBus: true
+                                    canRecord: false
+                                    name: busData.name || qsTr("Bus")
+                                    muted: busData.muted === true
+                                    solo: busData.solo === true
+                                    volume: liveVolume
+                                    pan: livePan
+                                    hasFx: (busData.audioEffects || []).length > 0
+                                    fxCount: (busData.audioEffects || []).length
+
+                                    onFxClicked: fxContextMenu.openForBus(busId, name, busData.audioEffects || [])
+                                    onRouteClicked: routeContextMenu.openForBus(busId, name)
+                                    onMuteToggled: EditorState.setAudioBusMuted(busId, !muted)
+                                    onSoloToggled: EditorState.setAudioBusSolo(busId, !solo)
+                                    onVolumePreviewed: (gain) => liveVolume = gain
+                                    onVolumeCommitted: EditorState.setAudioBusVolume(busId, liveVolume)
+                                    onVolumeSet: (gain) => {
+                                        liveVolume = gain
+                                        EditorState.setAudioBusVolume(busId, gain)
+                                    }
+                                    onPanPreviewed: (value) => livePan = value
+                                    onPanCommitted: EditorState.setAudioBusPan(busId, livePan)
+                                    onPanSet: (value) => {
+                                        livePan = value
+                                        EditorState.setAudioBusPan(busId, value)
+                                    }
                                 }
                             }
                         }
@@ -724,21 +838,37 @@ Rectangle {
     ThemedContextMenu {
         id: fxContextMenu
         property bool isMaster: false
+        property bool isBus: false
         property int targetTrackIndex: -1
+        property string targetBusId: ""
         property string targetTrackName: ""
         property var targetEffects: []
 
         function openForTrack(trackIdx, trackName, effects) {
             isMaster = false
+            isBus = false
             targetTrackIndex = trackIdx
+            targetBusId = ""
             targetTrackName = trackName
+            targetEffects = effects
+            open()
+        }
+
+        function openForBus(busId, busName, effects) {
+            isMaster = false
+            isBus = true
+            targetTrackIndex = -1
+            targetBusId = busId
+            targetTrackName = busName
             targetEffects = effects
             open()
         }
 
         function openForMaster(effects) {
             isMaster = true
+            isBus = false
             targetTrackIndex = -1
+            targetBusId = ""
             targetTrackName = qsTr("Master")
             targetEffects = effects
             open()
@@ -746,7 +876,11 @@ Rectangle {
 
         ThemedMenuItem {
             enabled: false
-            text: fxContextMenu.isMaster ? qsTr("Master Bus FX") : qsTr("Track FX — %1").arg(fxContextMenu.targetTrackName)
+            text: fxContextMenu.isMaster
+                  ? qsTr("Master Bus FX")
+                  : (fxContextMenu.isBus
+                     ? qsTr("Bus FX — %1").arg(fxContextMenu.targetTrackName)
+                     : qsTr("Track FX — %1").arg(fxContextMenu.targetTrackName))
             icon.name: Theme.icons.audioLines
         }
 
@@ -762,6 +896,8 @@ Rectangle {
                 onTriggered: {
                     if (fxContextMenu.isMaster)
                         EditorState.setMasterAudioEffectEnabled(index, effectItem.enabled === false)
+                    else if (fxContextMenu.isBus)
+                        EditorState.setBusAudioEffectEnabled(fxContextMenu.targetBusId, index, effectItem.enabled === false)
                     else
                         EditorState.setTrackAudioEffectEnabled(fxContextMenu.targetTrackIndex, index, effectItem.enabled === false)
                 }
@@ -781,6 +917,8 @@ Rectangle {
                     onTriggered: {
                         if (fxContextMenu.isMaster)
                             EditorState.addMasterAudioEffect(modelData.id)
+                        else if (fxContextMenu.isBus)
+                            EditorState.addBusAudioEffect(fxContextMenu.targetBusId, modelData.id)
                         else
                             EditorState.addTrackAudioEffect(fxContextMenu.targetTrackIndex, modelData.id)
                     }
@@ -796,11 +934,123 @@ Rectangle {
                 if (fxContextMenu.isMaster) {
                     for (var i = fxContextMenu.targetEffects.length - 1; i >= 0; i--)
                         EditorState.removeMasterAudioEffect(i)
+                } else if (fxContextMenu.isBus) {
+                    for (var k = fxContextMenu.targetEffects.length - 1; k >= 0; k--)
+                        EditorState.removeBusAudioEffect(fxContextMenu.targetBusId, k)
                 } else {
                     for (var j = fxContextMenu.targetEffects.length - 1; j >= 0; j--)
                         EditorState.removeTrackAudioEffect(fxContextMenu.targetTrackIndex, j)
                 }
             }
+        }
+    }
+
+    ThemedContextMenu {
+        id: routeContextMenu
+        property bool isBus: false
+        property int targetTrackIndex: -1
+        property string targetBusId: ""
+        property string targetName: ""
+        property string targetOutputBusId: ""
+        property var targetSends: []
+
+        function openForTrack(trackIdx, trackName, outputBusId, sends) {
+            isBus = false
+            targetTrackIndex = trackIdx
+            targetBusId = ""
+            targetName = trackName
+            targetOutputBusId = outputBusId || ""
+            targetSends = sends || []
+            open()
+        }
+
+        function openForBus(busId, busName) {
+            isBus = true
+            targetTrackIndex = -1
+            targetBusId = busId
+            targetName = busName
+            targetOutputBusId = ""
+            targetSends = []
+            open()
+        }
+
+        function findSend(busId) {
+            for (let i = 0; i < targetSends.length; i++) {
+                if (targetSends[i].busId === busId)
+                    return targetSends[i]
+            }
+            return null
+        }
+
+        ThemedMenuItem {
+            enabled: false
+            text: routeContextMenu.isBus
+                  ? qsTr("Bus — %1").arg(routeContextMenu.targetName)
+                  : qsTr("Routing — %1").arg(routeContextMenu.targetName)
+            icon.name: Theme.icons.slidersVertical
+        }
+
+        ThemedMenuSeparator {}
+
+        ThemedContextMenu {
+            title: qsTr("Output bus")
+            visible: !routeContextMenu.isBus
+
+            ThemedMenuItem {
+                text: qsTr("Master")
+                icon.name: routeContextMenu.targetOutputBusId === "" ? Theme.icons.check : ""
+                onTriggered: EditorState.setTrackOutputBus(routeContextMenu.targetTrackIndex, "")
+            }
+
+            Repeater {
+                model: EditorState.audioBuses.length
+                delegate: ThemedMenuItem {
+                    required property int index
+                    readonly property var bus: EditorState.audioBuses[index] || ({})
+                    text: bus.name || qsTr("Bus")
+                    icon.name: routeContextMenu.targetOutputBusId === bus.id ? Theme.icons.check : ""
+                    onTriggered: EditorState.setTrackOutputBus(routeContextMenu.targetTrackIndex, bus.id)
+                }
+            }
+        }
+
+        ThemedContextMenu {
+            title: qsTr("Aux sends")
+            visible: !routeContextMenu.isBus
+
+            Repeater {
+                model: EditorState.audioBuses.length
+                delegate: ThemedMenuItem {
+                    required property int index
+                    readonly property var bus: EditorState.audioBuses[index] || ({})
+                    readonly property var sendObj: routeContextMenu.findSend(bus.id)
+                    text: sendObj
+                          ? qsTr("%1 (%2% %3)").arg(bus.name).arg(Math.round((sendObj.level || 0) * 100)).arg(sendObj.preFader ? qsTr("Pre") : qsTr("Post"))
+                          : qsTr("Send to %1 (50% Post)").arg(bus.name)
+                    icon.name: sendObj ? Theme.icons.check : ""
+                    onTriggered: {
+                        if (!sendObj)
+                            EditorState.setTrackAudioSend(routeContextMenu.targetTrackIndex, bus.id, 0.5, false, true)
+                        else if (!sendObj.preFader)
+                            EditorState.setTrackAudioSend(routeContextMenu.targetTrackIndex, bus.id, sendObj.level, true, true)
+                        else
+                            EditorState.removeTrackAudioSend(routeContextMenu.targetTrackIndex, bus.id)
+                    }
+                }
+            }
+        }
+
+        ThemedMenuItem {
+            text: qsTr("Add audio sub-bus")
+            icon.name: Theme.icons.plus
+            onTriggered: EditorState.addAudioBus()
+        }
+
+        ThemedMenuItem {
+            visible: routeContextMenu.isBus
+            text: qsTr("Remove sub-bus")
+            icon.name: Theme.icons.trash
+            onTriggered: EditorState.removeAudioBus(routeContextMenu.targetBusId)
         }
     }
 }

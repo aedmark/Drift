@@ -6,6 +6,9 @@
 #include "core/edit/TimelineOps.h"
 #include "engine/render3d/scene/ClipTransform3d.h"
 
+#include <QHash>
+#include <QMatrix4x4>
+#include <QSet>
 #include <QVector4D>
 
 namespace drift {
@@ -110,10 +113,15 @@ QList<TransformParent> transformParentsAt(const Project &project, TimeUs timelin
                                           double renderScale)
 {
     const QList<Track> &tracks = project.tracks();
-    bool anyLayer = false;
-    for (const Track &track : tracks)
-        anyLayer = anyLayer || track.isTransformLayer();
-    if (!anyLayer)
+    bool anyWork = false;
+    for (const Track &track : tracks) {
+        if (track.isTransformLayer() || (track.motion.enabled && !track.motion.isDefault())
+            || !track.compositeParentTrackId.isEmpty()) {
+            anyWork = true;
+            break;
+        }
+    }
+    if (!anyWork)
         return {};
 
     const QSize projectSize(project.width(), project.height());
@@ -151,6 +159,93 @@ QList<TransformParent> transformParentsAt(const Project &project, TimeUs timelin
             }
         }
     }
+
+    // Track Motion & Parent/Child Track Compositing (Tier 2B).
+    auto trackMotionMatrixAt = [&](const Track &track, double *outOpacity) -> QTransform {
+        const TrackMotion &m = track.motion;
+        if (!m.enabled || m.isDefault()) {
+            if (outOpacity)
+                *outOpacity = 1.0;
+            return QTransform();
+        }
+        const auto eval = [&](const KeyframeTrack<double> &kt, double fallback) -> double {
+            return (!kt.isEmpty() && kt.enabled()) ? kt.evaluateAt(timelineUs) : fallback;
+        };
+        const double w = double(qMax(1, projectSize.width())) * renderScale;
+        const double h = double(qMax(1, projectSize.height())) * renderScale;
+        const double cx = w * 0.5;
+        const double cy = h * 0.5;
+        const double px = eval(m.posXTrack, m.posX) * w;
+        const double py = eval(m.posYTrack, m.posY) * h;
+        const double sx = qBound(0.01, eval(m.scaleXTrack, m.scaleX), 16.0);
+        const double sy = qBound(0.01, eval(m.scaleYTrack, m.scaleY), 16.0);
+        const double rotZ = eval(m.rotationTrack, m.rotationDeg);
+        const double alpha = qBound(0.0, eval(m.opacityTrack, m.opacity), 1.0);
+        if (outOpacity)
+            *outOpacity = alpha;
+
+        if (!qFuzzyIsNull(m.rotationXDeg) || !qFuzzyIsNull(m.rotationYDeg)
+            || !qFuzzyIsNull(m.zOffset)) {
+            QMatrix4x4 mat;
+            mat.translate(float(cx + px), float(cy + py), float(m.zOffset * qMax(w, h)));
+            if (!qFuzzyIsNull(m.rotationYDeg))
+                mat.rotate(float(m.rotationYDeg), 0.0f, 1.0f, 0.0f);
+            if (!qFuzzyIsNull(m.rotationXDeg))
+                mat.rotate(float(m.rotationXDeg), 1.0f, 0.0f, 0.0f);
+            if (!qFuzzyIsNull(rotZ))
+                mat.rotate(float(rotZ), 0.0f, 0.0f, 1.0f);
+            mat.scale(float(sx), float(sy), 1.0f);
+            mat.translate(float(-cx), float(-cy), 0.0f);
+            return mat.toTransform(1024.0f);
+        }
+
+        QTransform t;
+        t.translate(cx + px, cy + py);
+        if (!qFuzzyIsNull(rotZ))
+            t.rotate(rotZ);
+        t.scale(sx, sy);
+        t.translate(-cx, -cy);
+        return t;
+    };
+
+    QHash<QString, int> trackIndexById;
+    trackIndexById.reserve(tracks.size());
+    for (int i = 0; i < tracks.size(); ++i) {
+        if (!tracks.at(i).id.isEmpty())
+            trackIndexById.insert(tracks.at(i).id, i);
+    }
+
+    for (int ti = 0; ti < tracks.size(); ++ti) {
+        QList<int> chain;
+        QSet<QString> visited;
+        int cur = ti;
+        while (cur >= 0 && cur < tracks.size()) {
+            const Track &t = tracks.at(cur);
+            if (!t.id.isEmpty()) {
+                if (visited.contains(t.id))
+                    break;
+                visited.insert(t.id);
+            }
+            chain.prepend(cur);
+            if (t.compositeParentTrackId.isEmpty())
+                break;
+            cur = trackIndexById.value(t.compositeParentTrackId, -1);
+        }
+
+        for (int idx : std::as_const(chain)) {
+            double mOpacity = 1.0;
+            const QTransform mMat = trackMotionMatrixAt(tracks.at(idx), &mOpacity);
+            if (!fuzzyIdentity(mMat)) {
+                parents[ti].matrix = mMat * parents[ti].matrix;
+                touched[ti] = true;
+            }
+            if (!qFuzzyCompare(mOpacity, 1.0)) {
+                parents[ti].opacity *= mOpacity;
+                touched[ti] = true;
+            }
+        }
+    }
+
     for (int i = 0; i < parents.size(); ++i)
         parents[i].hasParent = touched.at(i) && !fuzzyIdentity(parents.at(i).matrix);
     return parents;

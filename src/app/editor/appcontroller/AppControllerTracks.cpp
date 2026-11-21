@@ -177,6 +177,7 @@ QHash<QString, QString> defaultShortcuts()
         // QML owns the window, so triggerAction only raises the request — same shape as the
         // file actions above.
         {QStringLiteral("multicam"), QStringLiteral("Ctrl+Shift+C")},
+        {QStringLiteral("toggleInlineMulticam"), QStringLiteral("Alt+Shift+C")},
         {QStringLiteral("transformTogether"), QStringLiteral("Ctrl+G")},
         {QStringLiteral("selectTransformLayer"), QStringLiteral("Shift+G")},
         {QStringLiteral("workspace.next"), QStringLiteral("Ctrl+Alt+Right")},
@@ -754,6 +755,455 @@ QVariantMap AppController::masterAudioLevels() const
         {QStringLiteral("left"), left},
         {QStringLiteral("right"), right}
     };
+}
+
+// --- Audio Sub-Buses, Aux/FX Sends & Real-Time LUFS Metering (Tier 2A) -------
+
+QVariantList AppController::audioBuses() const
+{
+    QVariantList out;
+    const QList<drift::AudioBus> &buses = m_project.audioBuses();
+    out.reserve(buses.size());
+    for (const drift::AudioBus &bus : buses) {
+        out.append(QVariantMap{
+            {QStringLiteral("id"), bus.id},
+            {QStringLiteral("name"), bus.name},
+            {QStringLiteral("volume"), bus.volume},
+            {QStringLiteral("pan"), bus.pan},
+            {QStringLiteral("muted"), bus.muted},
+            {QStringLiteral("solo"), bus.solo},
+            {QStringLiteral("audioEffects"), busAudioEffects(bus.id)},
+        });
+    }
+    return out;
+}
+
+QString AppController::addAudioBus(const QString &name)
+{
+    drift::AudioBus bus;
+    bus.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    const QString trimmed = name.trimmed();
+    bus.name = trimmed.isEmpty() ? tr("Bus %1").arg(m_project.audioBuses().size() + 1) : trimmed;
+
+    const drift::Project before = m_project;
+    m_project.audioBuses().append(bus);
+    pushProjectEdit(before, tr("Add audio bus"));
+    finishEdit(tr("Audio bus added"));
+    emit audioBusesChanged();
+    return bus.id;
+}
+
+void AppController::removeAudioBus(const QString &busId)
+{
+    int idx = -1;
+    const QList<drift::AudioBus> &buses = m_project.audioBuses();
+    for (int i = 0; i < buses.size(); ++i) {
+        if (buses.at(i).id == busId) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx < 0)
+        return;
+
+    const drift::Project before = m_project;
+    m_project.audioBuses().removeAt(idx);
+    bool touchedTracks = false;
+    for (drift::Track &track : m_project.tracks()) {
+        if (track.outputBusId == busId) {
+            track.outputBusId.clear();
+            touchedTracks = true;
+        }
+        for (int s = track.audioSends.size() - 1; s >= 0; --s) {
+            if (track.audioSends.at(s).busId == busId) {
+                track.audioSends.removeAt(s);
+                touchedTracks = true;
+            }
+        }
+    }
+    pushProjectEdit(before, tr("Remove audio bus"));
+    finishEdit(tr("Audio bus removed"));
+    emit audioBusesChanged();
+    if (touchedTracks) {
+        m_tracksCacheValid = false;
+        emit tracksChanged();
+    }
+}
+
+void AppController::renameAudioBus(const QString &busId, const QString &name)
+{
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty())
+        return;
+    for (int i = 0; i < m_project.audioBuses().size(); ++i) {
+        if (m_project.audioBuses().at(i).id == busId) {
+            if (m_project.audioBuses().at(i).name == trimmed)
+                return;
+            const drift::Project before = m_project;
+            m_project.audioBuses()[i].name = trimmed;
+            pushProjectEdit(before, tr("Rename audio bus"));
+            finishEdit(tr("Audio bus renamed"));
+            emit audioBusesChanged();
+            return;
+        }
+    }
+}
+
+void AppController::setAudioBusVolume(const QString &busId, double volume)
+{
+    const double clamped = qBound(0.0, volume, 2.0);
+    for (int i = 0; i < m_project.audioBuses().size(); ++i) {
+        if (m_project.audioBuses().at(i).id == busId) {
+            if (qFuzzyCompare(m_project.audioBuses().at(i).volume, clamped))
+                return;
+            const drift::Project before = m_project;
+            m_project.audioBuses()[i].volume = clamped;
+            pushProjectEdit(before, tr("Adjust audio bus volume"));
+            finishEdit(tr("Audio bus volume changed"));
+            emit audioBusesChanged();
+            return;
+        }
+    }
+}
+
+void AppController::setAudioBusPan(const QString &busId, double pan)
+{
+    const double clamped = qBound(-1.0, pan, 1.0);
+    for (int i = 0; i < m_project.audioBuses().size(); ++i) {
+        if (m_project.audioBuses().at(i).id == busId) {
+            if (qFuzzyCompare(1.0 + m_project.audioBuses().at(i).pan, 1.0 + clamped))
+                return;
+            const drift::Project before = m_project;
+            m_project.audioBuses()[i].pan = clamped;
+            pushProjectEdit(before, tr("Adjust audio bus pan"));
+            finishEdit(tr("Audio bus pan changed"));
+            emit audioBusesChanged();
+            return;
+        }
+    }
+}
+
+void AppController::setAudioBusMuted(const QString &busId, bool muted)
+{
+    for (int i = 0; i < m_project.audioBuses().size(); ++i) {
+        if (m_project.audioBuses().at(i).id == busId) {
+            if (m_project.audioBuses().at(i).muted == muted)
+                return;
+            const drift::Project before = m_project;
+            m_project.audioBuses()[i].muted = muted;
+            pushProjectEdit(before, muted ? tr("Mute audio bus") : tr("Unmute audio bus"));
+            finishEdit(muted ? tr("Audio bus muted") : tr("Audio bus unmuted"));
+            emit audioBusesChanged();
+            return;
+        }
+    }
+}
+
+void AppController::setAudioBusSolo(const QString &busId, bool solo)
+{
+    for (int i = 0; i < m_project.audioBuses().size(); ++i) {
+        if (m_project.audioBuses().at(i).id == busId) {
+            if (m_project.audioBuses().at(i).solo == solo)
+                return;
+            const drift::Project before = m_project;
+            m_project.audioBuses()[i].solo = solo;
+            pushProjectEdit(before, solo ? tr("Solo audio bus") : tr("Unsolo audio bus"));
+            finishEdit(solo ? tr("Audio bus soloed") : tr("Audio bus unsoloed"));
+            emit audioBusesChanged();
+            return;
+        }
+    }
+}
+
+QString AppController::trackOutputBus(int trackIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return {};
+    return m_project.tracks().at(trackIndex).outputBusId;
+}
+
+void AppController::setTrackOutputBus(int trackIndex, const QString &busId)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    if (!busId.isEmpty()) {
+        bool exists = false;
+        for (const drift::AudioBus &bus : m_project.audioBuses()) {
+            if (bus.id == busId) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists)
+            return;
+    }
+    if (m_project.tracks().at(trackIndex).outputBusId == busId)
+        return;
+
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].outputBusId = busId;
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Route track output bus"));
+    finishEdit(tr("Track output bus updated"));
+    emit tracksChanged();
+}
+
+QVariantList AppController::trackAudioSends(int trackIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return {};
+    QVariantList out;
+    const QList<drift::AudioSend> &sends = m_project.tracks().at(trackIndex).audioSends;
+    out.reserve(sends.size());
+    for (const drift::AudioSend &send : sends) {
+        out.append(QVariantMap{
+            {QStringLiteral("busId"), send.busId},
+            {QStringLiteral("level"), send.level},
+            {QStringLiteral("preFader"), send.preFader},
+            {QStringLiteral("enabled"), send.enabled},
+        });
+    }
+    return out;
+}
+
+void AppController::setTrackAudioSend(int trackIndex, const QString &busId, double level,
+                                      bool preFader, bool enabled)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size() || busId.isEmpty())
+        return;
+    bool exists = false;
+    for (const drift::AudioBus &bus : m_project.audioBuses()) {
+        if (bus.id == busId) {
+            exists = true;
+            break;
+        }
+    }
+    if (!exists)
+        return;
+
+    const double clamped = qBound(0.0, level, 2.0);
+    const drift::Project before = m_project;
+    QList<drift::AudioSend> &sends = m_project.tracks()[trackIndex].audioSends;
+    int found = -1;
+    for (int i = 0; i < sends.size(); ++i) {
+        if (sends.at(i).busId == busId) {
+            found = i;
+            break;
+        }
+    }
+    const drift::AudioSend entry{busId, clamped, preFader, enabled};
+    if (found >= 0) {
+        if (sends.at(found) == entry)
+            return;
+        sends[found] = entry;
+    } else {
+        sends.append(entry);
+    }
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Set track aux send"));
+    finishEdit(tr("Track aux send updated"));
+    emit tracksChanged();
+}
+
+void AppController::removeTrackAudioSend(int trackIndex, const QString &busId)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size() || busId.isEmpty())
+        return;
+    const QList<drift::AudioSend> &check = m_project.tracks().at(trackIndex).audioSends;
+    int found = -1;
+    for (int i = 0; i < check.size(); ++i) {
+        if (check.at(i).busId == busId) {
+            found = i;
+            break;
+        }
+    }
+    if (found < 0)
+        return;
+
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].audioSends.removeAt(found);
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Remove track aux send"));
+    finishEdit(tr("Track aux send removed"));
+    emit tracksChanged();
+}
+
+QVariantMap AppController::audioBusLevels(const QString &busId) const
+{
+    float left = 0.0f;
+    float right = 0.0f;
+    if (m_playback.isPlaying() && !busId.isEmpty()) {
+        const auto levels = m_playback.busAudioLevels(busId);
+        left = levels.first;
+        right = levels.second;
+    }
+    return {
+        {QStringLiteral("left"), left},
+        {QStringLiteral("right"), right},
+    };
+}
+
+QVariantMap AppController::masterLoudness() const
+{
+    const drift::RealtimeLoudnessSnapshot snap = m_playback.masterLoudness();
+    return {
+        {QStringLiteral("momentaryLufs"), snap.momentaryLufs},
+        {QStringLiteral("shortTermLufs"), snap.shortTermLufs},
+        {QStringLiteral("integratedLufs"), snap.integratedLufs},
+        {QStringLiteral("truePeakDbfs"), snap.truePeakDbfs},
+        {QStringLiteral("maxHoldTruePeakDbfs"), snap.maxHoldTruePeakDbfs},
+        {QStringLiteral("loudnessRangeLu"), snap.loudnessRangeLu},
+        {QStringLiteral("clipping"), snap.clipping},
+    };
+}
+
+void AppController::resetMasterLoudness()
+{
+    m_playback.resetMasterLoudness();
+}
+
+// --- Track Motion & Parent/Child Track Compositing (Tier 2B) ----------------
+
+QVariantMap AppController::trackMotion(int trackIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return {};
+    const drift::TrackMotion &m = m_project.tracks().at(trackIndex).motion;
+    return {
+        {QStringLiteral("enabled"), m.enabled},
+        {QStringLiteral("posX"), m.posX},
+        {QStringLiteral("posY"), m.posY},
+        {QStringLiteral("scaleX"), m.scaleX},
+        {QStringLiteral("scaleY"), m.scaleY},
+        {QStringLiteral("rotationDeg"), m.rotationDeg},
+        {QStringLiteral("rotationXDeg"), m.rotationXDeg},
+        {QStringLiteral("rotationYDeg"), m.rotationYDeg},
+        {QStringLiteral("zOffset"), m.zOffset},
+        {QStringLiteral("opacity"), m.opacity},
+    };
+}
+
+void AppController::setTrackMotion(int trackIndex, const QVariantMap &motion)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+
+    const drift::Project before = m_project;
+    drift::TrackMotion &m = m_project.tracks()[trackIndex].motion;
+    if (motion.contains(QStringLiteral("enabled")))
+        m.enabled = motion.value(QStringLiteral("enabled")).toBool();
+    else
+        m.enabled = true;
+    if (motion.contains(QStringLiteral("posX")))
+        m.posX = qBound(-4.0, motion.value(QStringLiteral("posX")).toDouble(), 4.0);
+    if (motion.contains(QStringLiteral("posY")))
+        m.posY = qBound(-4.0, motion.value(QStringLiteral("posY")).toDouble(), 4.0);
+    if (motion.contains(QStringLiteral("scaleX")))
+        m.scaleX = qBound(0.01, motion.value(QStringLiteral("scaleX")).toDouble(), 16.0);
+    if (motion.contains(QStringLiteral("scaleY")))
+        m.scaleY = qBound(0.01, motion.value(QStringLiteral("scaleY")).toDouble(), 16.0);
+    if (motion.contains(QStringLiteral("rotationDeg")))
+        m.rotationDeg = motion.value(QStringLiteral("rotationDeg")).toDouble();
+    if (motion.contains(QStringLiteral("rotationXDeg")))
+        m.rotationXDeg = motion.value(QStringLiteral("rotationXDeg")).toDouble();
+    if (motion.contains(QStringLiteral("rotationYDeg")))
+        m.rotationYDeg = motion.value(QStringLiteral("rotationYDeg")).toDouble();
+    if (motion.contains(QStringLiteral("zOffset")))
+        m.zOffset = qBound(-4.0, motion.value(QStringLiteral("zOffset")).toDouble(), 4.0);
+    if (motion.contains(QStringLiteral("opacity")))
+        m.opacity = qBound(0.0, motion.value(QStringLiteral("opacity")).toDouble(), 1.0);
+
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Edit track motion"));
+    finishEdit(tr("Track motion updated"));
+    emit tracksChanged();
+}
+
+void AppController::resetTrackMotion(int trackIndex)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    if (m_project.tracks().at(trackIndex).motion.isDefault())
+        return;
+
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].motion = drift::TrackMotion{};
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Reset track motion"));
+    finishEdit(tr("Track motion reset"));
+    emit tracksChanged();
+}
+
+QString AppController::trackCompositeParent(int trackIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return {};
+    return m_project.tracks().at(trackIndex).compositeParentTrackId;
+}
+
+bool AppController::setTrackCompositeParent(int trackIndex, const QString &parentTrackId)
+{
+    const QList<drift::Track> &tracks = m_project.tracks();
+    if (trackIndex < 0 || trackIndex >= tracks.size())
+        return false;
+    const QString childId = tracks.at(trackIndex).id;
+    if (tracks.at(trackIndex).compositeParentTrackId == parentTrackId)
+        return true;
+
+    if (!parentTrackId.isEmpty()) {
+        if (parentTrackId == childId)
+            return false;
+        QHash<QString, int> idToIndex;
+        for (int i = 0; i < tracks.size(); ++i) {
+            if (!tracks.at(i).id.isEmpty())
+                idToIndex.insert(tracks.at(i).id, i);
+        }
+        if (!idToIndex.contains(parentTrackId))
+            return false;
+        // Walk candidate parent's ancestor chain to reject any cycle back to childId.
+        QSet<QString> visited;
+        QString cur = parentTrackId;
+        while (!cur.isEmpty()) {
+            if (cur == childId || visited.contains(cur))
+                return false;
+            visited.insert(cur);
+            const int idx = idToIndex.value(cur, -1);
+            if (idx < 0)
+                break;
+            cur = tracks.at(idx).compositeParentTrackId;
+        }
+    }
+
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].compositeParentTrackId = parentTrackId;
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Set composite parent track"));
+    finishEdit(tr("Composite parent track updated"));
+    emit tracksChanged();
+    return true;
+}
+
+QString AppController::trackCompositeBlendMode(int trackIndex) const
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return drift::blendModeToString(drift::BlendMode::Normal);
+    return drift::blendModeToString(m_project.tracks().at(trackIndex).compositeBlendMode);
+}
+
+void AppController::setTrackCompositeBlendMode(int trackIndex, const QString &blendMode)
+{
+    if (trackIndex < 0 || trackIndex >= m_project.tracks().size())
+        return;
+    const drift::BlendMode parsed = drift::blendModeFromString(blendMode);
+    if (m_project.tracks().at(trackIndex).compositeBlendMode == parsed)
+        return;
+
+    const drift::Project before = m_project;
+    m_project.tracks()[trackIndex].compositeBlendMode = parsed;
+    m_tracksCacheValid = false;
+    pushProjectEdit(before, tr("Set track composite mode"));
+    finishEdit(tr("Track composite mode updated"));
+    emit tracksChanged();
 }
 
 void AppController::setTrackClipDisplay(int trackIndex, int mode)
@@ -2072,6 +2522,8 @@ void AppController::triggerAction(const QString &actionId)
         togglePlayback();
     else if (actionId == QStringLiteral("multicam"))
         emit openMulticamWindowRequested();
+    else if (actionId == QStringLiteral("toggleInlineMulticam"))
+        toggleInlineMulticam();
     else if (actionId == QStringLiteral("delete"))
         deleteSelectedClip();
     else if (actionId == QStringLiteral("deleteWithEffects"))
@@ -2628,6 +3080,8 @@ QByteArray AppController::audioLayoutFingerprint() const
         }
     }
     hash.addData(QByteArray::number(m_project.masterAudioEffects().size()));
+    hash.addData(QByteArray::number(m_project.masterVideoEffects().size()));
+    hash.addData(QByteArray::number(m_project.audioBuses().size()));
     return hash.result();
 }
 

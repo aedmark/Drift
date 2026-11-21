@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/project/Project.h"
+#include "engine/audio/analysis/LoudnessMeter.h"
 #include "core/base/Time.h"
 #include "engine/audio/dsp/AudioEffectRack.h"
 #include "engine/audio/dsp/ClipAudioRetimer.h"
@@ -106,6 +107,9 @@ public:
 
     QPair<float, float> trackLevels(int trackIndex) const;
     QPair<float, float> masterLevels() const;
+    QPair<float, float> busLevels(const QString &busId) const;
+    drift::RealtimeLoudnessSnapshot masterLoudness() const;
+    void resetMasterLoudness();
     // Loudest block per channel since the previous call, master first then one pair per
     // requested track. A meter polling slower than the mixer's block rate would otherwise
     // see whichever block happened to be last and miss the transients between polls.
@@ -143,6 +147,9 @@ private:
     mutable QPair<float, float> m_masterLevels{0.0f, 0.0f};
     mutable QHash<int, QPair<float, float>> m_trackMeterPeaks;
     mutable QPair<float, float> m_masterMeterPeak{0.0f, 0.0f};
+    mutable QHash<QString, QPair<float, float>> m_busLevels;
+    mutable QHash<QString, QPair<float, float>> m_busMeterPeaks;
+    mutable drift::RealtimeLoudnessMeter m_realtimeLoudness;
     quint64 m_streamSalt = 0;
     int m_depth = 0;
 };

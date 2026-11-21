@@ -192,10 +192,31 @@ QStringList changedTrackFields(const Track &a, const Track &b, int fromIndex, in
     if (!qFuzzyCompare(a.volume, b.volume) || !qFuzzyCompare(1.0 + a.pan, 1.0 + b.pan)
         || a.volumeEnvelope.keyframes() != b.volumeEnvelope.keyframes()
         || a.panEnvelope.keyframes() != b.panEnvelope.keyframes()
-        || a.muteEnvelope.keyframes() != b.muteEnvelope.keyframes())
+        || a.muteEnvelope.keyframes() != b.muteEnvelope.keyframes()
+        || a.outputBusId != b.outputBusId || a.audioSends != b.audioSends)
         fields.append(QStringLiteral("audio"));
-    if (a.compositeEnvelope.keyframes() != b.compositeEnvelope.keyframes())
+    if (a.compositeEnvelope.keyframes() != b.compositeEnvelope.keyframes()
+        || a.compositeParentTrackId != b.compositeParentTrackId
+        || a.compositeBlendMode != b.compositeBlendMode)
         fields.append(QStringLiteral("composite"));
+    if (a.motion.enabled != b.motion.enabled || !qFuzzyCompare(1.0 + a.motion.posX, 1.0 + b.motion.posX)
+        || !qFuzzyCompare(1.0 + a.motion.posY, 1.0 + b.motion.posY)
+        || !qFuzzyCompare(a.motion.scaleX, b.motion.scaleX)
+        || !qFuzzyCompare(a.motion.scaleY, b.motion.scaleY)
+        || !qFuzzyCompare(1.0 + a.motion.rotationDeg, 1.0 + b.motion.rotationDeg)
+        || !qFuzzyCompare(1.0 + a.motion.rotationXDeg, 1.0 + b.motion.rotationXDeg)
+        || !qFuzzyCompare(1.0 + a.motion.rotationYDeg, 1.0 + b.motion.rotationYDeg)
+        || !qFuzzyCompare(1.0 + a.motion.zOffset, 1.0 + b.motion.zOffset)
+        || !qFuzzyCompare(a.motion.opacity, b.motion.opacity)
+        || a.motion.posXTrack.keyframes() != b.motion.posXTrack.keyframes()
+        || a.motion.posYTrack.keyframes() != b.motion.posYTrack.keyframes()
+        || a.motion.scaleXTrack.keyframes() != b.motion.scaleXTrack.keyframes()
+        || a.motion.scaleYTrack.keyframes() != b.motion.scaleYTrack.keyframes()
+        || a.motion.rotationTrack.keyframes() != b.motion.rotationTrack.keyframes()
+        || a.motion.opacityTrack.keyframes() != b.motion.opacityTrack.keyframes())
+        fields.append(QStringLiteral("motion"));
+    if (effectsToJson(a.effects) != effectsToJson(b.effects))
+        fields.append(QStringLiteral("effects"));
     if (!sameTransitions(a, b))
         fields.append(QStringLiteral("transitions"));
     if (a.adjustmentScope != b.adjustmentScope || a.parentTrackId != b.parentTrackId || a.spanEndTrackId != b.spanEndTrackId)

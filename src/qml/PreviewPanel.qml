@@ -82,6 +82,12 @@ PanelFrame {
             }
         }
 
+        InlineMulticamOverlay {
+            anchors.fill: parent
+            visible: EditorState.inlineMulticamEnabled
+            z: 10
+        }
+
         PreviewOsd {
             id: osd
             anchors.fill: parent

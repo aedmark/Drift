@@ -2774,6 +2774,10 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Inline multicamera mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Search…</source>
         <translation>Buscar…</translation>
     </message>
@@ -4915,6 +4919,118 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Add bus audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bus audio effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove bus audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bus audio effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable bus audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable bus audio effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bus audio effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bus audio effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add track video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track video effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove track video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track video effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable track video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable track video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track video effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track video effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit track video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track video effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add master video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master video effect added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove master video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master video effect removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable master video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable master video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master video effect enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master video effect disabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit master video effect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master video effect edited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Add media effect</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5262,6 +5378,138 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Bus %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add audio bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus added</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove audio bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rename audio bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus renamed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust audio bus volume</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus volume changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust audio bus pan</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus pan changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mute audio bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unmute audio bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus muted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus unmuted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Solo audio bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsolo audio bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus soloed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Audio bus unsoloed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Route track output bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track output bus updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set track aux send</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track aux send updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove track aux send</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track aux send removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit track motion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track motion updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset track motion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track motion reset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set composite parent track</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Composite parent track updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set track composite mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track composite mode updated</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Move track</source>
         <translation>Mover pista</translation>
     </message>
@@ -5592,6 +5840,22 @@
     </message>
     <message>
         <source>Delete Active Take</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Create multicamera track</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Multicamera track created</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cut multicam angle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Multicam angle cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6482,6 +6746,22 @@
         <translation>Mezclador de audio</translation>
     </message>
     <message>
+        <source>Master LUFS  M %1 · S %2 · I %3  |  TP %4 dB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Real-time ITU-R BS.1770 / EBU R128 loudness (Momentary / Short-Term / Integrated LUFS &amp; True Peak hold). Click to reset.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>+ Bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add an audio sub-bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Measuring… %1%</source>
         <translation>Midiendo… %1%</translation>
     </message>
@@ -6545,6 +6825,10 @@
         <translation>Cerrar mezclador de audio</translation>
     </message>
     <message>
+        <source>Add audio sub-bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Resume recording</source>
         <translation>Reanudar grabación</translation>
     </message>
@@ -6569,11 +6853,19 @@
         <translation>Añadir pista de audio</translation>
     </message>
     <message>
+        <source>Bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Drag to resize — double-click to fit</source>
         <translation>Arrastra para redimensionar — haz doble clic para ajustar</translation>
     </message>
     <message>
         <source>Master Bus FX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bus FX — %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6595,6 +6887,42 @@
     <message>
         <source>Remove all effects</source>
         <translation type="unfinished">Eliminar todos los efectos</translation>
+    </message>
+    <message>
+        <source>Bus — %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Routing — %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Output bus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Aux sends</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 (%2% %3)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pre</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Post</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send to %1 (50% Post)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove sub-bus</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Master</source>
@@ -11537,6 +11865,34 @@
     </message>
 </context>
 <context>
+    <name>InlineMulticamOverlay</name>
+    <message>
+        <source>Inline Multicamera (%1 angles) — Press 1–9 or click angle to cut</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Inline Multicamera — Select or place playhead over a multi-take video clip</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Exit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Exit Inline Multicamera Mode (Alt+Shift+C)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No multi-take clip at the playhead.
+Select 2+ video clips on the timeline and choose Take → Create Multicamera Track from Selection.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Angle %1</source>
+        <translation type="unfinished">Ángulo %1</translation>
+    </message>
+</context>
+<context>
     <name>JobRegistry</name>
     <message>
         <source>Queued</source>
@@ -15327,11 +15683,27 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Bus FX on %1 (%2 active)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bus FX on %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Track FX on %1 (%2 active)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Track FX on %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bus options (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Output bus &amp; aux sends for %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -16361,6 +16733,46 @@ Si la reproducción se corta, prueba con otra opción.</translation>
     <message>
         <source>Keep mask handles on the preview while another clip is selected</source>
         <translation>Mantener los controladores de máscara en la vista previa mientras otro clip esté seleccionado</translation>
+    </message>
+    <message>
+        <source>Inline Multicamera Mode (Alt+Shift+C)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Split the preview into live clickable angle tiles while cutting multi-take clips</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master FX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 active…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>None…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Master Video Output FX applied after all tracks composite</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Effect</source>
+        <translation type="unfinished">Efecto</translation>
+    </message>
+    <message>
+        <source> [Bypassed]</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add master video effect…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove all master effects</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -25285,6 +25697,18 @@ Si la reproducción se corta, prueba con otra opción.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Create Multicamera Track from Selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Exit Inline Multicamera Mode (Alt+Shift+C)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Inline Multicamera Mode (Alt+Shift+C)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Take</source>
         <translation type="unfinished"></translation>
     </message>
@@ -26761,6 +27185,78 @@ Si la reproducción se corta, prueba con otra opción.</translation>
     <message>
         <source>Add transform layer above</source>
         <translation>Añadir capa de transformación encima</translation>
+    </message>
+    <message>
+        <source>Track Video FX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Effect</source>
+        <translation type="unfinished">Efecto</translation>
+    </message>
+    <message>
+        <source> [Bypassed]</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add video effect…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove all video effects</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track Motion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable track motion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable track motion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>PiP Top-Right (30%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>PiP Top-Left (30%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>PiP Bottom-Right (30%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>PiP Bottom-Left (30%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Center 50%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset track motion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Composite Parent Track</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>None (Independent)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Track Composite Mode</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Track height</source>

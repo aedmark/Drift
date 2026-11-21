@@ -107,6 +107,18 @@ struct TrackList : QList<Track>
             track.clips.detach();
             track.transitions.detach();
             track.audioEffects.detach();
+            track.audioSends.detach();
+            track.effects.detach();
+            track.motion.posXTrack.detachSharedData();
+            track.motion.posYTrack.detachSharedData();
+            track.motion.scaleXTrack.detachSharedData();
+            track.motion.scaleYTrack.detachSharedData();
+            track.motion.rotationTrack.detachSharedData();
+            track.motion.opacityTrack.detachSharedData();
+            track.volumeEnvelope.detachSharedData();
+            track.panEnvelope.detachSharedData();
+            track.compositeEnvelope.detachSharedData();
+            track.muteEnvelope.detachSharedData();
         }
     }
 };
@@ -251,6 +263,14 @@ public:
     QList<Effect> &masterAudioEffects() { return m_masterAudioEffects; }
     void setMasterAudioEffects(const QList<Effect> &effects) { m_masterAudioEffects = effects; }
 
+    const QList<Effect> &masterVideoEffects() const { return m_masterVideoEffects; }
+    QList<Effect> &masterVideoEffects() { return m_masterVideoEffects; }
+    void setMasterVideoEffects(const QList<Effect> &effects) { m_masterVideoEffects = effects; }
+
+    const QList<AudioBus> &audioBuses() const { return m_audioBuses; }
+    QList<AudioBus> &audioBuses() { return m_audioBuses; }
+    void setAudioBuses(const QList<AudioBus> &buses) { m_audioBuses = buses; }
+
     void resetToDefaultTimeline();
     TimeUs durationUs() const;
 
@@ -318,6 +338,8 @@ private:
     QStringList m_openSequenceTabs;
     QList<Bookmark> m_bookmarks;
     QList<Effect> m_masterAudioEffects;
+    QList<Effect> m_masterVideoEffects;
+    QList<AudioBus> m_audioBuses;
     TimeUs m_workAreaInUs = -1;
     TimeUs m_workAreaOutUs = -1;
     Background m_background;

@@ -42,15 +42,15 @@ Status: **Completed (`main`)**
 
 ## Tier 2 — Pro Mixing, Compositing & Multi-Clip Workflows (`v1.2.0`)
 
-Status: **Planned**
+Status: **Completed**
 
 1. **Audio Sub-Buses, Aux/FX Sends & Integrated LUFS Metering**
-   - Route multiple tracks into named stereo/surround **Submix Buses** with dedicated per-bus FX racks, **Pre/Post-Fader Aux Sends**, and real-time EBU R128 Momentary / Short-Term / Integrated **LUFS loudness meters**.
+   - Route multiple tracks into named stereo **Submix Buses** with dedicated per-bus FX racks, **Pre/Post-Fader Aux Sends**, and real-time EBU R128 Momentary / Short-Term / Integrated **LUFS loudness meters**.
 2. **Video Track FX Rack, Master Video Output FX & Track Motion**
    - Persistent per-track **Video Track FX** chains and global **Master Video Output FX**.
    - **Parent/Child Track Compositing** (*Multiply (Mask)*, *Add*, *Difference*) and **3D Track Motion** keyframes above clip-level Pan/Crop.
-3. **Inline Multicamera Take-Switching Mode (`Ctrl+Shift+D`)**
-   - Toggle synchronized multicamera grid playback directly inside the main timeline monitor and punch live camera cuts into `ClipTake` events on the fly.
+3. **Inline Multicamera Take-Switching Mode (`Alt+Shift+C`)**
+   - Create a multi-take multicamera clip from selected video clips, toggle split-grid live camera tiles directly inside the main preview monitor, and punch live cuts (`1–9` or click) into `ClipTake` events on the fly.
 
 ---
 
